@@ -1,0 +1,354 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+body {
+  font-family: 'Inter Tight', sans-serif;
+  min-width: 375px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: Inter Tight, sans-serif;
+  --font-serif: Inter Tight, serif;
+  --font-mono: monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-background: var(--sidebar-background);
+  --color-sidebar: var(--sidebar);
+  --color-chart-6: var(--chart-6);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-transparent: var(--transparent);
+  --radius-xs: 0.25rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+  --radius-4xl: 3rem;
+  --breakpoint-xsm: 23.4375rem;
+  --shadow-2xs: 0 1px 0 0 oklch(0.118 0.014 284.115 / 0.05);
+  --shadow-xs: 0 1px 2px 0 oklch(0.118 0.014 284.115 / 0.05);
+  --shadow-xs-dark: 0px 1px 2px 0px rgba(5, 5, 10, 0.2);
+  --shadow-sm: 0 1px 3px 0 oklch(0.118 0.014 284.115 / 0.1), 0 1px 2px -1px oklch(0.118 0.014 284.115 / 0.1);
+  --shadow-md: 0 4px 6px -1px oklch(0.118 0.014 284.115 / 0.1), 0 2px 4px -2px oklch(0.118 0.014 284.115 / 0.1);
+  --shadow-lg: 0 10px 15px -3px oklch(0.118 0.014 284.115 / 0.1), 0 4px 6px -4px oklch(0.118 0.014 284.115 / 0.1);
+  --shadow-xl: 0 20px 25px -5px oklch(0.118 0.014 284.115 / 0.1), 0 8px 10px -6px oklch(0.118 0.014 284.115 / 0.1);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.118 0.014 284.115);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.232 0.006 285.946);
+  --card-foreground: oklch(0.951 0.011 286.195);
+  --popover: oklch(0.118 0.014 284.115);
+  --popover-foreground: oklch(0.951 0.011 286.195);
+  --primary: oklch(0.791 0.01 286.174);
+  --primary-foreground: oklch(0.232 0.006 285.946);
+  --secondary: #303034;
+  --secondary-foreground: #d4d4db;
+  --muted: oklch(0.311 0.007 285.98);
+  --muted-foreground: #89898f;
+  --accent: oklch(0.392 0.007 286.088);
+  --accent-foreground: oklch(0.951 0.011 286.195);
+  --destructive: oklch(0.628 0.258 29.234);
+  --border: oklch(0.311 0.007 285.98);
+  --input: #525252;
+  --ring: oklch(0.55 0.008 286.145);
+  --chart-1: oklch(0.517 0.27 263.327);
+  --chart-2: oklch(0.871 0.261 146.685);
+  --chart-3: oklch(0.87 0.148 202.875);
+  --chart-4: oklch(0.697 0.321 327.72);
+  --chart-5: oklch(0.628 0.258 29.234);
+  --chart-6: oklch(0.772 0.174 64.552);
+  --sidebar-background: oklch(0.232 0.006 285.946);
+  --sidebar: oklch(0.232 0.006 285.946);
+  --sidebar-foreground: oklch(0.951 0.011 286.195);
+  --sidebar-primary: oklch(0.928 0.23 123.978);
+  --sidebar-primary-foreground: oklch(0.951 0.011 286.195);
+  --sidebar-accent: oklch(0.311 0.007 285.98);
+  --sidebar-accent-foreground: oklch(0.951 0.011 286.195);
+  --sidebar-border: oklch(0.311 0.007 285.98);
+  --sidebar-ring: oklch(0.472 0.007 274.863);
+  --brand: oklch(0.928 0.23 123.978);
+  --transparent: oklch(0.118 0.014 284.115 / 0);
+
+  /* ==================================================================
+   * LAYOUT DIMENSIONS
+   * ================================================================== */
+
+  /**
+   * Desktop header height (profile page header)
+   * - Used for sticky positioning of filter bars and sidebars
+   * - Matches ProfilePageHeader height on desktop (lg+)
+   * - Applied: ProfilePageFilterBar, ProfilePageSidebar sticky top offset
+   * - Responsive: Desktop only (hidden on mobile via lg:flex)
+   */
+  --header-height: 146px;
+
+  /**
+   * Mobile header height
+   * - Used for sticky positioning of mobile menu below header
+   * - Matches MobileHeader component height
+   * - Applied: ProfilePageMobileMenu sticky top offset
+   * - Responsive: Mobile only (hidden on desktop via lg:hidden)
+   */
+  --header-height-mobile: 80px;
+
+  /**
+   * Main content header offset
+   * - Vertical offset for floating elements that should appear below the main header
+   * - Used by: NewPostsButton when in fixed/floating mode
+   * 
+   * Value rationale (120px):
+   * - Header container has py-6 (24px) outer padding + py-4/py-6 inner padding
+   * - Total header visual height is approximately 100-120px on desktop
+   * - 120px ensures floating button appears clearly below header content
+   * - Provides visual separation without overlapping header elements
+   * 
+   * Note: This differs from --header-height (146px) which is used for profile page
+   * sticky sidebars that need to account for ProfilePageHeader's full height.
+   */
+  --header-offset-main: 120px;
+
+  /**
+   * Sidebar and filter bar width
+   * - Standard width for left/right sidebars and filter components
+   * - Ensures consistent layout across different sidebar types
+   * - Applied to: LeftSidebar, RightSidebar, ProfilePageSidebar, ProfilePageFilterBar
+   * - Responsive: Desktop only (hidden on mobile, sidebars use drawers instead)
+   * 
+   * Rationale:
+   * - 180px provides optimal content width for navigation/filter items
+   * - Balances readability with efficient use of horizontal space
+   * - Maintains 3-column layout (sidebar-content-sidebar) on wide screens
+   * - Consistent with Figma design specifications
+   * 
+   * Non-responsive by design:
+   * - On mobile (<lg): sidebars are hidden, content uses full width
+   * - On desktop (≥lg): fixed 180px ensures predictable layout
+   * - Responsive behavior handled via Tailwind's lg: breakpoint, not CSS variables
+   */
+  --filter-bar-width: 180px;
+
+  /**
+   * Popover width
+   * - Standard width for popover components (dropdowns, pickers)
+   * - Ensures consistent popover sizing across the application
+   * - Applied to: StatusPicker PopoverContent
+   * - Used for: Status selection dropdowns and similar picker components
+   */
+  --popover-width: 280px;
+
+  /**
+   * Avatar zoom modal size
+   * - Size of the avatar when displayed in the zoom modal
+   * - Used for full-screen avatar preview on profile page
+   * - Applied to: AvatarZoomModal component
+   * 
+   * Rationale:
+   * - 362px provides optimal viewing size on desktop
+   * - min() function ensures responsive sizing on mobile devices
+   * - 90vw (90% of viewport width) prevents overflow on small screens
+   * - Maintains aspect ratio across all device sizes
+   * - Ensures avatar is prominently displayed without overwhelming the viewport
+   * 
+   * Responsive behavior:
+   * - Desktop (≥402px width): 362px (max size)
+   * - Mobile (<402px width):  90% of viewport width
+   * - Examples:
+   *   → 1920px viewport: 362px
+   *   → 768px viewport:  362px
+   *   → 375px viewport:  337px (90% of 375px)
+   *   → 320px viewport:  288px (90% of 320px)
+   */
+  --avatar-zoom-size: min(362px, 90vw);
+
+  /* ==================================================================
+   * Z-INDEX LAYERS (Stacking Order)
+   * ================================================================== */
+
+  /**
+   * Z-index for sticky headers
+   * - Ensures headers stay above scrolling content
+   * - Used by: Header component (desktop main header)
+   * - Also used by: SettingsMobileMenu (fixed positioning)
+   * 
+   * Rationale for value 20:
+   * - Higher than content (0) and typical component overlays (1-10)
+   * - Lower than mobile menu (30) to ensure proper mobile stacking
+   * - Leaves room for intermediate layers (11-19) if needed
+   * - Avoids excessive values (100+) for maintainability
+   */
+  --z-sticky-header: 20;
+
+  /**
+   * Z-index for mobile-specific UI elements
+   * - Ensures mobile header and menu appear above sticky headers
+   * - Used by: MobileHeader, ProfilePageMobileMenu
+   * 
+   * Rationale for value 30:
+   * - Must be higher than sticky header (20) for proper mobile layering
+   * - Ensures mobile navigation is always accessible
+   * - Lower than modals/dialogs (typically 40-50+) to allow overlays
+   * - Part of a consistent z-index scale: content(0) < header(20) < mobile(30) < modal(40+)
+   * 
+   * Responsive behavior:
+   * - Only applied to mobile-only components (lg:hidden)
+   * - Desktop uses different layout without mobile menu
+   */
+  --z-mobile-menu: 30;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .bg-brand {
+    background-color: var(--brand);
+  }
+  .border-brand {
+    border-color: var(--brand);
+  }
+  .text-brand {
+    color: var(--brand);
+  }
+  .hover\:bg-brand\/90:hover {
+    background-color: oklch(from var(--brand) calc(l * 0.9) c h);
+  }
+}
+
+@layer utilities {
+  /* Shadow utilities */
+  .shadow-xs-dark {
+    box-shadow: var(--shadow-xs-dark);
+  }
+
+  /* Thicker white caret for focused inputs (used by PostTagInput) */
+  .caret-white {
+    caret-color: white;
+  }
+  .caret-thick::selection {
+    /* noop: selection styles kept default */
+  }
+  input.caret-white {
+    caret-color: #fff;
+  }
+  /* Some browsers allow caret-width via proprietary property */
+  input.caret-thick {
+    caret-color: #fff;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: auto;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    border-radius: 4px;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .onboarding-nav {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background-color: var(--background);
+    padding-bottom: 1.5rem;
+    z-index: 10;
+  }
+
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .onboarding-nav {
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+  }
+
+  @supports (padding-bottom: constant(safe-area-inset-bottom)) {
+    .onboarding-nav {
+      padding-bottom: max(1.5rem, constant(safe-area-inset-bottom));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .onboarding-nav {
+      position: static;
+      padding-bottom: 0;
+      background-color: transparent;
+    }
+    @keyframes accordion-down {
+      from {
+        height: 0;
+      }
+      to {
+        height: var(--radix-accordion-content-height);
+      }
+    }
+
+    @keyframes accordion-up {
+      from {
+        height: var(--radix-accordion-content-height);
+      }
+      to {
+        height: 0;
+      }
+    }
+
+    .animate-accordion-down {
+      animation: accordion-down 0.2s ease-out;
+    }
+
+    .animate-accordion-up {
+      animation: accordion-up 0.2s ease-out;
+    }
+  }
+}
+
