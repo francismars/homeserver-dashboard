@@ -150,12 +150,15 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 ### Post-MVP (Not Blocking)
 
 - Trigger homeserver restart
-- Activity feed (last sign-ins)
-- Heaviest files / disk usage by user
-- Filter by extension
+- Activity feed (last sign-ins) - **See FEATURE_IDEAS.md for implementation plan**
+- Heaviest files / disk usage by user - **See FEATURE_IDEAS.md**
+- Filter by extension - **See FEATURE_IDEAS.md**
 - Rate limit controls
 - Logs display
 - Testnet/mainnet toggle (can be env-based for MVP)
+- **User Management Dashboard** - List users, view activity, manage storage (see FEATURE_IDEAS.md)
+- **Real-Time Metrics** - Prometheus metrics visualization (see FEATURE_IDEAS.md)
+- **File Search** - Search across all files (see FEATURE_IDEAS.md)
 
 ## Implementation Plan (Standalone Dashboard)
 
