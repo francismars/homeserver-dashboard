@@ -12,9 +12,11 @@ const getService = () => {
 export function useAdminActions() {
   const [isDeletingUrl, setIsDeletingUrl] = useState(false);
   const [isDisablingUser, setIsDisablingUser] = useState(false);
+  const [isEnablingUser, setIsEnablingUser] = useState(false);
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [deleteUrlError, setDeleteUrlError] = useState<Error | null>(null);
   const [disableUserError, setDisableUserError] = useState<Error | null>(null);
+  const [enableUserError, setEnableUserError] = useState<Error | null>(null);
   const [generateInviteError, setGenerateInviteError] = useState<Error | null>(null);
   const [generatedInvites, setGeneratedInvites] = useState<string[]>([]);
 
@@ -50,6 +52,22 @@ export function useAdminActions() {
     }
   }, []);
 
+  const enableUser = useCallback(async (pubkey: string) => {
+    const service = getService();
+    setIsEnablingUser(true);
+    setEnableUserError(null);
+
+    try {
+      await service.enableUser({ pubkey });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to enable user');
+      setEnableUserError(error);
+      throw error;
+    } finally {
+      setIsEnablingUser(false);
+    }
+  }, []);
+
   const generateInvite = useCallback(async () => {
     const service = getService();
     setIsGeneratingInvite(true);
@@ -70,12 +88,15 @@ export function useAdminActions() {
   return {
     deleteUrl,
     disableUser,
+    enableUser,
     generateInvite,
     isDeletingUrl,
     isDisablingUser,
+    isEnablingUser,
     isGeneratingInvite,
     deleteUrlError,
     disableUserError,
+    enableUserError,
     generateInviteError,
     generatedInvites,
   };

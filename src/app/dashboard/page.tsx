@@ -9,6 +9,7 @@ import { DashboardActions } from '@/components/organisms/DashboardActions';
 import { InviteList } from '@/components/molecules/InviteList';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
+import { UserManagement } from '@/components/organisms/UserManagement';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
@@ -44,12 +45,13 @@ export default function DashboardPage() {
         </header>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="config">Config</TabsTrigger>
             <TabsTrigger value="actions">Actions</TabsTrigger>
             <TabsTrigger value="invites">Invites</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
@@ -92,6 +94,17 @@ export default function DashboardPage() {
 
           <TabsContent value="invites" className="space-y-4">
             <InviteList invites={generatedInvites} onGenerate={generateInvite} isGenerating={isGeneratingInvite} />
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            <UserManagement
+              onViewUserFiles={(pubkey) => {
+                // Navigate to Files tab and set path
+                const filesTab = document.querySelector('[value="files"]') as HTMLElement;
+                if (filesTab) filesTab.click();
+                // Note: FileBrowser would need to accept an initialPath prop to navigate directly
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="files" className="space-y-4">
