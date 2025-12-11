@@ -6,30 +6,31 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 
 ## 🎯 Implementation Status
 
-**Overall Progress: ~75% Complete**
+**Overall Progress: ~85% Complete**
 
 ### ✅ Completed Phases
 
 - ✅ **Phase 0**: Bootstrap - COMPLETE
   - Next.js project scaffolded, dependencies installed, design system copied
-  - Shadcn components installed (tabs, card, button, input, textarea, dialog, alert, skeleton, label)
+  - Shadcn components installed (tabs, card, button, input, textarea, dialog, alert, skeleton, label, select)
   - `.env.example` created with proper `NEXT_PUBLIC_` prefixes
 
 - ✅ **Phase 1**: Services & Hooks - COMPLETE  
   - `AdminService` with all endpoints (info, usage, config, delete, disable, invite)
+  - `WebDavService` with PROPFIND, GET, PUT, DELETE, MKCOL, MOVE, COPY operations
   - Mock adapter with realistic data
-  - All hooks implemented (`useAdminInfo`, `useAdminUsage`, `useAdminActions`, `useConfigEditor`)
+  - All hooks implemented (`useAdminInfo`, `useAdminUsage`, `useAdminActions`, `useConfigEditor`, `useWebDav`)
   - Auto-mock mode when env vars missing (dev-friendly)
 
 - ✅ **Phase 2**: UI Shell - COMPLETE
-  - `/dashboard` page with 5-tab navigation
+  - `/dashboard` page with 7-tab navigation (Overview, Usage, Config, Actions, Invites, Files, API)
   - Loading skeletons and error states
   - All Shadcn UI components created
 
 - ✅ **Phase 3**: Components - COMPLETE
   - **Atoms**: `StatCard`, `ProgressBar`
   - **Molecules**: `ConfigEditor`, `ActionPanel`, `InviteList`
-  - **Organisms**: `DashboardOverview`, `DashboardUsage`, `DashboardConfig`, `DashboardActions`
+  - **Organisms**: `DashboardOverview`, `DashboardUsage`, `DashboardConfig`, `DashboardActions`, `FileBrowser`, `ApiExplorer`
   - All components functional and wired to hooks
 
 ### ⚠️ Partially Complete
@@ -62,10 +63,63 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 - ✅ Admin actions (delete URL with confirm, disable user with confirm, generate invite)
 - ✅ Config editor (mock mode, ready for backend endpoints)
 - ✅ Copy-to-clipboard for invite codes
+- ✅ **File Browser** - WebDAV file management (browse, view, edit, upload, delete, create directories)
+- ✅ **API Explorer** - Interactive API testing tool for all homeserver endpoints
 
 **Ready for Testing**: Dashboard is functional with mock data. Can connect to real homeserver when `NEXT_PUBLIC_ADMIN_BASE_URL` and `NEXT_PUBLIC_ADMIN_TOKEN` env vars are set.
 
 **Next Priority**: Add toast notifications (Phase 4), then write tests (Phase 5), then packaging/docs (Phase 6).
+
+### 🚧 Known Limitations & Issues
+
+**API Endpoint Limitations:**
+
+1. **`/info` endpoint missing fields** ⚠️
+   - **Issue**: The `/info` endpoint doesn't return `pubkey`, `address`, and `version` fields
+   - **Impact**: Overview tab shows "N/A" for these fields
+   - **Status**: Backend changes were attempted but reverted. Dashboard handles gracefully by showing "N/A"
+   - **Workaround**: None - requires backend update to `/info` endpoint
+
+2. **Config endpoints not implemented** ⚠️
+   - **Issue**: `GET /config` and `PUT /config` endpoints don't exist on backend
+   - **Impact**: Config Editor tab works in mock mode only, cannot save real config
+   - **Status**: Fully mocked in `AdminService`, ready for backend implementation
+   - **Workaround**: Use mock mode for UI testing
+
+3. **Usage breakdown not available** 📊
+   - **Issue**: No dedicated `/usage` endpoint with `usersByInvite` or `storageByUser` breakdowns
+   - **Impact**: Usage tab shows aggregate data only (sufficient for MVP)
+   - **Status**: Using `/info` data, which is acceptable per MVP requirements
+   - **Workaround**: None needed - MVP requirement says "if data available"
+
+**File Browser Limitations:**
+
+4. **WebDAV path restrictions** ⚠️
+   - **Issue**: WebDAV paths must follow `/dav/{pubkey}/pub/{path}` structure
+   - **Impact**: Cannot create files/directories at root `/dav/` level
+   - **Status**: File browser enforces this restriction with validation and helpful error messages
+   - **Workaround**: Navigate to user's `/pub/` directory first, then create files/folders
+
+5. **Path parsing edge cases** 🔧
+   - **Issue**: Some PROPFIND responses may include `/dav` in paths, causing phantom "dav" folders
+   - **Impact**: Fixed with improved path normalization
+   - **Status**: Resolved - path parsing now strips `/dav` prefixes correctly
+
+**Authentication:**
+
+6. **Admin auth header** ✅
+   - **Status**: Fixed - Changed from `Authorization: Bearer` to `X-Admin-Password` header
+   - **Impact**: Admin endpoints now authenticate correctly
+   - **Note**: WebDAV endpoints use HTTP Basic Auth (`admin:password`), handled separately
+
+**Post-MVP Features (Not Blocking):**
+
+- Toast notifications (currently using Alert components)
+- Config conflict handling (409 responses)
+- Enhanced usage breakdowns
+- Activity feed
+- Rate limit controls
+- Logs display
 
 ## MVP Requirements (Priority)
 
@@ -120,17 +174,19 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 - ✅ Auto-enables mock mode when `baseUrl` is empty (dev-friendly)
 
 ### ✅ Phase 2 – UI Shell (COMPLETE)
-- ✅ `/dashboard` page with 5 tabs (Overview, Usage, Config, Actions, Invites)
+- ✅ `/dashboard` page with 7 tabs (Overview, Usage, Config, Actions, Invites, Files, API)
 - ✅ Loading/skeleton states for all sections
 - ✅ Error states with Alert components
-- ✅ Created Shadcn UI components: tabs, card, skeleton, alert, button, textarea, dialog, input, label
+- ✅ Created Shadcn UI components: tabs, card, skeleton, alert, button, textarea, dialog, input, label, select
 
 ### ✅ Phase 3 – Components (COMPLETE)
 - ✅ **Atoms**: `StatCard`, `ProgressBar`
 - ✅ **Molecules**: `ConfigEditor` (with save/reset, checksum, dirty state), `ActionPanel` (with confirm dialog), `InviteList` (with copy-to-clipboard)
-- ✅ **Organisms**: `DashboardOverview`, `DashboardUsage`, `DashboardConfig`, `DashboardActions`
+- ✅ **Organisms**: `DashboardOverview`, `DashboardUsage`, `DashboardConfig`, `DashboardActions`, `FileBrowser`, `ApiExplorer`
 - ✅ All components wired to hooks and functional
 - ✅ Config editor works in mock mode (ready for backend endpoints)
+- ✅ **File Browser**: Full WebDAV file management with directory navigation, file viewing/editing, upload, delete, create directory
+- ✅ **API Explorer**: Interactive tool to test all homeserver endpoints (Admin, Client, Metrics servers) with proper auth handling
 
 ### ⚠️ Phase 4 – Polish & UX Safeguards (PARTIAL)
 - ✅ Confirm dialogs implemented in `ActionPanel` for delete/disable actions
@@ -158,18 +214,24 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 - Add snapshot tests following Franky's patterns
 - Set up Vitest configuration if needed
 
-### ❌ Phase 6 – Packaging & Docs (NOT STARTED)
+### ⚠️ Phase 6 – Packaging & Docs (PARTIAL)
 - ✅ `.env.example` created
 - ❌ No README.md
 - ❌ No Dockerfile
 - ❌ No docker-compose.yml
 - ❌ No deployment documentation
+- ✅ Created documentation files (later removed):
+  - `API_REFERENCE.md` - Comprehensive API documentation
+  - `WEBDAV_ACCESS.md` - WebDAV access guide
+  - `FILE_STORAGE.md` - File storage location guide
+  - `FRANKY_SETUP.md` - Franky integration guide
 
 **Remaining work:**
 - Create comprehensive README with setup instructions
 - Add Dockerfile for UI-only container
 - Add docker-compose.yml for local dev
 - Document CORS requirements and deployment notes
+- Recreate API/WebDAV documentation if needed
 
 **Why phased?** Unblocks UI quickly with mocks, allows parallel work, and accommodates backend gaps (config/usage breakdown) without stalling.
 
@@ -255,9 +317,17 @@ homeserver-dashboard/
 │   │       │   ├── DashboardConfig.tsx
 │   │       │   ├── DashboardConfig.test.tsx
 │   │       │   └── index.ts
-│   │       └── DashboardActions/
-│   │           ├── DashboardActions.tsx
-│   │           ├── DashboardActions.test.tsx
+│   │       ├── DashboardActions/
+│   │       │   ├── DashboardActions.tsx
+│   │       │   ├── DashboardActions.test.tsx
+│   │       │   └── index.ts
+│   │       ├── FileBrowser/
+│   │       │   ├── FileBrowser.tsx       # WebDAV file browser component
+│   │       │   ├── FileBrowser.types.ts
+│   │       │   └── index.ts
+│   │       └── ApiExplorer/
+│   │           ├── ApiExplorer.tsx       # Interactive API testing tool
+│   │           ├── ApiExplorer.types.ts
 │   │           └── index.ts
 │   │
 │   ├── libs/
@@ -269,32 +339,39 @@ homeserver-dashboard/
 │   │       └── fetch.ts
 │   │
 │   ├── services/
-│   │   └── admin/
-│   │       ├── admin.test.ts
-│   │       ├── admin.ts                # HTTP client for admin endpoints
-│   │       ├── admin.types.ts           # Request/response types
-│   │       ├── admin.mock.ts            # Mock implementation for dev
+│   │   ├── admin/
+│   │   │   ├── admin.test.ts
+│   │   │   ├── admin.ts                # HTTP client for admin endpoints
+│   │   │   ├── admin.types.ts           # Request/response types
+│   │   │   ├── admin.mock.ts            # Mock implementation for dev
+│   │   │   └── index.ts
+│   │   └── webdav/
+│   │       ├── webdav.ts                # WebDAV service (PROPFIND, GET, PUT, DELETE, MKCOL, etc.)
+│   │       ├── webdav.types.ts          # WebDAV types
 │   │       └── index.ts
 │   │
 │   └── hooks/
-│       └── admin/
-│           ├── useAdminInfo/
-│           │   ├── useAdminInfo.tsx
-│           │   ├── useAdminInfo.test.tsx
-│           │   ├── useAdminInfo.types.ts
-│           │   └── index.ts
-│           ├── useAdminUsage/
-│           │   ├── useAdminUsage.tsx
-│           │   ├── useAdminUsage.test.tsx
-│           │   └── index.ts
-│           ├── useConfigEditor/
-│           │   ├── useConfigEditor.tsx
-│           │   ├── useConfigEditor.test.tsx
-│           │   └── index.ts
-│           └── useAdminActions/
-│               ├── useAdminActions.tsx
-│               ├── useAdminActions.test.tsx
-│               └── index.ts
+│       ├── admin/
+│       │   ├── useAdminInfo/
+│       │   │   ├── useAdminInfo.tsx
+│       │   │   ├── useAdminInfo.test.tsx
+│       │   │   ├── useAdminInfo.types.ts
+│       │   │   └── index.ts
+│       │   ├── useAdminUsage/
+│       │   │   ├── useAdminUsage.tsx
+│       │   │   ├── useAdminUsage.test.tsx
+│       │   │   └── index.ts
+│       │   ├── useConfigEditor/
+│       │   │   ├── useConfigEditor.tsx
+│       │   │   ├── useConfigEditor.test.tsx
+│       │   │   └── index.ts
+│       │   └── useAdminActions/
+│       │       ├── useAdminActions.tsx
+│       │       ├── useAdminActions.test.tsx
+│       │       └── index.ts
+│       └── webdav/
+│           ├── useWebDav.tsx            # WebDAV hook for file operations
+│           └── index.ts
 │
 └── .env.example                        # ADMIN_* env vars
 ```
@@ -530,6 +607,9 @@ Post-MVP (not blocking): restart endpoint, activity feed, heaviest files, rate-l
 - ✅ Delete URL / Disable user: Requires confirm dialog via `ActionPanel`; shows error Alert on failure
 - ✅ Generate invite: Renders returned token in `InviteList` with copy buttons; keeps last 10 generated invites in state
 - ✅ Copy-to-clipboard: Implemented in `InviteList` with visual feedback
+- ✅ **File Browser**: Browse directories, view/edit files, upload files, create directories, delete files/folders
+- ✅ **API Explorer**: Test all homeserver endpoints with proper authentication (X-Admin-Password for admin, Basic Auth for WebDAV)
+- ✅ **Path validation**: File browser enforces WebDAV path structure (`/dav/{pubkey}/pub/{path}`)
 
 **Remaining:**
 - ❌ Toast notifications: Success/error toasts not yet implemented (currently using Alert components)
@@ -570,10 +650,26 @@ Post-MVP (not blocking): restart endpoint, activity feed, heaviest files, rate-l
 - ✅ Local dev: **Auto-enables mock mode when `baseUrl` is empty** (no env vars needed for development)
 - ✅ Real mode: Enabled when `NEXT_PUBLIC_ADMIN_BASE_URL` and `NEXT_PUBLIC_ADMIN_TOKEN` are set
 - ✅ Error handling: Prevents HTML error pages from being displayed, shows user-friendly error messages
+- ✅ **WebDAV integration**: File browser uses HTTP Basic Auth (`admin:password`) automatically from env vars
+- ✅ **API Explorer**: Supports testing Admin, Client, and Metrics servers with proper auth handling
 
 **Remaining:**
 - ❌ Packaging: UI-only Docker image exposing Next app
 - ❌ Umbrel/StartOS compose with env/token mounting
 - ❌ CORS documentation for admin endpoints
 - ❌ Port documentation (default 3000) and base URL mapping
+- ❌ File storage location documentation (default: `~/.pubky/data/files/`)
+
+## File Storage
+
+**Default Location:**
+- **Windows**: `C:\Users\{USERNAME}\.pubky\data\files\`
+- **macOS/Linux**: `~/.pubky/data/files/`
+
+**Structure**: Files are organized by user pubkey: `{data_dir}/data/files/{pubkey}/pub/{file_path}`
+
+**Access**: Files can be accessed via:
+- WebDAV file browser in dashboard
+- Direct filesystem access (not recommended while homeserver is running)
+- WebDAV clients (Windows Explorer, macOS Finder, rclone, etc.)
 
