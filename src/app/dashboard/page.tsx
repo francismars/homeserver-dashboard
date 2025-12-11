@@ -7,6 +7,8 @@ import { DashboardUsage } from '@/components/organisms/DashboardUsage';
 import { DashboardConfig } from '@/components/organisms/DashboardConfig';
 import { DashboardActions } from '@/components/organisms/DashboardActions';
 import { InviteList } from '@/components/molecules/InviteList';
+import { ApiExplorer } from '@/components/organisms/ApiExplorer';
+import { FileBrowser } from '@/components/organisms/FileBrowser';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
@@ -42,12 +44,14 @@ export default function DashboardPage() {
         </header>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="config">Config</TabsTrigger>
             <TabsTrigger value="actions">Actions</TabsTrigger>
             <TabsTrigger value="invites">Invites</TabsTrigger>
+            <TabsTrigger value="files">Files</TabsTrigger>
+            <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -88,6 +92,19 @@ export default function DashboardPage() {
 
           <TabsContent value="invites" className="space-y-4">
             <InviteList invites={generatedInvites} onGenerate={generateInvite} isGenerating={isGeneratingInvite} />
+          </TabsContent>
+
+          <TabsContent value="files" className="space-y-4">
+            <FileBrowser />
+          </TabsContent>
+
+          <TabsContent value="api" className="space-y-4">
+            <ApiExplorer
+              adminBaseUrl={process.env.NEXT_PUBLIC_ADMIN_BASE_URL || 'http://127.0.0.1:6288'}
+              clientBaseUrl={process.env.NEXT_PUBLIC_ADMIN_BASE_URL?.replace(':6288', ':6286') || 'http://127.0.0.1:6286'}
+              metricsBaseUrl={process.env.NEXT_PUBLIC_ADMIN_BASE_URL?.replace(':6288', ':6289') || 'http://127.0.0.1:6289'}
+              adminToken={process.env.NEXT_PUBLIC_ADMIN_TOKEN}
+            />
           </TabsContent>
         </Tabs>
       </div>
