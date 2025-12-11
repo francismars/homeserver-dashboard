@@ -11,7 +11,7 @@ import {
 const defaultHeaders = (token?: string) =>
   token
     ? {
-        Authorization: `Bearer ${token}`,
+        'X-Admin-Password': token,
       }
     : {};
 
