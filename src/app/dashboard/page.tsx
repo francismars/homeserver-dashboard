@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminUsage, useConfigEditor, useAdminActions } from '@/hooks/admin';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
@@ -34,6 +35,14 @@ export default function DashboardPage() {
     disableUserError,
     generatedInvites,
   } = useAdminActions();
+
+  // Memoize callback to prevent UserManagement rerenders
+  const handleViewUserFiles = useCallback((pubkey: string) => {
+    // Navigate to Files tab and set path
+    const filesTab = document.querySelector('[value="files"]') as HTMLElement;
+    if (filesTab) filesTab.click();
+    // Note: FileBrowser would need to accept an initialPath prop to navigate directly
+  }, []);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -97,14 +106,7 @@ export default function DashboardPage() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
-            <UserManagement
-              onViewUserFiles={(pubkey) => {
-                // Navigate to Files tab and set path
-                const filesTab = document.querySelector('[value="files"]') as HTMLElement;
-                if (filesTab) filesTab.click();
-                // Note: FileBrowser would need to accept an initialPath prop to navigate directly
-              }}
-            />
+            <UserManagement onViewUserFiles={handleViewUserFiles} />
           </TabsContent>
 
           <TabsContent value="files" className="space-y-4">
