@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminUsage, useConfigEditor, useAdminActions } from '@/hooks/admin';
+import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { DashboardUsage } from '@/components/organisms/DashboardUsage';
 import { DashboardConfig } from '@/components/organisms/DashboardConfig';
@@ -44,14 +45,26 @@ export default function DashboardPage() {
     // Note: FileBrowser would need to accept an initialPath prop to navigate directly
   }, []);
 
+  const handleSettingsClick = useCallback(() => {
+    // Navigate to config tab
+    const configTab = document.querySelector('[value="config"]') as HTMLElement;
+    if (configTab) configTab.click();
+  }, []);
+
+  const handleUserClick = useCallback(() => {
+    // TODO: Implement user account menu/dialog
+    console.log('User account clicked');
+  }, []);
+
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
-        <header className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">Homeserver</p>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Manage your homeserver settings and monitor usage</p>
-        </header>
+    <div className="min-h-screen bg-background text-foreground">
+      <main>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
+          <DashboardNavbar
+            avatarInitial="A"
+            onSettingsClick={handleSettingsClick}
+            onUserClick={handleUserClick}
+          />
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-8">
@@ -122,7 +135,8 @@ export default function DashboardPage() {
             />
           </TabsContent>
         </Tabs>
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }
