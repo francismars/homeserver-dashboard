@@ -83,25 +83,43 @@ export class UserService {
    */
   async createUser(request: CreateUserRequest, recoveryPassphrase?: string): Promise<CreateUserResponse> {
     try {
+      console.log('[UserService.createUser] Starting user creation...');
+      console.log('[UserService.createUser] Request:', {
+        hasHomeserverPubkey: !!request.homeserverPubkey,
+        hasSignupToken: !!request.signupToken,
+        clientBaseUrl: this.clientBaseUrl,
+        adminBaseUrl: this.adminBaseUrl,
+      });
+
       // Generate a new keypair
+      console.log('[UserService.createUser] Generating keypair...');
       const generated = generateKeypair();
+      console.log('[UserService.createUser] Keypair generated:', {
+        pubkey: generated.publicKey,
+        secretKeyLength: generated.secretKey.length,
+      });
 
       // Sign up the user to the homeserver
       // For local/testnet, we can call the client API directly without needing the homeserver pubkey
       // The SDK's testnet client automatically rewrites URLs to localhost
+      console.log('[UserService.createUser] Signing up user...');
       await signupUser(
         generated.keypair, 
         request.homeserverPubkey || null, // Optional for local/testnet
         request.signupToken,
         this.clientBaseUrl // Pass client base URL for direct signup
       );
+      console.log('[UserService.createUser] User signed up successfully!');
 
       // Optionally create a recovery file
       let recoveryFile: Uint8Array | undefined;
       if (recoveryPassphrase) {
+        console.log('[UserService.createUser] Creating recovery file...');
         recoveryFile = createRecoveryFile(generated.keypair, recoveryPassphrase);
+        console.log('[UserService.createUser] Recovery file created, size:', recoveryFile.length);
       }
 
+      console.log('[UserService.createUser] User creation complete!');
       return {
         pubkey: generated.publicKey,
         secretKeyHex: generated.secretKeyHex,
@@ -109,6 +127,21 @@ export class UserService {
         recoveryFile,
       };
     } catch (error) {
+      console.error('[UserService.createUser] User creation failed:', error);
+      
+      // Log full error details
+      if (error instanceof Error) {
+        console.error('[UserService.createUser] Error name:', error.name);
+        console.error('[UserService.createUser] Error message:', error.message);
+        console.error('[UserService.createUser] Error stack:', error.stack);
+        
+        if ('cause' in error) {
+          console.error('[UserService.createUser] Error cause:', error.cause);
+        }
+      } else {
+        console.error('[UserService.createUser] Unknown error type:', typeof error, error);
+      }
+      
       throw new Error(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -125,12 +158,18 @@ export class UserService {
       url.searchParams.set('signup_token', request.signupToken);
     }
 
+    // Convert Uint8Array to ArrayBuffer for fetch
+    const body = request.authToken.buffer.slice(
+      request.authToken.byteOffset,
+      request.authToken.byteOffset + request.authToken.byteLength
+    );
+
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
       },
-      body: request.authToken,
+      body: body,
     });
 
     if (!response.ok) {
