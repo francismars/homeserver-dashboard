@@ -129,35 +129,14 @@ export function UserManagement({ onViewUserFiles }: UserManagementProps) {
               </Button>
               <Button
                 size="sm"
-                onClick={async () => {
-                  // Auto-create user directly (no pubkey needed for local/testnet)
-                  try {
-                    await createUser(
-                      {
-                        homeserverPubkey: adminInfo?.pubkey, // Optional - only needed for mainnet
-                        signupToken: undefined, // Try without token first
-                      },
-                      undefined // No recovery passphrase by default
-                    );
-                    // Show success dialog
-                    setShowCreateUserDialog(true);
-                    if (adminInfo?.pubkey) {
-                      setHomeserverPubkey(adminInfo.pubkey);
-                    }
-                  } catch (err: any) {
-                    // If it fails due to missing token, show dialog
-                    if (err.message?.includes('token') || err.message?.includes('Token')) {
-                      setShowCreateUserDialog(true);
-                      if (adminInfo?.pubkey) {
-                        setHomeserverPubkey(adminInfo.pubkey);
-                      }
-                    } else {
-                      // Other error - show dialog with error
-                      setShowCreateUserDialog(true);
-                      if (adminInfo?.pubkey) {
-                        setHomeserverPubkey(adminInfo.pubkey);
-                      }
-                    }
+                onClick={() => {
+                  // Always show dialog - homeserver pubkey is required
+                  setShowCreateUserDialog(true);
+                  // Pre-fill pubkey from adminInfo if available
+                  if (adminInfo?.pubkey && adminInfo.pubkey !== 'N/A') {
+                    setHomeserverPubkey(adminInfo.pubkey);
+                  } else {
+                    setHomeserverPubkey('');
                   }
                 }}
                 disabled={isCreating}
@@ -471,25 +450,28 @@ export function UserManagement({ onViewUserFiles }: UserManagementProps) {
             <div className="space-y-4">
               <Alert>
                 <AlertDescription>
-                  {adminInfo?.pubkey 
-                    ? '✓ Homeserver pubkey detected. For local/testnet homeservers, this is optional - the dashboard will connect directly.'
-                    : 'For local/testnet homeservers, you don\'t need to enter the pubkey - the dashboard will connect directly. Only required for mainnet.'}
+                  <strong>Homeserver pubkey is required</strong> even for local/testnet homeservers. 
+                  The SDK needs it to construct the signup URL. 
+                  You can find it in your homeserver <code className="text-xs bg-muted px-1 py-0.5 rounded">config.toml</code> file 
+                  (look for <code className="text-xs bg-muted px-1 py-0.5 rounded">homeserver_pubkey</code> field) or in the homeserver startup logs.
                 </AlertDescription>
               </Alert>
               
               <div className="space-y-2">
                 <Label htmlFor="homeserverPubkey">
-                  Homeserver Pubkey (Optional - only needed for mainnet)
+                  Homeserver Pubkey <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="homeserverPubkey"
                   value={homeserverPubkey || adminInfo?.pubkey || ''}
                   onChange={(e) => setHomeserverPubkey(e.target.value)}
-                  placeholder="Leave empty for local/testnet homeservers"
+                  placeholder="Enter homeserver pubkey (z-base-32 format)"
                   className="font-mono"
+                  required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Only required for mainnet homeservers. Local/testnet homeservers connect directly without this.
+                  Required for both local/testnet and mainnet homeservers. 
+                  Find it in <code className="text-xs bg-muted px-1 py-0.5 rounded">config.toml</code> or startup logs.
                 </p>
               </div>
 
@@ -554,7 +536,8 @@ export function UserManagement({ onViewUserFiles }: UserManagementProps) {
                 <Button
                   onClick={async () => {
                     const pubkey = homeserverPubkey.trim() || adminInfo?.pubkey || '';
-                    if (!pubkey) {
+                    if (!pubkey || pubkey === 'N/A') {
+                      alert('Please enter the homeserver pubkey. You can find it in your homeserver config.toml file (homeserver_pubkey field) or startup logs.');
                       return;
                     }
                     try {
@@ -569,7 +552,7 @@ export function UserManagement({ onViewUserFiles }: UserManagementProps) {
                       // Error handled by hook
                     }
                   }}
-                  disabled={isCreating || false}
+                  disabled={isCreating || !homeserverPubkey.trim()}
                 >
                   {isCreating ? 'Creating...' : 'Create User'}
                 </Button>
