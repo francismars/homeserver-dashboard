@@ -204,21 +204,7 @@ export class WebDavService {
         normalizedHref = '/';
       }
       
-      // Ensure both paths end with / for directories
-      const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
-      const normalizedHrefPath = normalizedHref.endsWith('/') ? normalizedHref : `${normalizedHref}/`;
-      
-      // Skip if this is the base path itself
-      if (normalizedHref === basePath || normalizedHrefPath === normalizedBasePath || href === `${this.baseUrl}${basePath}`) {
-        return;
-      }
-      
-      // Skip if this is just "/dav" or "/dav/" - shouldn't appear as a folder
-      if (normalizedHref === '/dav' || normalizedHref === '/dav/') {
-        return;
-      }
-
-      // Extract relative path from href
+      // Extract relative path from href first (before filtering)
       let path = href;
       if (href.startsWith(this.baseUrl)) {
         path = href.substring(this.baseUrl.length);
@@ -249,14 +235,41 @@ export class WebDavService {
       if (!path.startsWith('/')) {
         path = '/' + path;
       }
-      // Ensure directories end with /
-      if (isCollection && !path.endsWith('/')) {
-        path = path + '/';
+      
+      // Normalize paths for comparison (remove trailing slashes and normalize)
+      const normalizeForCompare = (p: string): string => {
+        let normalized = p.replace(/\/$/, '') || '/';
+        // Remove any /dav prefix
+        if (normalized.startsWith('/dav')) {
+          normalized = normalized.substring(4) || '/';
+        }
+        return normalized;
+      };
+      
+      const basePathForCompare = normalizeForCompare(basePath);
+      const pathForCompare = normalizeForCompare(path);
+      
+      // Skip if this is the base path itself (the directory we're listing)
+      // This is the first item that WebDAV returns - the directory itself
+      if (pathForCompare === basePathForCompare) {
+        return;
+      }
+      
+      // Also check if the displayName matches the last part of the basePath
+      // This catches cases where the path normalization might differ
+      const basePathLastPart = basePath.split('/').filter(Boolean).pop() || '';
+      if (basePathLastPart && displayName === basePathLastPart && pathForCompare === basePathForCompare) {
+        return;
       }
       
       // Skip if path is just "/dav" or "/dav/" - this shouldn't appear as a folder
       if (path === '/dav' || path === '/dav/') {
         return;
+      }
+      
+      // Ensure directories end with /
+      if (isCollection && !path.endsWith('/')) {
+        path = path + '/';
       }
 
       files.push({

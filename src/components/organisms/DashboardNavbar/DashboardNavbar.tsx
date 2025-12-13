@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Info } from 'lucide-react';
 import { Logo } from '@/components/molecules/Logo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,8 +66,12 @@ export function DashboardNavbar({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Settings</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onSettingsClick}>
-                  Configuration
+                <DropdownMenuItem onClick={onSettingsClick} className="flex items-center justify-between">
+                  <span>Configuration</span>
+                  <Badge variant="outline" className="text-xs font-normal border-dashed ml-2">
+                    <Info className="h-3 w-3 mr-1" />
+                    Mock
+                  </Badge>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   Preferences
