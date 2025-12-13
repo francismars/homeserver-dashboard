@@ -13,6 +13,8 @@ import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { UserStatsDialog } from '@/components/organisms/UserStatsDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
+import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
@@ -141,6 +143,59 @@ export default function DashboardPage() {
           action={serverControlAction}
         />
       </div>
+      
+      {/* Footer */}
+      <footer className="mt-6 pt-4 pb-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 text-sm text-muted-foreground">
+          {/* Copyright and version */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <span>Homeserver Dashboard</span>
+              <span className="text-xs">
+                {info?.version ? `v${info.version}` : 'v0.1.0-dev'}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span>Powered by Pubky</span>
+              <span>© {new Date().getFullYear()} Synonym Software Ltd.</span>
+            </div>
+          </div>
+          
+          {/* Links */}
+          <div className="flex flex-wrap items-center justify-end gap-6 text-xs">
+            <Link
+              href="https://github.com/synonymdev/pubky"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <Github className="h-3.5 w-3.5" />
+              <span>GitHub</span>
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+            <Link
+              href="https://docs.pubky.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>Documentation</span>
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+            <Link
+              href="https://github.com/synonymdev/pubky/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+              <span>Support</span>
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+      </footer>
     </main>
   </div>
 );

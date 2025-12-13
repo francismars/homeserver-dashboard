@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useUserManagement } from '@/hooks/user';
-import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, BarChart3 } from 'lucide-react';
+import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, BarChart3, X, Clipboard } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 import { cn } from '@/libs/utils';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
@@ -333,6 +333,19 @@ function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUs
     }
   }, [users]);
 
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setSearchQuery(text);
+    } catch (err) {
+      console.error('Failed to paste:', err);
+    }
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
   // Pre-compute mock details for all users to avoid recalculating
   const usersWithMockDetails = useMemo(() => {
     return users.map(user => ({
@@ -494,8 +507,30 @@ function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUs
                 placeholder="Search by pubkey..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 pr-20"
               />
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleClearSearch}
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={handlePaste}
+                  title="Paste from clipboard"
+                >
+                  <Clipboard className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
               <SelectTrigger className="w-full sm:w-[180px]">
