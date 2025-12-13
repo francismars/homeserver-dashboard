@@ -1,0 +1,268 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Info, Save, X } from 'lucide-react';
+import { cn } from '@/libs/utils';
+
+// Mock config data
+const MOCK_CONFIG = `[general]
+# The URL of the Postgres database.
+# Important: The database must be created manually.
+# Default: "postgres://localhost:5432/pubky_homeserver"
+database_url = "postgres://localhost:5432/pubky_homeserver"
+
+# The mode for the signup. Default: "token_required" Options:
+# "open" - anyone can signup.
+# "token_required" - a signup token is required to signup.
+signup_mode = "token_required"
+
+# Maximum storage a single user may occupy (in MB).
+# Set it to 0 for unlimited.
+user_storage_quota_mb = 0
+
+[drive]
+# The port number to run an HTTPS (Pkarr TLS) server on.
+# Pkarr TLS is a TLS implementation that is compatible with the Pkarr protocol.
+# No need to provide a ICANN TLS certificate.
+pubky_listen_socket = "127.0.0.1:6287"
+
+# The port number to run an HTTP (clear text) server on.
+# Used for http requests from regular browsers.
+# May be put behind a reverse proxy with TLS enabled.
+icann_listen_socket = "127.0.0.1:6286"
+
+# Rate limit endpoints dynamically.
+# path is a glob pattern of the path. See syntax in https://crates.io/crates/fast-glob
+# method is the HTTP method. Examples: GET, POST, PUT, HEAD, DELETE
+# quota defines the limit itself in the format $rate$rate_unit/$time_unit.
+#  - $rate is a positive integer, max 4'294'967'296.
+#  - $rate_unit is either "r" for requests, "kb" for kilobytes, 
+#    "mb" for megabytes, "gb" for gigabytes.
+#  Speed limits limit download and upload.
+#  - $time_unit is either "s" for second, "m" for minute.
+# key defines what who is rate limited. 
+#  - "ip" limits based on the IP address.
+#  - "user" limits based on the user pubkey. Requires the endpoint to have authentication.
+# burst is a temporary allowance of quota that is added to the limit. 
+#   By default, burst is equal the quota rate.
+# whitelist is a list of IP addresses or user pubkeys that are exempt from the rate limit.
+#
+# Limit login attempts to 20 requests per minute per IP. 
+# [[drive.rate_limits]]
+# path = "/session"
+# method = "POST"
+# quota = "20r/m"
+# key = "ip"
+# whitelist = [
+#     "127.0.0.1"
+# ]
+#
+# Limit file uploads to 1 megabyte per second per user with a temporary burst of 10 megabytes.
+# [[drive.rate_limits]]
+# path = "/pub/**" 
+# method = "PUT"
+# quota = "1mb/s"
+# key = "user"
+# burst = 10
+
+[storage]
+# Defines where the files are stored.
+# You have multiple options defined by the type.
+# Supported types: "file_system", "google_bucket".
+# Depending on the option, different settings need to be provided.
+# Only one storage type can be activated at one time.
+
+# Local File System
+# Files are saved on your local disk.
+type = "file_system"
+
+# Google Cloud Bucket
+# Files are saved in a Google Cloud Bucket.
+# type = "google_bucket"
+# Name of the Google Cloud Bucket. The bucket must exist already.
+# bucket_name = "my_bucket"
+# Path to the service account file. The content of the service account file can also be added directly in here.
+# This must be absolute/full path.
+# credential = "/path/to/my_service_account.json"
+
+# In Memory storage
+# Files are saved in memory. Only use when you know what you are doing!
+# type = "in_memory"
+
+[admin]
+# Enable or disable the admin server
+enabled = true
+
+# The port number to run the admin HTTP (clear text) server on.
+# Used for admin requests from the admin UI.
+# If this API is every exposed to the public internet, make sure to add a HTTPS cert.
+listen_socket = "127.0.0.1:6288"
+
+# The password for the admin user to access the admin UI.
+admin_password = "admin"
+
+# [metrics]
+# Enable or disable the metrics server
+# enabled = true
+
+# The socket address to run the metrics HTTP server on. It exposes Prometheus metrics at the /metrics endpoint.
+# It should be isolated from the public network and only accessible to monitoring systems.
+# listen_socket = "127.0.0.1:6289"
+
+# [pkdns]
+# The public IP address of the homeserver pubky_drive_api to be advertised on the DHT.
+# Must be set to be reachable from the outside.
+# public_ip = "127.0.0.1"
+
+# The pubky tls port in case it differs from the pubky_listen_socket port.
+# If not set defaults to the pubky_listen_socket port.
+# public_pubky_tls_port = 6287
+
+# The icann http port in case it differs from the icann_listen_socket port.
+# If not set defaults to the icann_listen_socket port.
+# public_icann_http_port = 80
+
+# An ICANN domain name is necessary to support legacy browsers
+#
+# Make sure to setup a domain name and point it the IP
+# address of this machine where you are running this server.
+#
+# This domain should point to the public_ip:public_port.
+# 
+# ICANN TLS is not natively supported, so you should be running
+# a reverse proxy and managing certificates yourself.
+# icann_domain = "localhost"
+
+# The interval at which user keys are republished to the DHT.
+# 0 means disabled.
+# user_keys_republisher_interval = 14400 # 4 hours in seconds
+
+# List of bootstrap nodes for the DHT.
+# If not set, the default pkarr bootstrap nodes will be used.
+# domain:port format.
+# dht_bootstrap_nodes = [
+#     "router.bittorrent.com:6881",
+#     "dht.transmissionbt.com:6881",
+#     "dht.libtorrent.org:25401",
+#     "relay.pkarr.org:6881",
+# ]
+
+# Relay node urls for the DHT.
+# Improves the availability of pkarr packets.
+# If not set and no bootstrap nodes are set, the default pkarr relay nodes will be used.
+# dht_relay_nodes = ["https://pkarr.pubky.app", "https://pkarr.pubky.org"]
+
+# Default UDP request timeout for the DHT
+# dht_request_timeout_ms = 2000
+
+# [logging]
+# Global runtime log level sets the default minimum logging level for all messages across the executable.
+# Available options: "trace", "debug", "info", "warn", "error"
+# level = "info"
+
+# Per-module log levels overrides the global log level for specific modules.
+# Useful for suppressing logs from external dependencies or increasing verbosity for debugging.
+# module_levels = ["pubky_homeserver=debug", "tower_http=debug"]
+`;
+
+interface ConfigDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
+  const [configValue, setConfigValue] = useState(MOCK_CONFIG);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const handleConfigChange = (value: string) => {
+    setConfigValue(value);
+    setHasChanges(value !== MOCK_CONFIG);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Simulate save
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setIsSaving(false);
+    setHasChanges(false);
+    // In real implementation, this would call the save API
+  };
+
+  const handleReset = () => {
+    setConfigValue(MOCK_CONFIG);
+    setHasChanges(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl h-[90vh] max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Homeserver Configuration</DialogTitle>
+            <Badge variant="outline" className="text-xs font-normal border-dashed">
+              <Info className="h-3 w-3 mr-1" />
+              Mock
+            </Badge>
+          </div>
+          <DialogDescription>
+            Edit the homeserver configuration file. Changes will require a restart to take effect.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground/70 italic">
+            <span>config.toml</span>
+            {hasChanges && (
+              <span className="text-yellow-600">Unsaved changes</span>
+            )}
+          </div>
+          <Textarea
+            value={configValue}
+            onChange={(e) => handleConfigChange(e.target.value)}
+            className={cn(
+              'flex-1 font-mono text-sm resize-none',
+              'border-dashed border-2 border-muted-foreground/30'
+            )}
+            placeholder="Configuration file content..."
+          />
+          <div className="text-xs text-muted-foreground/60 italic pt-2 border-t border-dashed border-muted-foreground/20">
+            This is mock data. The configuration editor requires backend endpoints to load and save the actual config.toml file.
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleReset} disabled={!hasChanges || isSaving}>
+            <X className="h-4 w-4 mr-2" />
+            Reset
+          </Button>
+          <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
+            {isSaving ? (
+              <>
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

@@ -22,10 +22,11 @@ export class UserService {
   /**
    * List all users by scanning WebDAV root directory.
    * Each user has a directory at /dav/{pubkey}/
+   * Only lists the root directory to get pubkeys - no additional calls for storage/file counts.
    */
   async listUsers(): Promise<UserListResponse> {
     try {
-      // List root directory to get all user directories
+      // List root directory to get all user directories (single DAV call)
       const rootDir = await this.webdavService.listDirectory('/', 1);
       
       const users: User[] = [];
@@ -41,29 +42,10 @@ export class UserService {
             continue;
           }
 
-          // Get user's storage info
-          let storageUsedMB: number | undefined;
-          let fileCount: number | undefined;
-          
-          try {
-            const userPubDir = await this.webdavService.listDirectory(`/${pubkey}/pub/`, 1);
-            // Calculate storage from files
-            const totalBytes = userPubDir.files
-              .filter(f => !f.isCollection)
-              .reduce((sum, f) => sum + (f.contentLength || 0), 0);
-            storageUsedMB = Math.round((totalBytes / (1024 * 1024)) * 100) / 100;
-            fileCount = userPubDir.files.filter(f => !f.isCollection).length;
-          } catch {
-            // User might not have /pub/ directory yet, or error accessing it
-            storageUsedMB = 0;
-            fileCount = 0;
-          }
-
+          // Only store the pubkey - storage, file count, and status are mock data
           users.push({
             pubkey,
             displayName: `${pubkey.substring(0, 8)}...${pubkey.substring(pubkey.length - 4)}`,
-            storageUsedMB,
-            fileCount,
           });
         }
       }

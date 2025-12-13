@@ -19,16 +19,23 @@ import {
   Trash2,
   RefreshCw,
   ChevronRight,
-  Home,
   Edit2,
   Save,
   X,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import type { FileBrowserProps } from './FileBrowser.types';
 
+type SortField = 'name' | 'size' | 'date' | 'type';
+type SortDirection = 'asc' | 'desc';
+type SortOption = { field: SortField; direction: SortDirection };
+
 export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
-  const { listDirectory, readFile, writeFile, deleteFile, createDirectory, isLoading, error } = useWebDav();
+  const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [files, setFiles] = useState<WebDavFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<WebDavFile | null>(null);
@@ -38,14 +45,22 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreateDirDialog, setShowCreateDirDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<WebDavFile | null>(null);
+  const [fileToRename, setFileToRename] = useState<WebDavFile | null>(null);
   const [newFileName, setNewFileName] = useState('');
   const [newFileContent, setNewFileContent] = useState('');
   const [newDirName, setNewDirName] = useState('');
+  const [renameValue, setRenameValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>({ field: 'type', direction: 'asc' });
 
   const loadDirectory = useCallback(async (path: string) => {
+    // Clear files immediately when path changes to show loading state
+    setFiles([]);
     const directory = await listDirectory(path);
     if (directory) {
       setFiles(directory.files);
@@ -175,6 +190,75 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
     setCurrentPath(path);
   };
 
+  const handleRename = async () => {
+    if (!fileToRename || !renameValue.trim()) return;
+    
+    setIsSaving(true);
+    setValidationError(null);
+    
+    try {
+      // Get the parent directory path
+      const parentPath = fileToRename.path.substring(0, fileToRename.path.lastIndexOf('/'));
+      const newPath = parentPath.endsWith('/') 
+        ? `${parentPath}${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`
+        : `${parentPath}/${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`;
+      
+      const success = await moveFile(fileToRename.path, newPath);
+      if (!success) {
+        throw new Error('Failed to rename file');
+      }
+      setShowRenameDialog(false);
+      setFileToRename(null);
+      setRenameValue('');
+      await loadDirectory(currentPath);
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : 'Failed to rename file');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    setSortOption((current) => {
+      // If clicking the same field, toggle direction; otherwise, set to ascending
+      if (current.field === field) {
+        return { field, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { field, direction: 'asc' };
+    });
+  };
+
+  // Filter and sort files
+  const filteredAndSortedFiles = files
+    .filter((file) => {
+      if (!debouncedSearchQuery) return true;
+      const query = debouncedSearchQuery.toLowerCase();
+      return file.displayName.toLowerCase().includes(query);
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortOption.field) {
+        case 'name':
+          comparison = a.displayName.localeCompare(b.displayName);
+          break;
+        case 'size':
+          comparison = (a.contentLength || 0) - (b.contentLength || 0);
+          break;
+        case 'date':
+          comparison = (a.lastModified || '').localeCompare(b.lastModified || '');
+          break;
+        case 'type':
+          // Folders first, then files, both alphabetically
+          if (a.isCollection && !b.isCollection) return -1;
+          if (!a.isCollection && b.isCollection) return 1;
+          comparison = a.displayName.localeCompare(b.displayName);
+          break;
+      }
+      
+      return sortOption.direction === 'asc' ? comparison : -comparison;
+    });
+
   const pathParts = currentPath.split('/').filter(Boolean);
   const breadcrumbs = pathParts.map((part, index) => {
     const path = '/' + pathParts.slice(0, index + 1).join('/') + (index < pathParts.length - 1 ? '/' : '');
@@ -244,19 +328,22 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search files..."
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 text-sm">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigateToPath('/')}
-              className="h-6 px-2"
-            >
-              <Home className="h-3 w-3" />
-            </Button>
             {breadcrumbs.map((crumb, index) => (
               <div key={index} className="flex items-center gap-2">
-                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -277,19 +364,6 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             </Alert>
           )}
 
-          {/* Info Alert for root level */}
-          {isRootLevel && (
-            <Alert>
-              <AlertTitle>WebDAV Root Directory</AlertTitle>
-              <AlertDescription>
-                This is the root directory. Navigate into a user directory (pubkey) and then into their <code>/pub/</code> folder to create files and directories.
-                <br />
-                <span className="text-xs text-muted-foreground mt-1 block">
-                  Path structure: <code>/dav/&#123;pubkey&#125;/pub/&#123;file_path&#125;</code>
-                </span>
-              </AlertDescription>
-            </Alert>
-          )}
 
           {/* File List */}
           {isLoading && files.length === 0 ? (
@@ -298,24 +372,70 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : files.length === 0 ? (
+          ) : filteredAndSortedFiles.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Folder className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>This directory is empty</p>
+              <p>
+                {files.length === 0 
+                  ? 'This directory is empty' 
+                  : `No files match "${debouncedSearchQuery}"`}
+              </p>
             </div>
           ) : (
             <div className="border rounded-md">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2 text-sm font-semibold">Name</th>
-                    <th className="text-left p-2 text-sm font-semibold">Size</th>
-                    <th className="text-left p-2 text-sm font-semibold">Modified</th>
+                    <th 
+                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('type')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>Name</span>
+                        {sortOption.field === 'type' && (
+                          sortOption.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('size')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>Size</span>
+                        {sortOption.field === 'size' && (
+                          sortOption.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort('date')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>Modified</span>
+                        {sortOption.field === 'date' && (
+                          sortOption.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        )}
+                      </div>
+                    </th>
                     <th className="text-right p-2 text-sm font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {files.map((file) => (
+                  {filteredAndSortedFiles.map((file) => (
                     <tr
                       key={file.path}
                       className="border-b hover:bg-muted/50 cursor-pointer"
@@ -339,19 +459,20 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                       </td>
                       <td className="p-2">
                         <div className="flex justify-end gap-1">
-                          {!file.isCollection && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFileClick(file);
-                              }}
-                              className="h-7 w-7 p-0"
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFileToRename(file);
+                              setRenameValue(file.displayName);
+                              setShowRenameDialog(true);
+                            }}
+                            className="h-7 w-7 p-0"
+                            title="Rename"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -361,6 +482,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                               setShowDeleteDialog(true);
                             }}
                             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            title="Delete"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -509,6 +631,57 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {fileToRename?.isCollection ? 'Directory' : 'File'}</DialogTitle>
+            <DialogDescription>
+              Enter a new name for <strong>{fileToRename?.displayName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {validationError && (
+              <Alert variant="destructive">
+                <AlertDescription>{validationError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label>New Name</Label>
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder={fileToRename?.displayName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && renameValue.trim()) {
+                    handleRename();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRenameDialog(false);
+              setFileToRename(null);
+              setRenameValue('');
+              setValidationError(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleRename} disabled={!renameValue.trim() || isSaving}>
+              {isSaving ? 'Renaming...' : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {filteredAndSortedFiles.length > 0 && files.length > filteredAndSortedFiles.length && (
+        <div className="text-sm text-muted-foreground">
+          Showing <strong>{filteredAndSortedFiles.length}</strong> of <strong>{files.length}</strong> files
+        </div>
+      )}
     </div>
   );
 }
