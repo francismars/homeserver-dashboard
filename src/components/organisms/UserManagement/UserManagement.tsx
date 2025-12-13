@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useUserManagement } from '@/hooks/user';
-import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, BarChart3, X, Clipboard } from 'lucide-react';
+import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, BarChart3, X, Clipboard, UserX } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 import { cn } from '@/libs/utils';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
@@ -242,7 +242,7 @@ const UserCard = memo(({
 });
 UserCard.displayName = 'UserCard';
 
-function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUser, onOpenInvites, onOpenStats }: UserManagementProps) {
+function UserManagementComponent({ onViewUserFiles, onDisableUser, onEnableUser, isDisablingUser, onOpenInvites, onOpenStats, onOpenDisabledUsers, numDisabledUsers }: UserManagementProps) {
   const { users, isLoading, error, refreshUsers } = useUserManagement();
   const [copiedPubkey, setCopiedPubkey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -353,6 +353,13 @@ function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUs
       mockDetails: getMockUserDetails(user.pubkey),
     }));
   }, [users]);
+
+  // Get list of disabled users (based on mock data for now)
+  const disabledUsers = useMemo(() => {
+    return usersWithMockDetails
+      .filter(({ mockDetails }) => mockDetails.isDisabled)
+      .map(({ user }) => user);
+  }, [usersWithMockDetails]);
 
   // Filter and sort users
   const filteredAndSortedUsers = useMemo(() => {
@@ -483,6 +490,18 @@ function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUs
                 >
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Stats
+                </Button>
+              )}
+              {onOpenDisabledUsers && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onOpenDisabledUsers({ all: users, disabled: disabledUsers });
+                  }}
+                >
+                  <UserX className="h-4 w-4 mr-2" />
+                  Disabled Users {numDisabledUsers !== undefined && `(${numDisabledUsers})`}
                 </Button>
               )}
               {onOpenInvites && (

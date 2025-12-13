@@ -6,6 +6,7 @@ import { useAdminInfo, useAdminUsage, useAdminActions } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { DashboardUsage } from '@/components/organisms/DashboardUsage';
+import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { UserManagement } from '@/components/organisms/UserManagement';
@@ -13,6 +14,8 @@ import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { UserStatsDialog } from '@/components/organisms/UserStatsDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
+import { DisabledUsersDialog } from '@/components/organisms/DisabledUsersDialog';
+import { UserProfileDialog } from '@/components/organisms/UserProfileDialog';
 import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -21,6 +24,7 @@ export default function DashboardPage() {
   const { data: usage, isLoading: usageLoading, error: usageError } = useAdminUsage();
   const {
     disableUser,
+    enableUser,
     generateInvite,
     isGeneratingInvite,
     isDisablingUser,
@@ -37,6 +41,9 @@ export default function DashboardPage() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
   const [isUserStatsDialogOpen, setIsUserStatsDialogOpen] = useState(false);
+  const [isDisabledUsersDialogOpen, setIsDisabledUsersDialogOpen] = useState(false);
+  const [isUserProfileDialogOpen, setIsUserProfileDialogOpen] = useState(false);
+  const [disabledUsersData, setDisabledUsersData] = useState<{ all: any[]; disabled: any[] } | null>(null);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
 
   const handleSettingsClick = useCallback(() => {
@@ -44,8 +51,7 @@ export default function DashboardPage() {
   }, []);
 
   const handleUserClick = useCallback(() => {
-    // TODO: Implement user account menu/dialog
-    console.log('User account clicked');
+    setIsUserProfileDialogOpen(true);
   }, []);
 
   const handleOpenStats = useCallback(() => {
@@ -73,10 +79,11 @@ export default function DashboardPage() {
           />
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
 
@@ -97,10 +104,20 @@ export default function DashboardPage() {
                     <UserManagement 
                       onViewUserFiles={handleViewUserFiles}
                       onDisableUser={disableUser}
+                      onEnableUser={enableUser}
                       isDisablingUser={isDisablingUser}
                       onOpenInvites={() => setIsInvitesDialogOpen(true)}
                       onOpenStats={handleOpenStats}
+                      onOpenDisabledUsers={(data) => {
+                        setDisabledUsersData(data);
+                        setIsDisabledUsersDialogOpen(true);
+                      }}
+                      numDisabledUsers={info?.num_disabled_users}
                     />
+                  </TabsContent>
+
+                  <TabsContent value="logs" className="space-y-4">
+                    <DashboardLogs isLoading={infoLoading} error={infoError} />
                   </TabsContent>
 
           <TabsContent value="api" className="space-y-4">
@@ -141,6 +158,37 @@ export default function DashboardPage() {
           open={!!serverControlAction}
           onOpenChange={(open) => !open && setServerControlAction(null)}
           action={serverControlAction}
+        />
+
+        {/* Disabled Users Dialog */}
+        {disabledUsersData && (
+          <DisabledUsersDialog
+            open={isDisabledUsersDialogOpen}
+            onOpenChange={(open) => {
+              setIsDisabledUsersDialogOpen(open);
+              if (!open) {
+                setDisabledUsersData(null);
+              }
+            }}
+            users={disabledUsersData.all}
+            disabledUsers={disabledUsersData.disabled}
+            onDisableUser={async (pubkey) => {
+              await disableUser(pubkey);
+              // Refresh users list - this will be handled by UserManagement's refresh
+            }}
+            onEnableUser={async (pubkey) => {
+              await enableUser(pubkey);
+              // Refresh users list - this will be handled by UserManagement's refresh
+            }}
+            isDisablingUser={isDisablingUser}
+          />
+        )}
+
+        {/* User Profile Dialog */}
+        <UserProfileDialog
+          open={isUserProfileDialogOpen}
+          onOpenChange={setIsUserProfileDialogOpen}
+          homeserverPubkey={info?.pubkey}
         />
       </div>
       
