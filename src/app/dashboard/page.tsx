@@ -12,6 +12,7 @@ import { UserManagement } from '@/components/organisms/UserManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { UserStatsDialog } from '@/components/organisms/UserStatsDialog';
+import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
   const [isUserStatsDialogOpen, setIsUserStatsDialogOpen] = useState(false);
+  const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
@@ -48,6 +50,14 @@ export default function DashboardPage() {
     setIsUserStatsDialogOpen(true);
   }, []);
 
+  const handleRestartServer = useCallback(() => {
+    setServerControlAction('restart');
+  }, []);
+
+  const handleShutdownServer = useCallback(() => {
+    setServerControlAction('shutdown');
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
@@ -56,6 +66,8 @@ export default function DashboardPage() {
             avatarInitial="A"
             onSettingsClick={handleSettingsClick}
             onUserClick={handleUserClick}
+            onRestartServer={handleRestartServer}
+            onShutdownServer={handleShutdownServer}
           />
 
         <Tabs defaultValue="overview" className="w-full">
@@ -120,6 +132,13 @@ export default function DashboardPage() {
           onOpenChange={setIsUserStatsDialogOpen}
           usage={usage}
           info={info}
+        />
+
+        {/* Server Control Dialog */}
+        <ServerControlDialog
+          open={!!serverControlAction}
+          onOpenChange={(open) => !open && setServerControlAction(null)}
+          action={serverControlAction}
         />
       </div>
     </main>
