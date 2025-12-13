@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Info, Power, RotateCw } from 'lucide-react';
+import { Settings, Info, Power, RotateCw, Moon, Sun } from 'lucide-react';
 import { Logo } from '@/components/molecules/Logo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +35,7 @@ export function DashboardNavbar({
   onRestartServer,
   onShutdownServer,
 }: DashboardNavbarProps) {
+  const [isDarkMode, setIsDarkMode] = useState(true); // Mock: default to dark mode
   return (
     <header
       className={cn(
@@ -80,8 +81,27 @@ export function DashboardNavbar({
                 <DropdownMenuItem>
                   Preferences
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  Appearance
+                <DropdownMenuItem 
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    {isDarkMode ? (
+                      <>
+                        <Moon className="h-4 w-4" />
+                        <span>Dark Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sun className="h-4 w-4" />
+                        <span>Light Mode</span>
+                      </>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-xs font-normal border-dashed ml-2">
+                    <Info className="h-3 w-3 mr-1" />
+                    Mock
+                  </Badge>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {onRestartServer && (
