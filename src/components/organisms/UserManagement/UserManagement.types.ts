@@ -3,5 +3,6 @@ export type UserManagementProps = {
   onDisableUser?: (pubkey: string) => void;
   isDisablingUser?: boolean;
   onOpenInvites?: () => void;
+  onOpenStats?: () => void;
 };
 

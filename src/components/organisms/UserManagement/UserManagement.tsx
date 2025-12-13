@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useUserManagement } from '@/hooks/user';
-import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Users, RefreshCw, Copy, Shield, ShieldOff, Calendar, Clock, HardDrive, FileText, Info, Key, Search, Filter, ArrowUpDown, FolderOpen, Eye, LayoutGrid, List, ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, BarChart3 } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 import { cn } from '@/libs/utils';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
@@ -242,7 +242,7 @@ const UserCard = memo(({
 });
 UserCard.displayName = 'UserCard';
 
-function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUser, onOpenInvites }: UserManagementProps) {
+function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUser, onOpenInvites, onOpenStats }: UserManagementProps) {
   const { users, isLoading, error, refreshUsers } = useUserManagement();
   const [copiedPubkey, setCopiedPubkey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -462,6 +462,16 @@ function UserManagementComponent({ onViewUserFiles, onDisableUser, isDisablingUs
                 <RefreshCw className={cn('h-4 w-4 mr-2', isLoading && 'animate-spin')} />
                 Refresh
               </Button>
+              {onOpenStats && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenStats}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Stats
+                </Button>
+              )}
               {onOpenInvites && (
                 <Button
                   variant="default"

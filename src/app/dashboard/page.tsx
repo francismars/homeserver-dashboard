@@ -11,6 +11,7 @@ import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { UserManagement } from '@/components/organisms/UserManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
+import { UserStatsDialog } from '@/components/organisms/UserStatsDialog';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
@@ -32,6 +33,7 @@ export default function DashboardPage() {
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
+  const [isUserStatsDialogOpen, setIsUserStatsDialogOpen] = useState(false);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
@@ -40,6 +42,10 @@ export default function DashboardPage() {
   const handleUserClick = useCallback(() => {
     // TODO: Implement user account menu/dialog
     console.log('User account clicked');
+  }, []);
+
+  const handleOpenStats = useCallback(() => {
+    setIsUserStatsDialogOpen(true);
   }, []);
 
   return (
@@ -79,6 +85,7 @@ export default function DashboardPage() {
                       onDisableUser={disableUser}
                       isDisablingUser={isDisablingUser}
                       onOpenInvites={() => setIsInvitesDialogOpen(true)}
+                      onOpenStats={handleOpenStats}
                     />
                   </TabsContent>
 
@@ -105,6 +112,14 @@ export default function DashboardPage() {
           invites={generatedInvites}
           onGenerate={generateInvite}
           isGenerating={isGeneratingInvite}
+        />
+
+        {/* User Stats Dialog */}
+        <UserStatsDialog
+          open={isUserStatsDialogOpen}
+          onOpenChange={setIsUserStatsDialogOpen}
+          usage={usage}
+          info={info}
         />
       </div>
     </main>
