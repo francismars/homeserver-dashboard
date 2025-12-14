@@ -38,23 +38,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
   - Footer with version info and links
 
 - ✅ **Phase 3**: Components - COMPLETE
-  - **Atoms**: `StatCard`
-  - **Molecules**: `Logo`
-  - **Organisms**: 
-    - `DashboardOverview` - Server stats and system health
-    - `DashboardUsage` - Storage capacity and resource trends with interactive charts
-    - `DashboardLogs` - Log viewer with filtering and auto-refresh
-    - `UserManagement` - Comprehensive user management with card/list views
-    - `FileBrowser` - WebDAV file management (integrated into Users tab)
-    - `ApiExplorer` - Interactive API testing tool
-    - `ConfigDialog` - Configuration editor (UI and TOML views)
-    - `InvitesDialog` - Invite management
-    - `UserStatsDialog` - User statistics overlay
-    - `DisabledUsersDialog` - Disabled users management
-    - `UserProfileDialog` - User sign-in and profile management
-    - `ServerControlDialog` - Server restart/shutdown controls
-    - `DashboardNavbar` - Top navigation bar
-  - All components functional and wired to hooks
+  - All components implemented (atoms, molecules, organisms) - see "MVP Core Features Status" for details
 
 - ✅ **Phase 4**: Polish & UX - MOSTLY COMPLETE
   - ✅ Confirm dialogs implemented for all destructive actions
@@ -221,30 +205,9 @@ All features using mock data are clearly marked with "Mock" badges and tooltips 
    - **Status**: Mocked, ready for backend implementation
    - **Backend Required**: Implement `POST /restart` and `POST /shutdown` endpoints
 
-**File Browser Limitations:**
-
-7. **WebDAV path restrictions** ⚠️
-   - **Issue**: WebDAV paths must follow `/dav/{pubkey}/pub/{path}` structure
-   - **Impact**: Cannot create files/directories at root `/dav/` level
-   - **Status**: File browser enforces this restriction with validation and helpful error messages
-   - **Workaround**: Navigate to user's `/pub/` directory first, then create files/folders
-
-8. **Path parsing edge cases** 🔧
-   - **Issue**: Some PROPFIND responses may include `/dav` in paths, causing phantom "dav" folders
-   - **Impact**: Fixed with improved path normalization
-   - **Status**: Resolved - path parsing now strips `/dav` prefixes correctly and filters out current directory
-
-**Authentication:**
-
-9. **Admin auth header** ✅
-   - **Status**: Fixed - Changed from `Authorization: Bearer` to `X-Admin-Password` header
-   - **Impact**: Admin endpoints now authenticate correctly
-   - **Note**: WebDAV endpoints use HTTP Basic Auth (`admin:password`), handled separately
-
-10. **User authentication** 🟡
-    - **Status**: Mock implementation using localStorage
-    - **Impact**: User profile sign-in works but uses mock authentication
-    - **Note**: Ready for backend AuthToken integration
+**Other Limitations:**
+- **WebDAV path restrictions**: Paths must follow `/dav/{pubkey}/pub/{path}` structure (enforced by file browser)
+- **User authentication**: Mock implementation using localStorage (ready for backend AuthToken integration)
 
 **Post-MVP Features (Not Blocking):**
 
@@ -261,143 +224,6 @@ See `FEATURE_IDEAS.md` for detailed feature ideas. High-priority future features
 - Toast notifications (currently using Alert components)
 - Config conflict handling (409 responses)
 
-## MVP Requirements (Priority)
-
-### Must Have
-
-1. **Basic Info Display** ✅
-   - ✅ Disk usage (used/total) - Real data from `/info`
-   - ✅ Total users, disabled users, signup codes - Real data from `/info`
-   - ⚠️ Homeserver pubkey - Mock (not in `/info` endpoint)
-   - ⚠️ IP:port (address) - Mock (not in `/info` endpoint)
-   - ⚠️ Current version - Mock (not in `/info` endpoint)
-   - ⚠️ Uptime - Mock (requires backend endpoint)
-
-2. **Usage Data** ✅
-   - ✅ Total number of signed-up users - Real data from `/info`
-   - ✅ Disk usage summary - Real data from `/info`
-   - ⚠️ Users by invite code - Mock (requires events API or additional endpoint)
-   - ⚠️ Resource trends (storage, CPU, RAM, network) - Mock data (requires metrics endpoint)
-
-3. **Admin Actions** ✅
-   - Delete any pubky URL (input URL → confirm → delete)
-   - Disable/ban user accounts (input pubkey → confirm)
-   - Enable user accounts
-   - Generate invite codes (single or multiple)
-
-4. **Config Editor** ✅ (UI Complete, Mock Data)
-   - ✅ Display Config.toml - Mock data (ready for `GET /config`)
-   - ✅ Edit capability (UI and TOML views) - Fully functional
-   - ✅ Save functionality - Mock (ready for `PUT /config`)
-   - ✅ Reload functionality - Fully functional
-   - ⚠️ Conflict handling - Not implemented (requires backend 409 response)
-
-5. **User Management** ✅
-   - List all users
-   - View user details
-   - Disable/enable users
-   - View user files
-   - Search and filter users
-   - Sort users by various criteria
-
-6. **File Browser** ✅
-   - Browse files and directories
-   - View and edit file contents
-   - Upload files
-   - Create directories
-   - Delete files/folders
-   - Rename files/folders
-   - Search and sort files
-
-### Post-MVP (Not Blocking)
-
-**Implemented (Mock Data):**
-- ✅ Logs display (complete UI, mock data - ready for `/logs` endpoint)
-- ✅ User profile and authentication (complete UI, mock data - ready for backend AuthToken)
-- ✅ Multi-homeserver management (complete UI, mock data - ready for PKARR integration)
-- ✅ Settings sync (complete UI, mock data - ready for backend endpoints)
-- ✅ Server restart/shutdown controls (mock implementation)
-
-**Future Features (See FEATURE_IDEAS.md):**
-- Activity feed / event stream
-- Real-time metrics dashboard (Prometheus)
-- File search across all users
-- Advanced storage analytics
-- User activity timeline
-- Health monitoring alerts
-- Backup and export tools
-- Keyboard shortcuts
-- Dashboard customization
-- Rate limit controls
-- Testnet/mainnet toggle
-
-## Implementation Plan (Standalone Dashboard)
-
-### ✅ Phase 0 – Bootstrap (COMPLETE)
-- ✅ Scaffolded Next.js + Tailwind + Shadcn; copied Franky's `globals.css`, `components.json`, `utils.ts`
-- ✅ Installed Shadcn primitives (button, card, input, textarea, tabs, dialog, alert, skeleton, label, select, avatar, dropdown-menu, scroll-area, switch)
-- ✅ Created `.env.example` with `NEXT_PUBLIC_ADMIN_BASE_URL`, `NEXT_PUBLIC_ADMIN_TOKEN`, `NEXT_PUBLIC_ADMIN_MOCK`
-- ✅ Set up TypeScript paths and project structure
-- ✅ Added `tw-animate-css` dependency
-- ✅ Added favicon
-
-### ✅ Phase 1 – Services & Hooks (COMPLETE)
-- ✅ `src/services/admin`: `getInfo()`, `generateInvite()`, `disableUser()`, `enableUser()`, `deleteUrl()`, `getUsage()`, `getConfig()`, `saveConfig()`
-- ✅ `src/services/user`: `listUsers()`, `generateKeypair()`, `signupUser()`, `signupUserDirect()`
-- ✅ `src/services/webdav`: `listDirectory()`, `readFile()`, `writeFile()`, `deleteFile()`, `createDirectory()`, `moveFile()`, `copyFile()`
-- ✅ Mock adapter with realistic mock data
-- ✅ Hooks: `useAdminInfo`, `useAdminUsage`, `useAdminActions`, `useConfigEditor`, `useUserManagement`, `useWebDav`
-- ✅ Error normalization and handling (prevents HTML error pages from showing)
-- ✅ Auto-enables mock mode when `baseUrl` is empty (dev-friendly)
-
-### ✅ Phase 2 – UI Shell (COMPLETE)
-- ✅ `/dashboard` page with 5 tabs (Overview, Usage, Users, Logs, API)
-- ✅ Modern navbar with logo, title, settings dropdown, and user profile button
-- ✅ Loading/skeleton states for all sections
-- ✅ Error states with Alert components
-- ✅ Footer with version info and links
-- ✅ Created Shadcn UI components: tabs, card, skeleton, alert, button, textarea, dialog, input, label, select, avatar, dropdown-menu, scroll-area, switch
-
-### ✅ Phase 3 – Components (COMPLETE)
-- ✅ All components implemented and functional (see "Implementation Summary" for details)
-
-### ✅ Phase 4 – Polish & UX Safeguards (MOSTLY COMPLETE)
-- ✅ Confirm dialogs implemented for all destructive actions
-- ✅ Error handling with Alert components
-- ✅ Loading states and skeletons
-- ✅ Search and filter functionality throughout
-- ✅ Pagination for large lists
-- ✅ Copy-to-clipboard with visual feedback
-- ✅ Mock data indicators (badges showing mock status)
-- ✅ Responsive design
-- ✅ Performance optimizations (React.memo, useMemo, useCallback, debouncing)
-- ✅ Clear buttons and paste functionality in search inputs
-- ✅ Breadcrumb navigation in file browser
-- ✅ Tooltips for mock data explanations
-- ❌ **Missing**: Toast notifications for success/error feedback (using Alert components instead)
-- ❌ **Missing**: Clear inputs on successful actions (some implemented, not all)
-- ❌ **Missing**: Success feedback messages (some implemented, not all)
-- ❌ **Missing**: Optional env selector (mainnet/testnet toggle)
-
-
-### ❌ Phase 5 – Testing (NOT STARTED)
-- ❌ No unit tests written yet
-- ❌ No snapshot tests
-- ❌ No hook tests
-- ❌ No e2e tests
-
-
-### ⚠️ Phase 6 – Packaging & Docs (PARTIAL)
-- ✅ `.env.example` created
-- ✅ Comprehensive README.md created with full feature documentation
-- ❌ No Dockerfile
-- ❌ No docker-compose.yml
-- ❌ No deployment documentation
-
-**Remaining work:**
-- Add Dockerfile for UI-only container
-- Add docker-compose.yml for local dev
-- Document CORS requirements and deployment notes
 
 ## Project Structure
 
@@ -481,16 +307,6 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 - Frontend sends `X-Admin-Password` header (matches backend)
 - 401 responses handled as auth failures
 
-### Missing Endpoints (Frontend Will Mock/Stub)
-
-**Status:**
-- ✅ `GET /config` - **Mocked** in `AdminService.getConfig()` (returns mock TOML config)
-- ✅ `PUT /config` - **Mocked** in `AdminService.saveConfig()` (simulates save with checksum)
-- ✅ `GET /usage` - **Uses `/info` data** - `AdminService.getUsage()` extracts usage from info response
-- ✅ `GET /logs` - **Mocked** in `DashboardLogs` component (returns mock log entries)
-- ⚠️ `POST /invite` - **Single token only** - Uses existing `/generate_signup_token` endpoint (bulk generation not available)
-
-**Note**: Config and logs endpoints are fully functional in mock mode. When backend adds these endpoints, just remove the mock checks in `AdminService` and `DashboardLogs`.
 
 
 
@@ -557,66 +373,15 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 - Direct filesystem access (not recommended while homeserver is running)
 - WebDAV clients (Windows Explorer, macOS Finder, rclone, etc.)
 
-## Implementation Summary
-
-### ✅ Completed Features
-
-**Core Functionality:**
-- ✅ All 6 MVP "Must Have" features fully implemented
-- ✅ Real API integration for user management, file operations, admin actions
-- ✅ Comprehensive UI for all features (real and mock data)
-- ✅ Performance optimizations throughout (React.memo, useMemo, useCallback, debouncing)
-- ✅ Error handling and loading states
-- ✅ Responsive design matching Franky's design system
-
-**User Management:**
-- ✅ Card and list view modes
-- ✅ Advanced search with clear/paste buttons
-- ✅ Filtering by status
-- ✅ Sorting (pubkey, storage, activity, status)
-- ✅ Pagination with first/last page buttons
-- ✅ Disable/enable users with confirmation
-- ✅ View user files (integrated FileBrowser)
-- ✅ View user details
-- ✅ Disabled users management dialog
-- ✅ User statistics overlay
-- ✅ Invite management dialog
-
-**File Management:**
-- ✅ Full WebDAV integration (browse, view, edit, upload, delete, create, rename)
-- ✅ Search and sort files
-- ✅ Breadcrumb navigation (no root access)
-- ✅ Path validation
-
-**UI/UX:**
-- ✅ Modern navbar with logo, settings, user profile
-- ✅ Footer with version info and links
-- ✅ Mock data clearly marked with badges and tooltips
-- ✅ Copy-to-clipboard with visual feedback
-- ✅ Confirm dialogs for destructive actions
-- ✅ Loading skeletons
-- ✅ Error alerts with user-friendly messages
-
-### ⚠️ Features Using Mock Data
-
-All mock features are clearly marked and ready for backend integration:
-- Config editor (UI complete, needs `GET /config` and `PUT /config`)
-- Logs viewer (UI complete, needs `GET /logs`)
-- User statistics (UI complete, needs user stats endpoints)
-- Storage capacity (UI complete, needs capacity endpoint)
-- Resource trends (UI complete, needs `/metrics` endpoint)
-- System health (UI complete, needs health endpoints)
-- Server control (UI complete, needs restart/shutdown endpoints)
-- User profile authentication (UI complete, needs AuthToken integration)
-- Multi-homeserver discovery (UI complete, needs PKARR integration)
-
-### ❌ Remaining Work
+## Remaining Work
 
 **High Priority:**
-1. **Testing** (Phase 5) - Write component, hook, and snapshot tests
-2. **Packaging** (Phase 6) - Dockerfile, docker-compose.yml, deployment docs
+1. **Backend API Endpoints** - 8+ endpoints needed (see "Known Limitations" above)
+2. **Testing** - Write component, hook, and snapshot tests
+3. **Packaging** - Dockerfile, docker-compose.yml, deployment docs
 
 **Optional Enhancements:**
 - Toast notifications (currently using Alert components)
 - Config conflict handling (409 responses)
 - Login & Connection Management (see FEATURE_IDEAS.md)
+- Future features (see FEATURE_IDEAS.md)
