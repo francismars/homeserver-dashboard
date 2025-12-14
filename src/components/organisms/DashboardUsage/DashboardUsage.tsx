@@ -47,10 +47,11 @@ const SimpleLineChart = ({
   maxValue: number; 
   formatValue: (val: number) => string;
 }) => {
-  const width = 300;
-  const height = 140;
+  // Use a base width for calculations, but make it responsive
+  const baseWidth = 400; // Increased base width for better scaling
+  const height = 200; // Increased height to match storage capacity card
   const padding = { top: 15, right: 15, bottom: 25, left: 40 };
-  const chartWidth = width - padding.left - padding.right;
+  const chartWidth = baseWidth - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const points = data.map((value, index) => {
@@ -73,8 +74,8 @@ const SimpleLineChart = ({
       <svg 
         width="100%" 
         height={height} 
-        viewBox={`0 0 ${width} ${height}`} 
-        preserveAspectRatio="xMidYMid meet"
+        viewBox={`0 0 ${baseWidth} ${height}`} 
+        preserveAspectRatio="none"
         className="overflow-visible"
       >
         <defs>
@@ -93,7 +94,7 @@ const SimpleLineChart = ({
               <line
                 x1={padding.left}
                 y1={y}
-                x2={width - padding.right}
+                x2={baseWidth - padding.right}
                 y2={y}
                 stroke="currentColor"
                 strokeWidth="0.5"
@@ -295,44 +296,42 @@ function TrendChartWithSwitcher() {
 
   return (
     <div className="space-y-4">
-      {/* Header with label and switcher */}
+      {/* Header with icons and total/percentage */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {trendData.icon}
-          <span className="text-sm font-medium">{trendData.label}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {trends.map((trend) => (
-            <button
-              key={trend.type}
-              onClick={() => setSelectedTrend(trend.type)}
-              className={cn(
-                'p-1.5 rounded transition-all',
-                selectedTrend === trend.type
-                  ? 'bg-primary text-primary-foreground shadow-sm scale-110'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              )}
-              title={trend.label}
-            >
-              {trend.icon}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Current value and change */}
-      <div className="space-y-1">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold">{trendData.formatValue(currentValue)}</span>
-          <div className={cn(
-            'flex items-center gap-1 text-xs font-medium',
-            isPositive ? 'text-green-600' : 'text-red-600'
-          )}>
-            <TrendingUp className={cn('h-3 w-3', !isPositive && 'rotate-180')} />
-            <span>{isPositive ? '+' : ''}{changePercent.toFixed(1)}%</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            {trends.map((trend) => (
+              <button
+                key={trend.type}
+                onClick={() => setSelectedTrend(trend.type)}
+                className={cn(
+                  'p-1.5 rounded transition-all',
+                  selectedTrend === trend.type
+                    ? 'bg-primary text-primary-foreground shadow-sm scale-110'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                )}
+                title={trend.label}
+              >
+                {trend.icon}
+              </button>
+            ))}
           </div>
+          <span className="text-sm font-medium text-muted-foreground">{trendData.label}</span>
         </div>
-        <p className="text-xs text-muted-foreground">vs previous period</p>
+        {/* Current value and change */}
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold">{trendData.formatValue(currentValue)}</span>
+            <div className={cn(
+              'flex items-center gap-1 text-xs font-medium',
+              isPositive ? 'text-green-600' : 'text-red-600'
+            )}>
+              <TrendingUp className={cn('h-3 w-3', !isPositive && 'rotate-180')} />
+              <span>{isPositive ? '+' : ''}{changePercent.toFixed(1)}%</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">vs previous period</p>
+        </div>
       </div>
 
       {/* Chart */}
@@ -443,7 +442,16 @@ export function DashboardUsage({ usage, isLoading, error, totalDiskMB, info }: D
 
                   {/* Storage Breakdown */}
                   <div className="pt-3 border-t border-dashed border-muted-foreground/20 space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground/70 italic mb-2">Breakdown:</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-medium text-muted-foreground/70 italic">Breakdown:</div>
+                      {(MOCK_STORAGE_INFO.usedGB / MOCK_STORAGE_INFO.totalCapacityGB) > 0.9 ? (
+                        <Badge variant="destructive" className="text-xs">Critical</Badge>
+                      ) : (MOCK_STORAGE_INFO.usedGB / MOCK_STORAGE_INFO.totalCapacityGB) > 0.75 ? (
+                        <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-600">Warning</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-green-600 border-green-600">Healthy</Badge>
+                      )}
+                    </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground/70 italic">User Data:</span>
                       <span className="font-semibold text-muted-foreground/70 italic">
@@ -461,20 +469,6 @@ export function DashboardUsage({ usage, isLoading, error, totalDiskMB, info }: D
                       <span className="font-semibold text-muted-foreground/70 italic">
                         {formatStorage(MOCK_STORAGE_INFO.breakdown.systemFiles * 1024)}
                       </span>
-                    </div>
-                  </div>
-
-                  {/* Storage Health */}
-                  <div className="pt-3 border-t border-dashed border-muted-foreground/20">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground/70 italic">Storage Health:</span>
-                      {(MOCK_STORAGE_INFO.usedGB / MOCK_STORAGE_INFO.totalCapacityGB) > 0.9 ? (
-                        <Badge variant="destructive" className="text-xs">Critical</Badge>
-                      ) : (MOCK_STORAGE_INFO.usedGB / MOCK_STORAGE_INFO.totalCapacityGB) > 0.75 ? (
-                        <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-600">Warning</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs text-green-600 border-green-600">Healthy</Badge>
-                      )}
                     </div>
                   </div>
 
