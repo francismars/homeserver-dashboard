@@ -2,6 +2,47 @@
 
 Based on available homeserver APIs, here are cool features we could add to the dashboard:
 
+## 🔧 Core Infrastructure Features
+
+### 0. **Login & Connection Management** ⭐⭐⭐
+**APIs**: Admin API (`/info`, `/dav`), Pubky SDK (PKARR resolution)
+
+**What it enables:**
+- **No env file required**: Deploy dashboard as standalone app without build-time configuration
+- **Multi-homeserver support**: Connect to and manage multiple homeservers from one dashboard
+- **Pubky authentication**: Optional sign-in with pubky for easier connection and homeserver discovery
+- **Flexible deployment**: Works for local development, self-hosted, or public deployments
+- **Better security**: Pubky-based auth instead of just admin tokens
+
+**User flows:**
+- **Anonymous mode**: Enter homeserver pubkey/URL + admin token → Connect
+- **Pubky mode**: Sign in with secret key → Discover homeservers via PKARR → Auto-connect
+- **Multi-homeserver**: Switch between connected homeservers, add new ones
+
+**Implementation:**
+- Create connection context/provider to manage current homeserver connection
+- Replace all `process.env.NEXT_PUBLIC_ADMIN_*` usage with connection context
+- Build connection page (`/connect` or `/`) with:
+  - Connection form (homeserver pubkey/URL + admin token)
+  - Optional "Sign in with Pubky" button
+  - Homeserver discovery for pubky users
+- Update routing: redirect to connection page if no connection exists
+- Store connections in:
+  - `sessionStorage` for anonymous users (single homeserver)
+  - `localStorage` (encrypted) for pubky users (multiple homeservers)
+- Add homeserver switcher in navbar for multi-homeserver management
+- Update all services/hooks to initialize with connection from context
+
+**Value**: 
+- Enables flexible deployment without rebuilds
+- Foundation for multi-homeserver management
+- Better UX for users managing multiple homeservers
+- More secure authentication option
+
+**Priority**: **CRITICAL** - Should be implemented before other features to enable flexible deployment
+
+---
+
 ## 🎯 High-Value Features (Easy to Implement)
 
 ### 1. **Activity Feed / Event Stream** ⭐⭐⭐
@@ -27,58 +68,24 @@ Based on available homeserver APIs, here are cool features we could add to the d
 
 ---
 
-### 2. **User Management Dashboard** ⭐⭐⭐
-**APIs**: `/events/` (to extract users), `/info` (user counts), WebDAV (to browse user files)
+### 2. **Storage Analytics** ⭐⭐ ⚠️ **PARTIALLY IMPLEMENTED**
+**Status**: ⚠️ Partially implemented in Usage tab
 
-**What it shows:**
-- List of all users (extracted from events or file system)
-- User details:
-  - Pubkey
-  - Signup date (from first event)
-  - Last activity timestamp
-  - Storage used (via WebDAV PROPFIND)
-  - File count
-  - Status (active/disabled)
-- Quick actions:
-  - Disable/Enable user
-  - View user's files
-  - Delete user's files
-  - Copy pubkey
+**What's implemented:**
+- ✅ Storage trends over time (mock data with interactive charts)
+- ✅ Storage capacity visualization with breakdown (User Data, Database, System Files)
+- ✅ Health status indicators (Healthy/Warning/Critical)
 
-**Implementation:**
-- Parse `/events/` to extract unique user pubkeys
-- Use WebDAV to get storage stats per user
-- Table view with sortable columns
-- Search/filter by pubkey
-- Link to File Browser filtered by user
-
-**Value**: Centralized user management and monitoring
-
----
-
-### 3. **Storage Analytics** ⭐⭐
-**APIs**: `/info` (total disk usage), WebDAV PROPFIND (per-user storage)
-
-**What it shows:**
-- Storage trends over time (if we track it)
+**Remaining work:**
 - Top users by storage usage
 - File type breakdown (by extension)
-- Storage growth chart
 - Storage by directory structure
 - Largest files/folders
-
-**Implementation:**
-- Aggregate WebDAV directory listings
-- Parse file extensions
-- Calculate directory sizes recursively
-- Charts using a simple charting library (recharts or similar)
-- Storage history (requires local storage or backend endpoint)
-
-**Value**: Understand storage patterns and identify heavy users
+- Real storage data (currently mocked)
 
 ---
 
-### 4. **Real-Time Metrics Dashboard** ⭐⭐
+### 3. **Real-Time Metrics Dashboard** ⭐⭐
 **API**: `GET /metrics` (Prometheus format)
 
 **What it shows:**
@@ -99,49 +106,45 @@ Based on available homeserver APIs, here are cool features we could add to the d
 
 ---
 
-### 5. **Signup Code Analytics** ⭐
-**APIs**: `/info` (signup code counts), `/events/` (to track usage)
+### 4. **Signup Code Analytics** ⭐ ⚠️ **PARTIALLY IMPLEMENTED**
+**Status**: ⚠️ Partially implemented in InvitesDialog
 
-**What it shows:**
-- Signup codes and their usage
-- Which codes generated the most users
-- Unused codes list
+**What's implemented:**
+- ✅ Generate signup tokens (real API: `/generate_signup_token`)
+- ✅ View recently generated invites
+- ✅ Copy invite codes to clipboard
+- ✅ Invite statistics display (mock data)
+
+**Remaining work:**
+- Track which codes generated the most users (requires events API)
+- Match signups to codes via events
+- Usage statistics per code
 - Code creation timeline
-- User signup timeline
-
-**Implementation:**
-- Track generated codes (already done)
-- Parse events to match signups to codes
-- Show usage statistics per code
-- Visualize signup trends
-
-**Value**: Understand invite code effectiveness
+- User signup timeline visualization
 
 ---
 
 ## 🚀 Advanced Features (Require More Work)
 
-### 6. **File Search & Analytics** ⭐⭐
-**APIs**: WebDAV PROPFIND (recursive directory listing)
+### 5. **File Search & Analytics** ⭐⭐ ⚠️ **PARTIALLY IMPLEMENTED**
+**Status**: ⚠️ Partially implemented in FileBrowser (integrated into Users tab)
 
-**What it shows:**
-- Search files by name across all users
+**What's implemented:**
+- ✅ Search files by name (within current directory)
+- ✅ Filter and sort files (by name, size, date)
+- ✅ Browse files and directories via WebDAV
+
+**Remaining work:**
+- Search across all users (currently limited to user-specific directories)
 - File type statistics
 - Largest files list
 - Most active files (by event frequency)
-- Duplicate file detection (by content hash from events)
-
-**Implementation:**
-- Recursive PROPFIND with depth=infinity
-- Client-side indexing/search
-- Parse file extensions
-- Match events to files for activity stats
-
-**Value**: Find files quickly and understand file patterns
+- Duplicate file detection
+- Recursive directory scanning across all users
 
 ---
 
-### 7. **User Activity Timeline** ⭐⭐
+### 6. **User Activity Timeline** ⭐⭐
 **APIs**: `/events/` filtered by user
 
 **What it shows:**
@@ -161,7 +164,7 @@ Based on available homeserver APIs, here are cool features we could add to the d
 
 ---
 
-### 8. **Health Monitoring & Alerts** ⭐⭐
+### 7. **Health Monitoring & Alerts** ⭐⭐
 **APIs**: `/info`, `/metrics`, `/events-stream`
 
 **What it shows:**
@@ -181,7 +184,7 @@ Based on available homeserver APIs, here are cool features we could add to the d
 
 ---
 
-### 9. **Backup & Export Tools** ⭐
+### 8. **Backup & Export Tools** ⭐
 **APIs**: WebDAV (full file access)
 
 **What it shows:**
@@ -200,42 +203,31 @@ Based on available homeserver APIs, here are cool features we could add to the d
 
 ---
 
-### 10. **System Logs Viewer** ⭐
-**APIs**: Could add `/logs` endpoint (not currently available)
-
-**What it shows:**
-- Real-time log stream
-- Filter by log level
-- Search logs
-- Export logs
-
-**Implementation:**
-- Would require new backend endpoint
-- Or parse metrics for error indicators
-- SSE stream for real-time logs
-
-**Value**: Debugging and troubleshooting
-
----
-
 ## 🎨 UI/UX Enhancements
 
-### 11. **Dark/Light Mode Toggle**
-- Already have theme variables from Franky
-- Add toggle in header
-- Persist preference
+### 9. **Dark/Light Mode Toggle** ⚠️ **PARTIALLY IMPLEMENTED**
+**Status**: ⚠️ Toggle exists but is mock (doesn't actually change theme)
 
-### 12. **Dashboard Customization**
+**What's implemented:**
+- ✅ Theme toggle in settings dropdown
+- ✅ UI for dark/light mode switching
+
+**Remaining work:**
+- Actual theme switching functionality
+- Persist preference in localStorage
+- Apply theme changes to the UI
+
+### 10. **Dashboard Customization**
 - Drag-and-drop widget arrangement
 - Show/hide cards
 - Customizable refresh intervals
 
-### 13. **Keyboard Shortcuts**
+### 11. **Keyboard Shortcuts**
 - Quick navigation between tabs
 - Search shortcuts
 - Action shortcuts (e.g., Ctrl+K for search)
 
-### 14. **Export Reports**
+### 12. **Export Reports**
 - PDF export of dashboard state
 - CSV export of user lists
 - JSON export of metrics
@@ -245,18 +237,17 @@ Based on available homeserver APIs, here are cool features we could add to the d
 ## 📊 Recommended Priority Order
 
 **Phase 1 (Quick Wins):**
-1. ✅ **Activity Feed** - High value, uses existing `/events/` endpoint
-2. ✅ **User Management Dashboard** - High value, combines multiple APIs
-3. ✅ **Storage Analytics** - Medium value, uses WebDAV + `/info`
+1. ⚠️ **Activity Feed** - High value, uses existing `/events/` endpoint
+2. ⚠️ **Storage Analytics** - ⚠️ **PARTIALLY IMPLEMENTED** (needs real data and additional features)
 
 **Phase 2 (More Complex):**
-4. ✅ **Real-Time Metrics** - Medium value, requires Prometheus parsing
-5. ✅ **File Search** - High value but requires recursive directory scanning
+3. ⚠️ **Real-Time Metrics** - Medium value, requires Prometheus parsing
+4. ⚠️ **File Search** - ⚠️ **PARTIALLY IMPLEMENTED** (needs cross-user search and analytics)
 
 **Phase 3 (Nice to Have):**
-6. ✅ **User Activity Timeline** - Nice visualization
-7. ✅ **Health Monitoring** - Proactive alerts
-8. ✅ **Signup Code Analytics** - Useful for understanding growth
+5. ⚠️ **User Activity Timeline** - Nice visualization
+6. ⚠️ **Health Monitoring** - Proactive alerts
+7. ⚠️ **Signup Code Analytics** - ⚠️ **PARTIALLY IMPLEMENTED** (needs usage tracking)
 
 ---
 
@@ -268,12 +259,6 @@ Based on available homeserver APIs, here are cool features we could add to the d
 - Extract user pubkey from path
 - Show relative timestamps ("2 minutes ago")
 - Link events to File Browser
-
-**For User Management:**
-- Extract unique users from events: `GET /events/?limit=1000` then parse paths
-- Or use WebDAV: `PROPFIND /dav/` to list user directories
-- Calculate storage per user via recursive PROPFIND
-- Cache user list to avoid repeated API calls
 
 **For Storage Analytics:**
 - Use WebDAV PROPFIND with depth=infinity for full directory tree

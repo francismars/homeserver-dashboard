@@ -5,169 +5,84 @@ A comprehensive web-based administration tool for managing Pubky homeservers. Bu
 ## 🎯 Features
 
 ### 📊 Overview Tab
-- **Server Statistics**: Real-time display of total users, disabled users, disk usage, and signup codes
+- **Server Statistics**: Real-time display of total users, disabled users, disk usage, and signup codes (from `/info` API)
 - **Server & Connection Info**: 
   - Connection status indicator (Connected/Mock Mode/Not Configured)
-  - Homeserver pubkey display
-  - Server version information
+  - Homeserver pubkey display (mock - requires backend endpoint)
+  - Server version information (mock - requires backend endpoint)
   - Admin endpoint configuration
 - **System Health & Status**: 
-  - Server uptime
-  - Database connection status
-  - DHT connectivity status
-  - Relay connection status
-  - Storage health monitoring
+  - Server uptime (mock)
+  - Database connection status (mock)
+  - DHT connectivity status (mock)
+  - Relay connection status (mock)
+  - Storage health monitoring (mock)
 
 ### 📈 Usage Tab
-- **Storage Capacity**: Visual display of storage usage with capacity indicators
+- **Storage Capacity**: 
+  - Visual display of storage usage with capacity indicators (mock data)
+  - Total capacity, used, and available storage
+  - Progress bar visualization
+  - Storage breakdown by category (User Data, Database, System Files)
+  - Health status badge (Healthy/Warning/Critical)
 - **Resource Trends**: Interactive charts showing:
-  - Storage usage trends
-  - CPU usage trends
-  - RAM usage trends
-  - Network usage trends
-- **Resource Consumption**: System-level resource monitoring
-- **Storage Analytics**: Detailed storage breakdown and analytics
+  - Storage usage trends (mock data)
+  - CPU usage trends (mock data)
+  - RAM usage trends (mock data)
+  - Network usage trends (mock data)
+  - Chart switcher with icon-based navigation
+  - Current value and percentage change display
+  - Custom SVG-based line charts with Y-axis labels
+- **Resource Consumption**: System-level resource monitoring (mock data)
 
 ### 👥 Users Tab
 - **User Management**:
   - **Card View**: Visual card layout with user details
   - **List View**: Table layout with sortable columns
-  - **Search & Filter**: Search by pubkey/name, filter by status (all/active/disabled)
-  - **Sorting**: Sort by pubkey, storage, activity, or status (in list view)
-  - **Pagination**: Navigate through large user lists with configurable items per page
-  - **User Details**: View detailed information about each user
-  - **File Browser Integration**: Browse user files directly from the user management interface
+  - **Search & Filter**: Search by pubkey/name, filter by status
+  - **Sorting**: Sort by pubkey, storage, activity, or status
+  - **Pagination**: Navigate large lists with configurable page sizes
+  - **User Details**: View comprehensive user information (mock data for storage/activity metrics)
+  - **File Browser Integration**: Browse user files directly from user management
   
-- **User Actions**:
-  - **Disable/Enable Users**: Disable or enable user accounts with confirmation
-  - **View Files**: Navigate to user's file directory
-  - **View Details**: See comprehensive user information
-  - **Copy Pubkey**: Quick copy functionality for user pubkeys
+- **User Actions**: Disable/enable users, view files, view details, copy pubkey
 
-- **Disabled Users Management**:
-  - Dedicated dialog for managing disabled users
-  - List all disabled users with search functionality
-  - Disable users by entering their pubkey
-  - Enable disabled users
-  - Real-time count from API (`num_disabled_users`)
+- **Disabled Users Management**: Dedicated dialog to manage disabled users with search
 
-- **Invite Management**:
-  - Generate new signup tokens
-  - View recently generated invites
-  - Copy invite codes to clipboard
-  - Invite statistics (mock data for now)
-
-- **User Statistics**:
-  - Comprehensive user statistics overlay
-  - Activity patterns and metrics
-  - Storage breakdown by user
+- **Invite Management**: Generate signup tokens, view invites, copy to clipboard
+- **User Statistics**: Comprehensive statistics overlay with activity patterns and storage breakdown
 
 ### 📝 Logs Tab
-- **Log Viewer**:
-  - Real-time log display with color-coded entries by level
-  - Scrollable log area (600px height)
-  - Timestamp formatting
-  - Source information display
-  
-- **Filtering & Search**:
-  - Filter by log level (All, Error, Warning, Info, Debug)
-  - Filter by event type (All, Authentication, User Management, Admin Operations, API Requests, Database, Network, Storage, System)
-  - Full-text search across log messages, sources, and details
-  
-- **Auto-Refresh**:
-  - Toggle auto-refresh on/off
-  - Configurable intervals (10s, 30s, 60s, 5m)
-  - Live log count display
-  
-- **Actions**:
-  - Manual refresh
-  - Download logs as text file
-  - Clear all logs (with confirmation)
+- **Log Viewer**: Real-time log display with color-coded entries by level (mock data - ready for `/logs` endpoint)
+- **Filtering & Search**: Filter by log level and event type, full-text search
+- **Auto-Refresh**: Configurable intervals with toggle
+- **Actions**: Manual refresh, download logs, clear logs
 
 ### ⚙️ Settings & Configuration
-- **Configuration Editor**:
-  - **UI View**: Graphical editor for homeserver configuration
-    - General settings (database URL, signup mode, storage quota)
-    - Drive settings (listen sockets)
-    - Storage settings (storage type)
-    - Admin settings (enable/disable, listen socket, password)
-    - Metrics settings (enable/disable, listen socket)
-  - **TOML View**: Raw TOML editor for advanced configuration
-  - Toggle between UI and TOML views
-  - Save and reload functionality
-  - Change tracking and validation
-
-- **Settings Dropdown**:
-  - Configuration editor access
-  - Theme toggle (mock - dark/light mode)
-  - Server control (restart/shutdown - mock)
-  - Preferences
-  - About
+- **Configuration Editor**: Graphical UI view and raw TOML editor with toggle (mock - requires backend endpoints)
+- **Settings Dropdown**: Configuration access, theme toggle (mock), server control (mock), preferences
 
 ### 👤 User Profile
-- **Sign In**:
-  - Sign in with secret key (64-character hex)
-  - Mock key generator button for testing
-  - Paste from clipboard functionality
-  - Session management (localStorage)
-  
-- **Profile Management**:
-  - View and edit display name
-  - View and copy public key
-  - Save profile changes
-  
-- **Multi-Homeserver Management**:
-  - View current homeserver information
-  - List other homeservers you own
-  - View homeserver details (users, storage, etc.)
-  
-- **Settings Sync**:
-  - Sync configuration settings from other homeservers
-  - Selectable settings to sync:
-    - Signup mode
-    - User storage quota
-    - Admin server enabled
-    - Metrics server enabled
-  - Apply synced settings to current homeserver
+- **Sign In**: Authenticate with secret key, mock key generator, session management (localStorage)
+- **Profile Management**: View/edit display name, view/copy public key (mock - requires backend)
+- **Multi-Homeserver Management**: View and manage multiple homeservers (mock)
+- **Settings Sync**: Sync configuration from other homeservers (mock)
 
 ### 🔧 API Explorer
 - Interactive tool to test homeserver API endpoints
 - Support for admin, client, and metrics endpoints
 - Request/response viewing
+- Useful for debugging and testing
+
+> **Note**: See [API Integration](#-api-integration) section below for detailed endpoint documentation.
 
 ### 📁 File Browser
-- **File Management**:
-  - Browse files and directories via WebDAV
-  - Navigate through user directories
-  - Breadcrumb navigation
-  - Search and filter files
-  - Sort by name, size, or date
-  
-- **File Operations**:
-  - View file contents
-  - Upload new files
-  - Create directories
-  - Rename files/folders
-  - Delete files/folders
-  - Edit file contents
+- **File Management**: Browse files via WebDAV, search/filter, sort by name/size/date
+- **File Operations**: View, upload, create, rename, delete, edit files and directories
 
 ### 🎨 UI/UX Features
-- **Modern Design**:
-  - Clean, responsive layout
-  - Dark mode support (mock toggle)
-  - Consistent design system based on Franky
-  - Shadcn UI components
-  
-- **Navigation**:
-  - Top navbar with logo and title
-  - Settings and user profile buttons
-  - Tabbed interface for main sections
-  
-- **Performance**:
-  - Optimized rendering with React.memo
-  - Debounced search inputs
-  - Efficient pagination
-  - Memoized computations
+- **Modern Design**: Responsive layout, dark mode support (mock), consistent design system based on Franky
+- **Navigation**: Top navbar with logo, settings, user profile, tabbed interface, footer
 
 ## 🚀 Prerequisites
 
@@ -240,64 +155,22 @@ npm start
 
 ### Mock Mode
 
-If `NEXT_PUBLIC_ADMIN_BASE_URL` is not set, the dashboard automatically enables mock mode, allowing you to develop and test the UI without a running homeserver. Many features are clearly marked with "Mock" badges to indicate they're using mock data.
+If `NEXT_PUBLIC_ADMIN_BASE_URL` is not set, the dashboard automatically enables mock mode. Features using mock data are clearly marked with "Mock" badges.
 
 ## 🏗️ Project Structure
 
 ```
 homeserver-dashboard/
 ├── src/
-│   ├── app/                          # Next.js app router pages
-│   │   ├── dashboard/                # Main dashboard page
-│   │   │   ├── page.tsx             # Dashboard component
-│   │   │   └── loading.tsx          # Loading state
-│   │   └── globals.css              # Global styles
-│   ├── components/                   # React components
-│   │   ├── atoms/                   # Basic UI components
-│   │   │   └── StatCard/           # Statistic card component
-│   │   ├── molecules/               # Composite components
-│   │   │   └── Logo/               # Logo component
-│   │   ├── organisms/               # Complex feature components
-│   │   │   ├── ApiExplorer/        # API testing tool
-│   │   │   ├── ConfigDialog/        # Configuration editor
-│   │   │   ├── DashboardLogs/      # Logs viewer
-│   │   │   ├── DashboardNavbar/    # Top navigation bar
-│   │   │   ├── DashboardOverview/  # Overview tab
-│   │   │   ├── DashboardUsage/      # Usage statistics
-│   │   │   ├── DisabledUsersDialog/ # Disabled users management
-│   │   │   ├── FileBrowser/        # WebDAV file browser
-│   │   │   ├── InvitesDialog/      # Invite management
-│   │   │   ├── ServerControlDialog/ # Server control
-│   │   │   ├── UserManagement/     # User management
-│   │   │   ├── UserProfileDialog/   # User profile & sign-in
-│   │   │   └── UserStatsDialog/     # User statistics
-│   │   └── ui/                      # Shadcn UI components
-│   ├── hooks/                        # React hooks
-│   │   ├── admin/                   # Admin API hooks
-│   │   │   ├── useAdminActions.tsx # Admin actions (disable user, generate invite)
-│   │   │   ├── useAdminInfo.tsx    # Server info
-│   │   │   └── useAdminUsage.tsx   # Usage statistics
-│   │   ├── user/                    # User management hooks
-│   │   │   └── useUserManagement.tsx # User listing
-│   │   └── webdav/                  # WebDAV hooks
-│   │       └── useWebDav.tsx        # WebDAV operations
-│   ├── services/                    # API clients
-│   │   ├── admin/                   # Admin API service
-│   │   │   ├── admin.ts            # AdminService class
-│   │   │   └── admin.types.ts      # Type definitions
-│   │   ├── user/                    # User service
-│   │   │   ├── user.ts            # UserService class
-│   │   │   ├── keyGenerator.ts   # Keypair generation & signup
-│   │   │   └── user.types.ts     # Type definitions
-│   │   └── webdav/                  # WebDAV service
-│   │       ├── webdav.ts           # WebDavService class
-│   │       └── webdav.types.ts    # Type definitions
-│   └── libs/                        # Utility functions
-│       └── utils.ts                # Helper functions
-├── public/                          # Static assets
-│   └── pubky-logo.svg              # Logo file
-├── .env.example                     # Environment variables template
-└── package.json                     # Dependencies
+│   ├── app/                    # Next.js app router
+│   ├── components/             # React components (atoms/molecules/organisms)
+│   ├── hooks/                  # React hooks (admin/user/webdav)
+│   ├── services/               # API clients (admin/user/webdav)
+│   └── libs/                   # Utility functions
+├── public/                     # Static assets
+├── .env.example
+├── FEATURE_IDEAS.md
+└── package.json
 ```
 
 ## 🛠️ Development
@@ -320,17 +193,10 @@ homeserver-dashboard/
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
 - `npm test` - Run tests
-- `npm run test:watch` - Run tests in watch mode
 
 ### Adding New Components
 
-Components follow atomic design principles:
-
-- **Atoms**: Basic UI elements (`Button`, `Input`, `Card`)
-- **Molecules**: Composite components (`Logo`, `StatCard`)
-- **Organisms**: Complex features (`DashboardOverview`, `FileBrowser`, `UserManagement`)
-
-Use Shadcn UI components as the foundation:
+Components follow atomic design principles (atoms/molecules/organisms). Use Shadcn UI as the foundation:
 
 ```bash
 npx shadcn@latest add [component-name]
@@ -338,7 +204,7 @@ npx shadcn@latest add [component-name]
 
 ## 📡 API Integration
 
-### Implemented Endpoints
+### Implemented Endpoints (Real API)
 
 | Endpoint | Method | Service Method | Status |
 |----------|--------|----------------|--------|
@@ -347,68 +213,27 @@ npx shadcn@latest add [component-name]
 | `/users/{pubkey}/disable` | POST | `AdminService.disableUser()` | ✅ Real |
 | `/users/{pubkey}/enable` | POST | `AdminService.enableUser()` | ✅ Real |
 | `/webdav/{*entry_path}` | DELETE | `AdminService.deleteUrl()` | ✅ Real |
-| `/dav/*` | PROPFIND/GET/PUT/DELETE/MKCOL | `WebDavService.*()` | ✅ Real |
+| `/dav/*` | PROPFIND | `WebDavService.listDirectory()` | ✅ Real |
+| `/dav/*` | GET | `WebDavService.readFile()` | ✅ Real |
+| `/dav/*` | PUT | `WebDavService.writeFile()` | ✅ Real |
+| `/dav/*` | DELETE | `WebDavService.deleteFile()` | ✅ Real |
+| `/dav/*` | MKCOL | `WebDavService.createDirectory()` | ✅ Real |
+| `/dav/*` | MOVE | `WebDavService.moveFile()` | ✅ Real |
 
 ### Mocked Endpoints
 
-| Endpoint | Method | Service Method | Status |
-|----------|--------|----------------|--------|
-| `/config` | GET | `AdminService.getConfig()` | 🟡 Mock |
-| `/config` | PUT | `AdminService.saveConfig()` | 🟡 Mock |
-| `/logs` | GET | (Not yet implemented) | 🟡 Mock |
-| User profile endpoints | Various | (Not yet implemented) | 🟡 Mock |
-| Multi-homeserver discovery | Various | (Not yet implemented) | 🟡 Mock |
+| Endpoint | Method | Service Method | Status | Notes |
+|----------|--------|----------------|--------|-------|
+| `/config` | GET | `AdminService.getConfig()` | 🟡 Mock | Requires backend implementation |
+| `/config` | PUT | `AdminService.saveConfig()` | 🟡 Mock | Requires backend implementation |
+| `/logs` | GET | (Not yet implemented) | 🟡 Mock | Ready for backend integration |
+| User profile endpoints | Various | (Not yet implemented) | 🟡 Mock | Requires backend implementation |
+| Multi-homeserver discovery | Various | (Not yet implemented) | 🟡 Mock | Requires PKARR integration |
+| Settings sync | Various | (Not yet implemented) | 🟡 Mock | Requires backend implementation |
+| Server control (restart/shutdown) | POST | (Not yet implemented) | 🟡 Mock | Requires backend implementation |
+| System health metrics | GET | (Not yet implemented) | 🟡 Mock | Requires backend implementation |
+| Usage trends (CPU/RAM/Network) | GET | (Not yet implemented) | 🟡 Mock | Requires metrics endpoint |
 
-## 🎨 Features in Detail
-
-### User Management
-
-The Users tab provides comprehensive user management capabilities:
-
-- **Dual View Modes**: Switch between card view and list view
-- **Advanced Filtering**: Search by pubkey or name, filter by status
-- **Smart Sorting**: Sort by multiple criteria (pubkey, storage, activity, status)
-- **Pagination**: Handle large user lists efficiently
-- **User Actions**: Disable/enable, view files, view details
-- **Real-time Data**: Uses actual API data for user counts and lists
-- **Mock Details**: Storage and activity data is mocked (requires additional API endpoints)
-
-### Configuration Editor
-
-The configuration editor provides two views:
-
-1. **UI View**: Graphical editor with form fields for each configuration section
-2. **TOML View**: Raw TOML text editor for advanced users
-
-Features:
-- Toggle between views
-- Change tracking
-- Save and reload functionality
-- Validation and error handling
-
-### Logs Viewer
-
-The logs tab provides comprehensive log viewing:
-
-- **Real-time Display**: Color-coded log entries by level
-- **Advanced Filtering**: Filter by level and event type
-- **Search**: Full-text search across all log fields
-- **Auto-refresh**: Configurable automatic refresh intervals
-- **Export**: Download logs as text files
-- **Clear**: Remove all logs (with confirmation)
-
-Currently uses mock data. Ready for backend integration when `/logs` endpoint is available.
-
-### User Profile & Authentication
-
-The user profile dialog provides:
-
-- **Sign In**: Authenticate with secret key
-- **Profile Management**: Edit display name and view pubkey
-- **Multi-Homeserver**: View and manage multiple homeservers
-- **Settings Sync**: Sync configuration between homeservers
-
-Currently uses localStorage for session management. Ready for backend authentication integration.
 
 ## 🐛 Troubleshooting
 
@@ -441,23 +266,26 @@ Currently uses localStorage for session management. Ready for backend authentica
 
 **Problem**: Some features show "Mock" badges.
 
-**Solution**: This is intentional. Features marked with "Mock" badges are using mock data because the backend endpoints are not yet implemented. These include:
-- Configuration editor (GET/PUT `/config`)
-- Logs viewer (GET `/logs`)
-- Some user statistics
-- Multi-homeserver discovery
-- Settings sync
+**Solution**: This is intentional. Features marked with "Mock" badges are using mock data because the backend endpoints are not yet implemented. See the [Mocked Endpoints](#mocked-endpoints) table and [Known Limitations](#-known-limitations) section for a complete list.
 
 When backend endpoints are available, remove the mock checks in the respective services.
 
 ## 📝 Known Limitations
 
-1. **Config Endpoints**: `GET /config` and `PUT /config` are mocked. Backend implementation pending.
-2. **Logs Endpoint**: `GET /logs` is not yet implemented. Using mock data.
-3. **User Statistics**: Some user statistics require additional API endpoints (currently mocked).
-4. **Multi-Homeserver**: Homeserver discovery via PKARR is not yet implemented (using mock data).
-5. **Settings Sync**: Requires backend endpoints for fetching configs from multiple homeservers.
-6. **User Profile**: Authentication and profile management use localStorage (mock implementation).
+The following features use mock data and require backend implementation:
+
+1. **Configuration Management**: `GET /config` and `PUT /config` endpoints
+2. **Logs Viewer**: `GET /logs` endpoint
+3. **User Statistics**: Additional API endpoints for detailed user metrics
+4. **Multi-Homeserver**: PKARR-based homeserver discovery
+5. **Settings Sync**: Backend endpoints for fetching/configuring multiple homeservers
+6. **User Profile**: Backend authentication and profile management (currently uses localStorage)
+7. **System Health**: Endpoints for uptime, database status, DHT/relay connectivity
+8. **Usage Trends**: Metrics endpoint for CPU, RAM, and Network data
+9. **Storage Capacity**: Backend implementation for total capacity and breakdown
+10. **Connection Management**: Currently requires environment variables (see `FEATURE_IDEAS.md` for planned login & connection management feature)
+
+See the [Mocked Endpoints](#mocked-endpoints) table for API-specific details.
 
 ## 🤝 Contributing
 
@@ -487,8 +315,9 @@ For issues related to:
 
 ## 🎯 Roadmap
 
-Future enhancements planned:
+Future enhancements planned (see `FEATURE_IDEAS.md` for details):
 
+- [ ] **Login & Connection Management** (CRITICAL) - Enable flexible deployment without env vars, multi-homeserver support
 - [ ] Real-time log streaming (SSE/WebSocket)
 - [ ] Advanced user analytics
 - [ ] Backup and export tools
@@ -499,3 +328,6 @@ Future enhancements planned:
 - [ ] Real authentication with backend
 - [ ] Multi-homeserver discovery via PKARR
 - [ ] Real-time configuration sync
+- [ ] Activity feed / event stream
+- [ ] Storage analytics
+- [ ] Real-time metrics dashboard
