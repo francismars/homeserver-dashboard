@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "next-env.d.ts",
+    "next.config.*",
+    "src/app/**/page.{js,jsx,ts,tsx}",
+    "src/app/**/layout.{js,jsx,ts,tsx}",
+    "src/app/**/loading.{js,jsx,ts,tsx}"
+  ],
+  "project": ["src/**/*.{js,jsx,ts,tsx}"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/components/ui/**": ["exports", "types"]
+  },
+  "ignoreDependencies": ["eslint", "eslint-config-next", "tw-animate-css"]
+}
+
+

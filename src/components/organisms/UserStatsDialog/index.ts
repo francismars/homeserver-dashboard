@@ -1,2 +1,0 @@
-export { UserStatsDialog } from './UserStatsDialog';
-

@@ -16,14 +16,12 @@ export function useUserManagement() {
   useEffect(() => {
     if (!servicesRef.current) {
       const adminBaseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
-      const clientBaseUrl = adminBaseUrl ? adminBaseUrl.replace(':6288', ':6286') : '';
       const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
 
       console.log('[useUserManagement] Initializing services...', {
         hasAdminBaseUrl: !!adminBaseUrl,
         hasAdminToken: !!adminToken,
         adminBaseUrl,
-        clientBaseUrl,
       });
 
       if (adminBaseUrl && adminToken) {
@@ -35,9 +33,6 @@ export function useUserManagement() {
 
         servicesRef.current = {
           userService: new UserService({
-            adminBaseUrl,
-            clientBaseUrl,
-            adminToken,
             webdavService,
           }),
         };
