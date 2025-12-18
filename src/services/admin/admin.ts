@@ -11,17 +11,15 @@ import {
 export class AdminService {
   private baseUrl: string;
   private token?: string;
-  private mock: boolean;
 
-  constructor({ baseUrl, token, mock = false }: AdminServiceDeps) {
+  constructor({ baseUrl, token }: AdminServiceDeps) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = token;
-    this.mock = mock;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    if (this.mock || !this.baseUrl) {
-      return this.mockResponse<T>(path);
+    if (!this.baseUrl) {
+      throw new Error('Admin API not configured. Set NEXT_PUBLIC_ADMIN_BASE_URL.');
     }
 
     try {
@@ -76,9 +74,6 @@ export class AdminService {
 
   async generateInvite(): Promise<GenerateInviteResponse> {
     // Backend returns plain string, not JSON
-    if (this.mock) {
-      return { token: 'MOCK-INVITE-TOKEN-' + Date.now() };
-    }
     const headers = new Headers();
     if (this.token) {
       headers.set('X-Admin-Password', this.token);
@@ -102,17 +97,11 @@ export class AdminService {
   }
 
   async getConfig(): Promise<AdminConfig> {
-    if (this.mock) {
-      return this.mockConfig();
-    }
     // Placeholder until backend provides config endpoint
     throw new Error('Config endpoint not available yet');
   }
 
-  async saveConfig(payload: AdminConfig): Promise<AdminConfig> {
-    if (this.mock) {
-      return { ...payload, checksum: 'mock-checksum', updatedAt: new Date().toISOString() };
-    }
+  async saveConfig(_payload: AdminConfig): Promise<AdminConfig> {
     // Placeholder until backend provides config endpoint
     throw new Error('Config endpoint not available yet');
   }
@@ -127,32 +116,5 @@ export class AdminService {
 
   async deleteUrl(payload: DeleteUrlRequest): Promise<void> {
     await this.request(`/webdav/${payload.path}`, { method: 'DELETE' });
-  }
-
-  private mockResponse<T>(path: string): T {
-    if (path === '/info') {
-      return {
-        num_users: 42,
-        num_disabled_users: 2,
-        total_disk_used_mb: 512,
-        num_signup_codes: 10,
-        num_unused_signup_codes: 5,
-        pubkey: 'pk:mock1234567890abcdef',
-        address: '127.0.0.1:8080',
-        version: '0.0.0-mock',
-      } as T;
-    }
-    if (path === '/generate_signup_token') {
-      return ('MOCK-INVITE-TOKEN-' + Date.now()) as T;
-    }
-    return undefined as T;
-  }
-
-  private mockConfig(): AdminConfig {
-    return {
-      configToml: '# Mock Config\n[server]\nport = 8080\n',
-      checksum: 'mock-checksum',
-      updatedAt: new Date().toISOString(),
-    };
   }
 }
