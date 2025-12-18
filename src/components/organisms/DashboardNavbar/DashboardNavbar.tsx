@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Settings, Info, Power, RotateCw, Moon, Sun } from 'lucide-react';
 import { Logo } from '@/components/molecules/Logo';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -18,20 +17,14 @@ import { cn } from '@/libs/utils';
 
 interface DashboardNavbarProps {
   className?: string;
-  avatarImage?: string;
-  avatarInitial?: string;
   onSettingsClick?: () => void;
-  onUserClick?: () => void;
   onRestartServer?: () => void;
   onShutdownServer?: () => void;
 }
 
 export function DashboardNavbar({
   className,
-  avatarImage,
-  avatarInitial = 'A',
   onSettingsClick,
-  onUserClick,
   onRestartServer,
   onShutdownServer,
 }: DashboardNavbarProps) {
@@ -137,20 +130,6 @@ export function DashboardNavbar({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* User avatar button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-12 w-12 p-0"
-              onClick={onUserClick}
-              aria-label="User account"
-            >
-              <Avatar className="h-12 w-12 cursor-pointer">
-                <AvatarImage src={avatarImage} alt="User" />
-                <AvatarFallback>{avatarInitial}</AvatarFallback>
-              </Avatar>
-            </Button>
           </div>
         </nav>
       </div>

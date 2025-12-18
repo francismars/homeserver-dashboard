@@ -12,7 +12,6 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { UserProfileDialog } from '@/components/organisms/UserProfileDialog';
 import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,15 +28,10 @@ export default function DashboardPage() {
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
-  const [isUserProfileDialogOpen, setIsUserProfileDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
-  }, []);
-
-  const handleUserClick = useCallback(() => {
-    setIsUserProfileDialogOpen(true);
   }, []);
 
   const handleRestartServer = useCallback(() => {
@@ -53,9 +47,7 @@ export default function DashboardPage() {
       <main>
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
           <DashboardNavbar
-            avatarInitial="A"
             onSettingsClick={handleSettingsClick}
-            onUserClick={handleUserClick}
             onRestartServer={handleRestartServer}
             onShutdownServer={handleShutdownServer}
           />
@@ -121,13 +113,6 @@ export default function DashboardPage() {
           open={!!serverControlAction}
           onOpenChange={(open) => !open && setServerControlAction(null)}
           action={serverControlAction}
-        />
-
-        {/* User Profile Dialog */}
-        <UserProfileDialog
-          open={isUserProfileDialogOpen}
-          onOpenChange={setIsUserProfileDialogOpen}
-          homeserverPubkey={info?.pubkey}
         />
       </div>
       
