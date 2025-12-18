@@ -1,7 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +76,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[90vh] max-h-[90vh] flex flex-col">
+      <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-5xl flex-col">
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <div className="flex items-center gap-2">
@@ -77,8 +84,8 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                 <Code className="h-4 w-4" />
                 Homeserver Configuration
               </DialogTitle>
-              <Badge variant="outline" className="text-xs font-normal border-dashed">
-                <Info className="h-3 w-3 mr-1" />
+              <Badge variant="outline" className="border-dashed text-xs font-normal">
+                <Info className="mr-1 h-3 w-3" />
                 Mock
               </Badge>
               <Badge variant="secondary" className="text-xs">
@@ -89,24 +96,24 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
           <DialogDescription>View the homeserver configuration file (TOML). Editing is disabled.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-2">
+        <div className="flex flex-1 flex-col gap-2 overflow-hidden">
           <div className="flex items-center justify-between text-xs text-muted-foreground/70 italic">
             <span>config.toml</span>
           </div>
           <Textarea
             value={configValue}
             readOnly
-            className={cn('flex-1 font-mono text-sm resize-none', 'border-dashed border-2 border-muted-foreground/30')}
+            className={cn('flex-1 resize-none font-mono text-sm', 'border-2 border-dashed border-muted-foreground/30')}
             placeholder="Configuration file content..."
           />
-          <div className="text-xs text-muted-foreground/60 italic pt-2 border-t border-dashed border-muted-foreground/20">
+          <div className="border-t border-dashed border-muted-foreground/20 pt-2 text-xs text-muted-foreground/60 italic">
             This is mock data. Backend endpoints are required to load the real config.toml.
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleReload} disabled={isReloading}>
-            <RefreshCw className={cn('h-4 w-4 mr-2', isReloading && 'animate-spin')} />
+            <RefreshCw className={cn('mr-2 h-4 w-4', isReloading && 'animate-spin')} />
             Reload
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -117,6 +124,3 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
     </Dialog>
   );
 }
-
-
-

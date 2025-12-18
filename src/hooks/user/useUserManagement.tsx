@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserService } from '@/services/user/user';
 import { WebDavService } from '@/services/webdav';
-import type { User, UserListResponse } from '@/services/user/user.types';
+import type { User } from '@/services/user/user.types';
 
 export function useUserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -42,7 +42,8 @@ export function useUserManagement() {
           adminBaseUrl: adminBaseUrl || 'MISSING',
           adminToken: adminToken ? 'SET' : 'MISSING',
         });
-        const errorMsg = 'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
+        const errorMsg =
+          'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
         setError(new Error(errorMsg));
         setIsLoading(false);
       }
@@ -57,7 +58,8 @@ export function useUserManagement() {
     }
 
     if (!servicesRef.current) {
-      const errorMsg = 'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
+      const errorMsg =
+        'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
       console.error('[useUserManagement]', errorMsg);
       setError(new Error(errorMsg));
       setIsLoading(false);
@@ -74,7 +76,7 @@ export function useUserManagement() {
       const response = await servicesRef.current.userService.listUsers();
       console.log('[useUserManagement] Users loaded successfully:', {
         count: response.users.length,
-        users: response.users.map(u => u.pubkey),
+        users: response.users.map((u) => u.pubkey),
       });
       setUsers(response.users);
     } catch (err) {

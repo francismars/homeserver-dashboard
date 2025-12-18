@@ -7,4 +7,3 @@ export type StatCardProps = {
   icon?: LucideIcon;
   intent?: 'default' | 'warning' | 'error' | 'success';
 };
-

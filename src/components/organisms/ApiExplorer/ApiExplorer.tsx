@@ -181,7 +181,9 @@ const METRICS_ENDPOINTS: ApiEndpoint[] = [
 export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, adminToken }: ApiExplorerProps) {
   const [selectedServer, setSelectedServer] = useState<'admin' | 'client' | 'metrics'>('admin');
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
-  const [customMethod, setCustomMethod] = useState<'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD' | 'PROPFIND' | 'MKCOL' | 'MOVE' | 'COPY'>('GET');
+  const [customMethod, setCustomMethod] = useState<
+    'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD' | 'PROPFIND' | 'MKCOL' | 'MOVE' | 'COPY'
+  >('GET');
   const [customPath, setCustomPath] = useState('');
   const [requestBody, setRequestBody] = useState('');
   const [response, setResponse] = useState<{
@@ -253,7 +255,9 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
         ? currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.method || customMethod
         : customMethod;
 
-      const endpoint = currentEndpoints.find((e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`));
+      const endpoint = currentEndpoints.find(
+        (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
+      );
       const baseUrl = currentGroup.baseUrl;
       const url = `${baseUrl}${path}`;
       const headers: Record<string, string> = {};
@@ -441,12 +445,12 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                         <span className="font-mono text-sm font-semibold">{endpoint.method}</span>
                         <span className="font-mono text-sm">{endpoint.path}</span>
                         {endpoint.requiresAuth && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                          <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                             Auth
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground mt-1">{endpoint.description}</span>
+                      <span className="mt-1 text-xs text-muted-foreground">{endpoint.description}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -457,7 +461,10 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Method</Label>
-              <Select value={customMethod} onValueChange={(v) => setCustomMethod(v as 'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD')}>
+              <Select
+                value={customMethod}
+                onValueChange={(v) => setCustomMethod(v as 'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD')}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -485,32 +492,48 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
             </div>
           </div>
 
-          {(customMethod === 'POST' || customMethod === 'PUT' || customMethod === 'DELETE' || customMethod === 'PROPFIND' || customMethod === 'MKCOL' || customMethod === 'MOVE' || customMethod === 'COPY') && (
+          {(customMethod === 'POST' ||
+            customMethod === 'PUT' ||
+            customMethod === 'DELETE' ||
+            customMethod === 'PROPFIND' ||
+            customMethod === 'MKCOL' ||
+            customMethod === 'MOVE' ||
+            customMethod === 'COPY') && (
             <div className="space-y-2">
               <Label>
                 Request Body
-                {selectedEndpoint && currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody?.includes('binary') && (
-                  <span className="text-xs text-muted-foreground ml-2">(Binary/Base64 for AuthToken endpoints)</span>
-                )}
+                {selectedEndpoint &&
+                  currentEndpoints
+                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
+                    ?.exampleBody?.includes('binary') && (
+                    <span className="ml-2 text-xs text-muted-foreground">(Binary/Base64 for AuthToken endpoints)</span>
+                  )}
               </Label>
               <Textarea
                 value={requestBody}
                 onChange={(e) => setRequestBody(e.target.value)}
                 placeholder={
-                  selectedEndpoint && currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody?.includes('binary')
+                  selectedEndpoint &&
+                  currentEndpoints
+                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
+                    ?.exampleBody?.includes('binary')
                     ? 'Base64-encoded binary data or raw bytes'
-                    : (customMethod === 'PROPFIND' || customMethod === 'MKCOL' || customMethod === 'MOVE' || customMethod === 'COPY')
-                    ? '<?xml version="1.0"?><d:propfind>...</d:propfind> (WebDAV XML)'
-                    : '{"key": "value"} or file content'
+                    : customMethod === 'PROPFIND' ||
+                        customMethod === 'MKCOL' ||
+                        customMethod === 'MOVE' ||
+                        customMethod === 'COPY'
+                      ? '<?xml version="1.0"?><d:propfind>...</d:propfind> (WebDAV XML)'
+                      : '{"key": "value"} or file content'
                 }
                 className="font-mono text-sm"
                 rows={6}
               />
-              {selectedEndpoint && currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody && (
-                <p className="text-xs text-muted-foreground">
-                  Example: {currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody}
-                </p>
-              )}
+              {selectedEndpoint &&
+                currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody && (
+                  <p className="text-xs text-muted-foreground">
+                    Example: {currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody}
+                  </p>
+                )}
             </div>
           )}
 
@@ -548,10 +571,10 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                   )}
                 </Button>
               </div>
-              <div className="rounded-md border bg-muted/50 p-4 space-y-3">
+              <div className="space-y-3 rounded-md border bg-muted/50 p-4">
                 <div>
                   <span className="text-sm font-semibold">Status: </span>
-                  <span className={cn('text-sm font-mono', getStatusColor(response.status))}>
+                  <span className={cn('font-mono text-sm', getStatusColor(response.status))}>
                     {response.status} {response.statusText}
                   </span>
                 </div>
@@ -563,13 +586,13 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                   <>
                     <div>
                       <span className="text-sm font-semibold">Headers:</span>
-                      <pre className="mt-1 text-xs font-mono bg-background p-2 rounded overflow-auto max-h-32">
+                      <pre className="mt-1 max-h-32 overflow-auto rounded bg-background p-2 font-mono text-xs">
                         {JSON.stringify(response.headers, null, 2)}
                       </pre>
                     </div>
                     <div>
                       <span className="text-sm font-semibold">Body:</span>
-                      <pre className="mt-1 text-xs font-mono bg-background p-2 rounded overflow-auto max-h-96">
+                      <pre className="mt-1 max-h-96 overflow-auto rounded bg-background p-2 font-mono text-xs">
                         {response.body || '(empty)'}
                       </pre>
                     </div>
@@ -583,4 +606,3 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
     </div>
   );
 }
-

@@ -28,12 +28,7 @@ export function DashboardNavbar({
   onShutdownServer,
 }: DashboardNavbarProps) {
   return (
-    <header
-      className={cn(
-        'w-full bg-linear-to-b from-background/95 to-transparent py-6 backdrop-blur-sm',
-        className
-      )}
-    >
+    <header className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-6 backdrop-blur-sm', className)}>
       <div className="flex w-full flex-row flex-wrap items-center justify-between gap-4 sm:gap-6">
         <nav className="flex w-full flex-row flex-wrap items-center gap-4 sm:flex-nowrap sm:items-center sm:gap-6">
           {/* Logo and title grouped together */}
@@ -64,8 +59,8 @@ export function DashboardNavbar({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSettingsClick} className="flex items-center justify-between">
                   <span>Configuration</span>
-                  <Badge variant="outline" className="text-xs font-normal border-dashed ml-2">
-                    <Info className="h-3 w-3 mr-1" />
+                  <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
+                    <Info className="mr-1 h-3 w-3" />
                     Mock
                   </Badge>
                 </DropdownMenuItem>
@@ -76,23 +71,23 @@ export function DashboardNavbar({
                       <RotateCw className="h-4 w-4" />
                       <span>Restart Homeserver</span>
                     </div>
-                    <Badge variant="outline" className="text-xs font-normal border-dashed ml-2">
-                      <Info className="h-3 w-3 mr-1" />
+                    <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
+                      <Info className="mr-1 h-3 w-3" />
                       Mock
                     </Badge>
                   </DropdownMenuItem>
                 )}
                 {onShutdownServer && (
-                  <DropdownMenuItem 
-                    onClick={onShutdownServer} 
+                  <DropdownMenuItem
+                    onClick={onShutdownServer}
                     className="flex items-center justify-between text-destructive focus:text-destructive"
                   >
                     <div className="flex items-center gap-2">
                       <Power className="h-4 w-4" />
                       <span>Shutdown Homeserver</span>
                     </div>
-                    <Badge variant="outline" className="text-xs font-normal border-dashed ml-2">
-                      <Info className="h-3 w-3 mr-1" />
+                    <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
+                      <Info className="mr-1 h-3 w-3" />
                       Mock
                     </Badge>
                   </DropdownMenuItem>
@@ -106,4 +101,3 @@ export function DashboardNavbar({
     </header>
   );
 }
-

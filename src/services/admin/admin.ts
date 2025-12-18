@@ -41,7 +41,7 @@ export class AdminService {
       if (!res.ok) {
         const contentType = res.headers.get('content-type');
         let message = `Request failed: ${res.status}`;
-        
+
         if (contentType?.includes('application/json')) {
           try {
             const json = await res.json();
@@ -56,7 +56,7 @@ export class AdminService {
             message = text || message;
           }
         }
-        
+
         throw new Error(message);
       }
 
@@ -143,7 +143,7 @@ export class AdminService {
       } as T;
     }
     if (path === '/generate_signup_token') {
-      return 'MOCK-INVITE-TOKEN-' + Date.now() as T;
+      return ('MOCK-INVITE-TOKEN-' + Date.now()) as T;
     }
     return undefined as T;
   }
@@ -156,4 +156,3 @@ export class AdminService {
     };
   }
 }
-

@@ -5,4 +5,3 @@ export type DashboardOverviewProps = {
   isLoading: boolean;
   error: Error | null;
 };
-

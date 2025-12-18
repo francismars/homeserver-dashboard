@@ -4,23 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { StatCard } from '@/components/atoms/StatCard';
-import {
-  Users,
-  HardDrive,
-  Shield,
-  Key,
-  Server,
-  Info,
-  CheckCircle2,
-  AlertCircle,
-} from 'lucide-react';
+import { Users, HardDrive, Shield, Key, Server, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
@@ -98,18 +84,16 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card 
+              <Card
                 className={cn(
-                  'relative border-dashed border-2 border-muted-foreground/30',
-                  'hover:border-muted-foreground/50 transition-colors cursor-help'
+                  'relative border-2 border-dashed border-muted-foreground/30',
+                  'cursor-help transition-colors hover:border-muted-foreground/50',
                 )}
               >
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="flex items-center gap-2">
-                        Server & Connection
-                      </CardTitle>
+                      <CardTitle className="flex items-center gap-2">Server & Connection</CardTitle>
                       <CardDescription>Homeserver details and dashboard connection</CardDescription>
                     </div>
                   </div>
@@ -120,32 +104,32 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                     <span className="text-sm text-muted-foreground">Connection Status:</span>
                     {isConfigured ? (
                       <Badge variant="default" className="bg-green-600">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
                         Connected
                       </Badge>
                     ) : isMockMode ? (
                       <Badge variant="secondary">
-                        <Server className="h-3 w-3 mr-1" />
+                        <Server className="mr-1 h-3 w-3" />
                         Mock Mode
                       </Badge>
                     ) : (
                       <Badge variant="destructive">
-                        <AlertCircle className="h-3 w-3 mr-1" />
+                        <AlertCircle className="mr-1 h-3 w-3" />
                         Not Configured
                       </Badge>
                     )}
                   </div>
 
                   {/* Server Pubkey */}
-                  <div className="flex justify-between items-center gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted-foreground">Homeserver Pubkey:</span>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono text-muted-foreground/70 italic truncate">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-mono text-xs text-muted-foreground/70 italic">
                         {homeserverPubkey}
                       </span>
                       {isPubkeyMock && (
-                        <Badge variant="outline" className="text-xs font-normal border-dashed shrink-0">
-                          <Info className="h-3 w-3 mr-1" />
+                        <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
+                          <Info className="mr-1 h-3 w-3" />
                           Mock
                         </Badge>
                       )}
@@ -153,13 +137,13 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                   </div>
 
                   {/* Server Version */}
-                  <div className="flex justify-between items-center gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted-foreground">Version:</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground/70 italic">{homeserverVersion}</span>
                       {isVersionMock && (
-                        <Badge variant="outline" className="text-xs font-normal border-dashed shrink-0">
-                          <Info className="h-3 w-3 mr-1" />
+                        <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
+                          <Info className="mr-1 h-3 w-3" />
                           Mock
                         </Badge>
                       )}
@@ -168,18 +152,14 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
                   {/* Admin Endpoint */}
                   {adminBaseUrl && (
-                    <div className="flex justify-between items-center pt-2 border-t">
+                    <div className="flex items-center justify-between border-t pt-2">
                       <span className="text-sm text-muted-foreground">Admin Endpoint:</span>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {adminBaseUrl}
-                      </code>
+                      <code className="rounded bg-muted px-2 py-1 text-xs">{adminBaseUrl}</code>
                     </div>
                   )}
 
-                  <div className="mt-3 pt-3 border-t border-dashed border-muted-foreground/20">
-                    <p className="text-xs text-muted-foreground/60 italic">
-                      Hover for implementation details
-                    </p>
+                  <div className="mt-3 border-t border-dashed border-muted-foreground/20 pt-3">
+                    <p className="text-xs text-muted-foreground/60 italic">Hover for implementation details</p>
                   </div>
                 </CardContent>
               </Card>
@@ -193,4 +173,3 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     </div>
   );
 }
-

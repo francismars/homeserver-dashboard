@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useWebDav } from '@/hooks/webdav';
@@ -63,14 +70,24 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>({ field: 'type', direction: 'asc' });
 
-  const loadDirectory = useCallback(async (path: string) => {
-    // Clear files immediately when path changes to show loading state
-    setFiles([]);
-    const directory = await listDirectory(path);
-    if (directory) {
-      setFiles(directory.files);
-    }
-  }, [listDirectory]);
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
+
+  const loadDirectory = useCallback(
+    async (path: string) => {
+      // Clear files immediately when path changes to show loading state
+      setFiles([]);
+      const directory = await listDirectory(path);
+      if (directory) {
+        setFiles(directory.files);
+      }
+    },
+    [listDirectory],
+  );
 
   useEffect(() => {
     loadDirectory(currentPath);
@@ -98,7 +115,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
   const handleSave = async () => {
     if (!selectedFile) return;
-    
+
     setIsSaving(true);
     const success = await writeFile(selectedFile.path, fileContent);
     if (success) {
@@ -123,21 +140,19 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
   const handleUpload = async () => {
     if (!newFileName.trim()) return;
-    
+
     // Validate path structure
     if (!canCreateFiles) {
-      setValidationError('Cannot create files at root level. Navigate to a user\'s /pub/ directory first.');
+      setValidationError("Cannot create files at root level. Navigate to a user's /pub/ directory first.");
       setShowUploadDialog(false);
       setTimeout(() => setValidationError(null), 5000);
       return;
     }
-    
+
     setIsSaving(true);
     setValidationError(null);
-    const uploadPath = currentPath.endsWith('/') 
-      ? `${currentPath}${newFileName}` 
-      : `${currentPath}/${newFileName}`;
-    
+    const uploadPath = currentPath.endsWith('/') ? `${currentPath}${newFileName}` : `${currentPath}/${newFileName}`;
+
     const success = await writeFile(uploadPath, newFileContent);
     if (success) {
       setShowUploadDialog(false);
@@ -150,21 +165,19 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
   const handleCreateDirectory = async () => {
     if (!newDirName.trim()) return;
-    
+
     // Validate path structure
     if (!canCreateFiles) {
-      setValidationError('Cannot create directories at root level. Navigate to a user\'s /pub/ directory first.');
+      setValidationError("Cannot create directories at root level. Navigate to a user's /pub/ directory first.");
       setShowCreateDirDialog(false);
       setTimeout(() => setValidationError(null), 5000);
       return;
     }
-    
+
     setIsSaving(true);
     setValidationError(null);
-    const dirPath = currentPath.endsWith('/') 
-      ? `${currentPath}${newDirName}/` 
-      : `${currentPath}/${newDirName}/`;
-    
+    const dirPath = currentPath.endsWith('/') ? `${currentPath}${newDirName}/` : `${currentPath}/${newDirName}/`;
+
     const success = await createDirectory(dirPath);
     if (success) {
       setShowCreateDirDialog(false);
@@ -176,7 +189,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
   const handleDelete = async () => {
     if (!fileToDelete) return;
-    
+
     setIsSaving(true);
     const success = await deleteFile(fileToDelete.path);
     if (success) {
@@ -244,17 +257,17 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
   const handleRename = async () => {
     if (!fileToRename || !renameValue.trim()) return;
-    
+
     setIsSaving(true);
     setValidationError(null);
-    
+
     try {
       // Get the parent directory path
       const parentPath = fileToRename.path.substring(0, fileToRename.path.lastIndexOf('/'));
-      const newPath = parentPath.endsWith('/') 
+      const newPath = parentPath.endsWith('/')
         ? `${parentPath}${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`
         : `${parentPath}/${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`;
-      
+
       const success = await moveFile(fileToRename.path, newPath);
       if (!success) {
         throw new Error('Failed to rename file');
@@ -289,7 +302,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
     })
     .sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortOption.field) {
         case 'name':
           comparison = a.displayName.localeCompare(b.displayName);
@@ -307,7 +320,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
           comparison = a.displayName.localeCompare(b.displayName);
           break;
       }
-      
+
       return sortOption.direction === 'asc' ? comparison : -comparison;
     });
 
@@ -323,7 +336,6 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
   // Check if we're in a valid location for creating files/directories
   // Must be inside a user's /pub/ directory (path contains /pub/)
   const canCreateFiles = currentPath.includes('/pub/') || currentPath.match(/^\/[^/]+\/pub\/?$/);
-  const isRootLevel = currentPath === '/' || currentPath === '';
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return '-';
@@ -351,32 +363,17 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               <CardDescription>Browse and manage files via WebDAV</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadDirectory(currentPath)}
-                disabled={isLoading}
-              >
+              <Button variant="outline" size="sm" onClick={() => loadDirectory(currentPath)} disabled={isLoading}>
                 <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
               </Button>
               {canCreateFiles && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreateDirDialog(true)}
-                    disabled={isLoading}
-                  >
-                    <FolderPlus className="h-4 w-4 mr-2" />
+                  <Button variant="outline" size="sm" onClick={() => setShowCreateDirDialog(true)} disabled={isLoading}>
+                    <FolderPlus className="mr-2 h-4 w-4" />
                     New Folder
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowUploadDialog(true)}
-                    disabled={isLoading}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
+                  <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} disabled={isLoading}>
+                    <Upload className="mr-2 h-4 w-4" />
                     Upload File
                   </Button>
                 </>
@@ -391,7 +388,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                 disabled={isDeletingUrl}
                 title="Delete an entry by pasting its path"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </Button>
             </div>
@@ -400,7 +397,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
         <CardContent className="space-y-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search files..."
               className="pl-9"
@@ -414,12 +411,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             {breadcrumbs.map((crumb, index) => (
               <div key={index} className="flex items-center gap-2">
                 {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateToPath(crumb.path)}
-                  className="h-6 px-2"
-                >
+                <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-2">
                   {crumb.name}
                 </Button>
               </div>
@@ -434,7 +426,6 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             </Alert>
           )}
 
-
           {/* File List */}
           {isLoading && files.length === 0 ? (
             <div className="space-y-2">
@@ -443,72 +434,65 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               ))}
             </div>
           ) : filteredAndSortedFiles.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Folder className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>
-                {files.length === 0 
-                  ? 'This directory is empty' 
-                  : `No files match "${debouncedSearchQuery}"`}
-              </p>
+            <div className="py-8 text-center text-muted-foreground">
+              <Folder className="mx-auto mb-2 h-12 w-12 opacity-50" />
+              <p>{files.length === 0 ? 'This directory is empty' : `No files match "${debouncedSearchQuery}"`}</p>
             </div>
           ) : (
-            <div className="border rounded-md">
+            <div className="rounded-md border">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th 
-                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                    <th
+                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
                       onClick={() => handleSort('type')}
                     >
                       <div className="flex items-center gap-2">
                         <span>Name</span>
-                        {sortOption.field === 'type' && (
-                          sortOption.direction === 'asc' ? (
+                        {sortOption.field === 'type' &&
+                          (sortOption.direction === 'asc' ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : (
                             <ArrowDown className="h-3 w-3" />
-                          )
-                        )}
+                          ))}
                       </div>
                     </th>
-                    <th 
-                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                    <th
+                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
                       onClick={() => handleSort('size')}
                     >
                       <div className="flex items-center gap-2">
                         <span>Size</span>
-                        {sortOption.field === 'size' && (
-                          sortOption.direction === 'asc' ? (
+                        {sortOption.field === 'size' &&
+                          (sortOption.direction === 'asc' ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : (
                             <ArrowDown className="h-3 w-3" />
-                          )
-                        )}
+                          ))}
                       </div>
                     </th>
-                    <th 
-                      className="text-left p-2 text-sm font-semibold cursor-pointer hover:bg-muted/50 select-none"
+                    <th
+                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
                       onClick={() => handleSort('date')}
                     >
                       <div className="flex items-center gap-2">
                         <span>Modified</span>
-                        {sortOption.field === 'date' && (
-                          sortOption.direction === 'asc' ? (
+                        {sortOption.field === 'date' &&
+                          (sortOption.direction === 'asc' ? (
                             <ArrowUp className="h-3 w-3" />
                           ) : (
                             <ArrowDown className="h-3 w-3" />
-                          )
-                        )}
+                          ))}
                       </div>
                     </th>
-                    <th className="text-right p-2 text-sm font-semibold">Actions</th>
+                    <th className="p-2 text-right text-sm font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAndSortedFiles.map((file) => (
                     <tr
                       key={file.path}
-                      className="border-b hover:bg-muted/50 cursor-pointer"
+                      className="cursor-pointer border-b hover:bg-muted/50"
                       onClick={() => handleFileClick(file)}
                     >
                       <td className="p-2">
@@ -524,9 +508,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                       <td className="p-2 text-sm text-muted-foreground">
                         {file.isCollection ? '-' : formatFileSize(file.contentLength)}
                       </td>
-                      <td className="p-2 text-sm text-muted-foreground">
-                        {formatDate(file.lastModified)}
-                      </td>
+                      <td className="p-2 text-sm text-muted-foreground">{formatDate(file.lastModified)}</td>
                       <td className="p-2">
                         <div className="flex justify-end gap-1">
                           <Button
@@ -569,7 +551,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
 
       {/* File Viewer/Editor Dialog */}
       <Dialog open={isViewingFile} onOpenChange={setIsViewingFile}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-h-[80vh] max-w-4xl">
           <DialogHeader>
             <DialogTitle>{selectedFile?.displayName}</DialogTitle>
             <DialogDescription>{selectedFile?.path}</DialogDescription>
@@ -579,12 +561,12 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               <Textarea
                 value={fileContent}
                 onChange={(e) => setFileContent(e.target.value)}
-                className="font-mono text-sm min-h-[400px]"
+                className="min-h-[400px] font-mono text-sm"
                 placeholder="File content..."
               />
             ) : (
-              <div className="border rounded-md p-4 bg-muted/50 max-h-[60vh] overflow-auto">
-                <pre className="text-sm font-mono whitespace-pre-wrap">{fileContent}</pre>
+              <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
+                <pre className="font-mono text-sm whitespace-pre-wrap">{fileContent}</pre>
               </div>
             )}
           </div>
@@ -592,11 +574,11 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             {isEditingFile ? (
               <>
                 <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving}>
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="mr-2 h-4 w-4" />
                   Cancel
                 </Button>
                 <Button onClick={handleSave} disabled={isSaving}>
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="mr-2 h-4 w-4" />
                   {isSaving ? 'Saving...' : 'Save'}
                 </Button>
               </>
@@ -606,7 +588,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                   Close
                 </Button>
                 <Button onClick={handleEdit}>
-                  <Edit2 className="h-4 w-4 mr-2" />
+                  <Edit2 className="mr-2 h-4 w-4" />
                   Edit
                 </Button>
               </>
@@ -625,11 +607,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>File Name</Label>
-              <Input
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="example.txt"
-              />
+              <Input value={newFileName} onChange={(e) => setNewFileName(e.target.value)} placeholder="example.txt" />
             </div>
             <div className="space-y-2">
               <Label>Content</Label>
@@ -663,11 +641,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Directory Name</Label>
-              <Input
-                value={newDirName}
-                onChange={(e) => setNewDirName(e.target.value)}
-                placeholder="new-folder"
-              />
+              <Input value={newDirName} onChange={(e) => setNewDirName(e.target.value)} placeholder="new-folder" />
             </div>
           </div>
           <DialogFooter>
@@ -732,12 +706,15 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowRenameDialog(false);
-              setFileToRename(null);
-              setRenameValue('');
-              setValidationError(null);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRenameDialog(false);
+                setFileToRename(null);
+                setRenameValue('');
+                setValidationError(null);
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={handleRename} disabled={!renameValue.trim() || isSaving}>
@@ -754,7 +731,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             <DialogTitle>Delete</DialogTitle>
             <DialogDescription>
               Paste a WebDAV entry path to delete (destructive). You can paste a full URL or a path like{' '}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">/dav/&lt;pubkey&gt;/pub/file.txt</code>.
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/dav/&lt;pubkey&gt;/pub/file.txt</code>.
             </DialogDescription>
           </DialogHeader>
 
@@ -778,7 +755,8 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Will delete: <code className="bg-muted px-1 py-0.5 rounded">{normalizeAdminDeletePath(deleteByPathInput) || '-'}</code>
+              Will delete:{' '}
+              <code className="rounded bg-muted px-1 py-0.5">{normalizeAdminDeletePath(deleteByPathInput) || '-'}</code>
             </p>
           </div>
 
@@ -793,11 +771,7 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteByPath}
-              disabled={isDeletingUrl}
-            >
+            <Button variant="destructive" onClick={handleDeleteByPath} disabled={isDeletingUrl}>
               {isDeletingUrl ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
@@ -812,4 +786,3 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
     </div>
   );
 }
-

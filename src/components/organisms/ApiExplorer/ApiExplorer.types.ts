@@ -22,4 +22,3 @@ export type EndpointGroup = {
   baseUrl: string;
   endpoints: ApiEndpoint[];
 };
-

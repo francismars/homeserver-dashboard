@@ -37,4 +37,3 @@ export type AdminServiceDeps = {
   token?: string;
   mock?: boolean;
 };
-

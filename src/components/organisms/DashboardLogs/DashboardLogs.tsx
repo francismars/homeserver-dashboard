@@ -8,16 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  ScrollArea,
-} from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   FileText,
   RefreshCw,
@@ -27,7 +19,6 @@ import {
   Trash2,
   Info,
   AlertCircle,
-  CheckCircle2,
   XCircle,
   Clock,
   Server,
@@ -41,16 +32,7 @@ import { cn } from '@/libs/utils';
 import type { DashboardLogsProps } from './DashboardLogs.types';
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
-export type LogEventType = 
-  | 'all'
-  | 'auth'
-  | 'user'
-  | 'admin'
-  | 'api'
-  | 'database'
-  | 'network'
-  | 'storage'
-  | 'system';
+export type LogEventType = 'all' | 'auth' | 'user' | 'admin' | 'api' | 'database' | 'network' | 'storage' | 'system';
 
 export interface LogEntry {
   id: string;
@@ -58,14 +40,23 @@ export interface LogEntry {
   level: LogLevel;
   eventType: LogEventType;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   source?: string;
 }
 
 // Mock log data generator
 const generateMockLogs = (count: number = 50): LogEntry[] => {
   const levels: LogLevel[] = ['info', 'warn', 'error', 'debug'];
-  const eventTypes: Exclude<LogEventType, 'all'>[] = ['auth', 'user', 'admin', 'api', 'database', 'network', 'storage', 'system'];
+  const eventTypes: Exclude<LogEventType, 'all'>[] = [
+    'auth',
+    'user',
+    'admin',
+    'api',
+    'database',
+    'network',
+    'storage',
+    'system',
+  ];
   const messages = [
     'User signed in successfully',
     'Failed authentication attempt',
@@ -127,7 +118,7 @@ const getLogLevelIcon = (level: LogLevel) => {
   }
 };
 
-const getLogLevelBadgeVariant = (level: LogLevel): "default" | "destructive" | "secondary" | "outline" => {
+const getLogLevelBadgeVariant = (level: LogLevel): 'default' | 'destructive' | 'secondary' | 'outline' => {
   switch (level) {
     case 'error':
       return 'destructive';
@@ -170,7 +161,7 @@ const formatTimestamp = (timestamp: string): string => {
   return date.toLocaleString();
 };
 
-export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
+export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -178,7 +169,6 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
   const [eventTypeFilter, setEventTypeFilter] = useState<LogEventType>('all');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load logs
@@ -187,9 +177,9 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
     try {
       // In real implementation, this would call the admin API
       // const response = await adminService.getLogs({ level, eventType, limit: 1000 });
-      
+
       // Mock implementation
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const mockLogs = generateMockLogs(100);
       setLogs(mockLogs);
     } catch (err) {
@@ -226,7 +216,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
 
   // Filter logs
   const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
+    return logs.filter((log) => {
       // Level filter
       if (levelFilter !== 'all' && log.level !== levelFilter) {
         return false;
@@ -243,7 +233,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
         return (
           log.message.toLowerCase().includes(query) ||
           log.source?.toLowerCase().includes(query) ||
-          log.details && JSON.stringify(log.details).toLowerCase().includes(query)
+          (log.details && JSON.stringify(log.details).toLowerCase().includes(query))
         );
       }
 
@@ -258,9 +248,12 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
   }, []);
 
   const handleDownloadLogs = useCallback(() => {
-    const logText = filteredLogs.map(log => 
-      `[${log.timestamp}] [${log.level.toUpperCase()}] [${log.eventType}] ${log.message}${log.source ? ` (${log.source})` : ''}${log.details ? ` ${JSON.stringify(log.details)}` : ''}`
-    ).join('\n');
+    const logText = filteredLogs
+      .map(
+        (log) =>
+          `[${log.timestamp}] [${log.level.toUpperCase()}] [${log.eventType}] ${log.message}${log.source ? ` (${log.source})` : ''}${log.details ? ` ${JSON.stringify(log.details)}` : ''}`,
+      )
+      .join('\n');
 
     const blob = new Blob([logText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -284,46 +277,31 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-dashed border-2 border-muted-foreground/30">
+      <Card className="border-2 border-dashed border-muted-foreground/30">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Homeserver Logs
-                <Badge variant="outline" className="text-xs font-normal border-dashed">
-                  <Info className="h-3 w-3 mr-1" />
+                <Badge variant="outline" className="border-dashed text-xs font-normal">
+                  <Info className="mr-1 h-3 w-3" />
                   Mock
                 </Badge>
               </CardTitle>
               <CardDescription>View and filter homeserver event logs</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadLogs}
-                disabled={isLoadingLogs}
-              >
-                <RefreshCw className={cn('h-4 w-4 mr-2', isLoadingLogs && 'animate-spin')} />
+              <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs}>
+                <RefreshCw className={cn('mr-2 h-4 w-4', isLoadingLogs && 'animate-spin')} />
                 Refresh
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadLogs}
-                disabled={filteredLogs.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handleDownloadLogs} disabled={filteredLogs.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
                 Download
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearLogs}
-                disabled={logs.length === 0}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handleClearLogs} disabled={logs.length === 0}>
+                <Trash2 className="mr-2 h-4 w-4" />
                 Clear
               </Button>
             </div>
@@ -331,9 +309,9 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
               <Input
                 placeholder="Search logs..."
                 value={searchQuery}
@@ -343,7 +321,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
             </div>
             <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as LogLevel | 'all')}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by level" />
               </SelectTrigger>
               <SelectContent>
@@ -356,7 +334,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
             </Select>
             <Select value={eventTypeFilter} onValueChange={(value) => setEventTypeFilter(value as LogEventType)}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by event" />
               </SelectTrigger>
               <SelectContent>
@@ -374,7 +352,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
           </div>
 
           {/* Auto-refresh controls */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
+          <div className="flex items-center gap-3 rounded-md bg-muted/50 p-3">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -383,7 +361,7 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="rounded"
               />
-              <Label htmlFor="autoRefresh" className="text-sm cursor-pointer">
+              <Label htmlFor="autoRefresh" className="cursor-pointer text-sm">
                 Auto-refresh every
               </Label>
             </div>
@@ -415,11 +393,11 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
               ))}
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <div className="py-8 text-center text-muted-foreground">
+              <FileText className="mx-auto mb-2 h-12 w-12 opacity-50" />
               <p>No logs found</p>
               {logs.length > 0 && (
-                <p className="text-sm mt-2">
+                <p className="mt-2 text-sm">
                   Try adjusting your filters (showing {filteredLogs.length} of {logs.length} logs)
                 </p>
               )}
@@ -431,38 +409,32 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
                   <div
                     key={log.id}
                     className={cn(
-                      'flex items-start gap-3 p-3 rounded-md border text-sm',
-                      log.level === 'error' && 'bg-destructive/10 border-destructive/20',
-                      log.level === 'warn' && 'bg-yellow-500/10 border-yellow-500/20',
-                      log.level === 'info' && 'bg-blue-500/10 border-blue-500/20',
-                      log.level === 'debug' && 'bg-muted border-muted-foreground/20'
+                      'flex items-start gap-3 rounded-md border p-3 text-sm',
+                      log.level === 'error' && 'border-destructive/20 bg-destructive/10',
+                      log.level === 'warn' && 'border-yellow-500/20 bg-yellow-500/10',
+                      log.level === 'info' && 'border-blue-500/20 bg-blue-500/10',
+                      log.level === 'debug' && 'border-muted-foreground/20 bg-muted',
                     )}
                   >
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getLogLevelIcon(log.level)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="mt-0.5 flex-shrink-0">{getLogLevelIcon(log.level)}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <Badge variant={getLogLevelBadgeVariant(log.level)} className="text-xs">
                           {log.level.toUpperCase()}
                         </Badge>
-                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
                           {getEventTypeIcon(log.eventType)}
                           {log.eventType}
                         </Badge>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           {formatTimestamp(log.timestamp)}
                         </span>
-                        {log.source && (
-                          <code className="text-xs text-muted-foreground ml-auto">
-                            {log.source}
-                          </code>
-                        )}
+                        {log.source && <code className="ml-auto text-xs text-muted-foreground">{log.source}</code>}
                       </div>
                       <p className="text-foreground">{log.message}</p>
                       {log.details && (
-                        <pre className="text-xs text-muted-foreground mt-2 p-2 bg-muted rounded overflow-x-auto">
+                        <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs text-muted-foreground">
                           {JSON.stringify(log.details, null, 2)}
                         </pre>
                       )}
@@ -473,13 +445,14 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
             </ScrollArea>
           )}
 
-          <div className="text-xs text-muted-foreground pt-2 border-t border-dashed">
-            <Badge variant="outline" className="text-xs font-normal border-dashed">
-              <Info className="h-3 w-3 mr-1" />
+          <div className="border-t border-dashed pt-2 text-xs text-muted-foreground">
+            <Badge variant="outline" className="border-dashed text-xs font-normal">
+              <Info className="mr-1 h-3 w-3" />
               Mock
             </Badge>
             <span className="ml-2">
-              In production, this would fetch logs from the homeserver's logging endpoint. The backend needs to expose a logs API endpoint.
+              In production, this would fetch logs from the homeserver&apos;s logging endpoint. The backend needs to
+              expose a logs API endpoint.
             </span>
           </div>
         </CardContent>
@@ -487,4 +460,3 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
     </div>
   );
 }
-
