@@ -74,55 +74,6 @@ export function InvitesDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* Mock Stats Section */}
-          <Card className="border-dashed border-2 border-muted-foreground/30">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">Invite Statistics</CardTitle>
-                <Badge variant="outline" className="text-xs font-normal border-dashed">
-                  <Info className="h-3 w-3 mr-1" />
-                  Mock
-                </Badge>
-              </div>
-              <CardDescription className="text-xs text-muted-foreground/70 italic">
-                Statistics require backend tracking of invite usage
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalGenerated}
-                  </div>
-                  <div className="text-xs text-muted-foreground/70 italic mt-1">Total Generated</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalUsed}
-                  </div>
-                  <div className="text-xs text-muted-foreground/70 italic mt-1">Used</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalUnused}
-                  </div>
-                  <div className="text-xs text-muted-foreground/70 italic mt-1">Unused</div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-dashed border-muted-foreground/20">
-                <div className="text-xs font-medium text-muted-foreground/70 italic mb-2">Users by Invite:</div>
-                <div className="space-y-1">
-                  {MOCK_INVITE_STATS.usersByInvite.map((item) => (
-                    <div key={item.inviteCode} className="flex justify-between text-xs text-muted-foreground/70 italic">
-                      <span className="font-mono">{item.inviteCode}:</span>
-                      <span>{item.userCount} users</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Generated Invites */}
           <Card>
             <CardHeader>
@@ -181,6 +132,55 @@ export function InvitesDialog({
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Mock Stats Section */}
+          <Card className="border-dashed border-2 border-muted-foreground/30">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Invite Statistics</CardTitle>
+                <Badge variant="outline" className="text-xs font-normal border-dashed">
+                  <Info className="h-3 w-3 mr-1" />
+                  Mock
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-muted-foreground/70 italic">
+                Statistics require backend tracking of invite usage
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
+                    {MOCK_INVITE_STATS.totalGenerated}
+                  </div>
+                  <div className="text-xs text-muted-foreground/70 italic mt-1">Total Generated</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
+                    {MOCK_INVITE_STATS.totalUsed}
+                  </div>
+                  <div className="text-xs text-muted-foreground/70 italic mt-1">Used</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
+                    {MOCK_INVITE_STATS.totalUnused}
+                  </div>
+                  <div className="text-xs text-muted-foreground/70 italic mt-1">Unused</div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-dashed border-muted-foreground/20">
+                <div className="text-xs font-medium text-muted-foreground/70 italic mb-2">Users by Invite:</div>
+                <div className="space-y-1">
+                  {MOCK_INVITE_STATS.usersByInvite.map((item) => (
+                    <div key={item.inviteCode} className="flex justify-between text-xs text-muted-foreground/70 italic">
+                      <span className="font-mono">{item.inviteCode}:</span>
+                      <span>{item.userCount} users</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
