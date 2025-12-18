@@ -61,7 +61,7 @@ export function DashboardNavbar({
                   <span>Configuration</span>
                   <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
-                    Mock
+                    Soon
                   </Badge>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -73,7 +73,7 @@ export function DashboardNavbar({
                     </div>
                     <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
                       <Info className="mr-1 h-3 w-3" />
-                      Mock
+                      Soon
                     </Badge>
                   </DropdownMenuItem>
                 )}
@@ -88,7 +88,7 @@ export function DashboardNavbar({
                     </div>
                     <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
                       <Info className="mr-1 h-3 w-3" />
-                      Mock
+                      Soon
                     </Badge>
                   </DropdownMenuItem>
                 )}

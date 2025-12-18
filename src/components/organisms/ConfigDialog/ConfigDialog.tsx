@@ -86,7 +86,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
               </DialogTitle>
               <Badge variant="outline" className="border-dashed text-xs font-normal">
                 <Info className="mr-1 h-3 w-3" />
-                Mock
+                Soon
               </Badge>
               <Badge variant="secondary" className="text-xs">
                 Read-only

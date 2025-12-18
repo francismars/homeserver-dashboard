@@ -298,10 +298,10 @@ export function DisabledUsersManagement({
                 Disabled Users
                 <Badge variant="outline" className="border-dashed text-xs font-normal">
                   <Info className="mr-1 h-3 w-3" />
-                  Mock
+                  Soon
                 </Badge>
               </CardTitle>
-              <CardDescription>List of disabled users (API pending)</CardDescription>
+              <CardDescription>List of disabled users</CardDescription>
             </div>
             <Badge variant="secondary" className="shrink-0">
               Total: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsers.length}

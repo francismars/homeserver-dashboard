@@ -49,7 +49,7 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
             <DialogTitle>{title}</DialogTitle>
             <Badge variant="outline" className="border-dashed text-xs font-normal">
               <Info className="mr-1 h-3 w-3" />
-              Mock
+              Soon
             </Badge>
           </div>
           <DialogDescription>{description}</DialogDescription>
