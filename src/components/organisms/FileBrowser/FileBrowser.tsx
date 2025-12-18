@@ -260,10 +260,13 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
     });
 
   const pathParts = currentPath.split('/').filter(Boolean);
-  const breadcrumbs = pathParts.map((part, index) => {
-    const path = '/' + pathParts.slice(0, index + 1).join('/') + (index < pathParts.length - 1 ? '/' : '');
-    return { name: part, path };
-  });
+  const breadcrumbs = [
+    { name: '/', path: '/' },
+    ...pathParts.map((part, index) => {
+      const path = '/' + pathParts.slice(0, index + 1).join('/') + (index < pathParts.length - 1 ? '/' : '');
+      return { name: part, path };
+    }),
+  ];
 
   // Check if we're in a valid location for creating files/directories
   // Must be inside a user's /pub/ directory (path contains /pub/)

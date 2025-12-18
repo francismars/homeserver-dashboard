@@ -7,6 +7,7 @@ import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
+import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { UserManagement } from '@/components/organisms/UserManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
@@ -83,9 +84,10 @@ export default function DashboardPage() {
           />
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
@@ -108,6 +110,10 @@ export default function DashboardPage() {
                       }}
                       numDisabledUsers={info?.num_disabled_users}
                     />
+                  </TabsContent>
+
+                  <TabsContent value="files" className="space-y-4">
+                    <FileBrowser initialPath="/" />
                   </TabsContent>
 
                   <TabsContent value="logs" className="space-y-4">
