@@ -286,7 +286,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
                 Homeserver Logs
                 <Badge variant="outline" className="border-dashed text-xs font-normal">
                   <Info className="mr-1 h-3 w-3" />
-                  Mock
+                  Soon
                 </Badge>
               </CardTitle>
               <CardDescription>View and filter homeserver event logs</CardDescription>
@@ -448,7 +448,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
           <div className="border-t border-dashed pt-2 text-xs text-muted-foreground">
             <Badge variant="outline" className="border-dashed text-xs font-normal">
               <Info className="mr-1 h-3 w-3" />
-              Mock
+              Soon
             </Badge>
             <span className="ml-2">
               In production, this would fetch logs from the homeserver&apos;s logging endpoint. The backend needs to

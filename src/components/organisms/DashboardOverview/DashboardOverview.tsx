@@ -4,23 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { StatCard } from '@/components/atoms/StatCard';
-import { Users, HardDrive, Shield, Key, Info, CheckCircle2, AlertCircle } from 'lucide-react';
-import { cn } from '@/libs/utils';
+import { Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
-// Mock data
-const MOCK_SERVER_INFO = {
-  address: 'https://homeserver.example.com',
-  version: '0.1.0-dev',
-  pubkey: 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o',
-};
-
-// Mock explanations
-const MOCK_EXPLANATIONS = {
-  serverInfo: `Some fields may be mock. This happens either because the dashboard is running in mock mode, or because the homeserver /info endpoint does not provide pubkey/version fields. To make these fields real, the backend needs to include them in /info (or expose a dedicated endpoint).`,
-};
+const FALLBACK_HOMESERVER_PUBKEY = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o';
+const FALLBACK_HOMESERVER_VERSION = '0.1.0-dev';
 
 export function DashboardOverview({ info, isLoading, error }: DashboardOverviewProps) {
   if (error) {
@@ -34,19 +22,20 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between gap-3">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     );
   }
 
@@ -59,109 +48,78 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
   const hasConfig = adminBaseUrl && adminToken;
   const isConfigured = !!hasConfig;
 
-  const homeserverPubkey = info.pubkey || MOCK_SERVER_INFO.pubkey;
-  const homeserverVersion = info.version || MOCK_SERVER_INFO.version;
-  const isPubkeyMock = !info.pubkey;
-  const isVersionMock = !info.version;
+  const isPubkeySoon = !info.pubkey;
+  const isVersionSoon = !info.version;
+
+  const homeserverPubkey = info.pubkey ?? FALLBACK_HOMESERVER_PUBKEY;
+  const homeserverVersion = info.version ?? FALLBACK_HOMESERVER_VERSION;
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Users" value={info.num_users.toString()} icon={Users} intent="default" />
-        <StatCard
-          label="Disabled Users"
-          value={info.num_disabled_users.toString()}
-          icon={Shield}
-          intent={info.num_disabled_users > 0 ? 'warning' : 'default'}
-        />
-        <StatCard label="Disk Used" value={`${info.total_disk_used_mb} MB`} icon={HardDrive} intent="default" />
-        <StatCard label="Signup Codes" value={info.num_signup_codes.toString()} icon={Key} intent="default" />
-      </div>
-
       <div className="grid gap-4">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Card
-                className={cn(
-                  'relative border-2 border-dashed border-muted-foreground/30',
-                  'cursor-help transition-colors hover:border-muted-foreground/50',
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">Server & Connection</CardTitle>
+                <CardDescription>Homeserver details and dashboard connection</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Connection Status */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Connection Status:</span>
+              {isConfigured ? (
+                <Badge variant="default" className="bg-green-600">
+                  <CheckCircle2 className="mr-1 h-3 w-3" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="destructive">
+                  <AlertCircle className="mr-1 h-3 w-3" />
+                  Not Configured
+                </Badge>
+              )}
+            </div>
+
+            {/* Server Pubkey */}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Homeserver Pubkey:</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-mono text-xs text-muted-foreground/70 italic">{homeserverPubkey}</span>
+                {isPubkeySoon && (
+                  <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
+                    <Info className="mr-1 h-3 w-3" />
+                    Soon
+                  </Badge>
                 )}
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">Server & Connection</CardTitle>
-                      <CardDescription>Homeserver details and dashboard connection</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Connection Status */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Connection Status:</span>
-                    {isConfigured ? (
-                      <Badge variant="default" className="bg-green-600">
-                        <CheckCircle2 className="mr-1 h-3 w-3" />
-                        Connected
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">
-                        <AlertCircle className="mr-1 h-3 w-3" />
-                        Not Configured
-                      </Badge>
-                    )}
-                  </div>
+              </div>
+            </div>
 
-                  {/* Server Pubkey */}
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-muted-foreground">Homeserver Pubkey:</span>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate font-mono text-xs text-muted-foreground/70 italic">
-                        {homeserverPubkey}
-                      </span>
-                      {isPubkeyMock && (
-                        <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
-                          <Info className="mr-1 h-3 w-3" />
-                          Mock
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+            {/* Server Version */}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Version:</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground/70 italic">{homeserverVersion}</span>
+                {isVersionSoon && (
+                  <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
+                    <Info className="mr-1 h-3 w-3" />
+                    Soon
+                  </Badge>
+                )}
+              </div>
+            </div>
 
-                  {/* Server Version */}
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-muted-foreground">Version:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground/70 italic">{homeserverVersion}</span>
-                      {isVersionMock && (
-                        <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
-                          <Info className="mr-1 h-3 w-3" />
-                          Mock
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Admin Endpoint */}
-                  {adminBaseUrl && (
-                    <div className="flex items-center justify-between border-t pt-2">
-                      <span className="text-sm text-muted-foreground">Admin Endpoint:</span>
-                      <code className="rounded bg-muted px-2 py-1 text-xs">{adminBaseUrl}</code>
-                    </div>
-                  )}
-
-                  <div className="mt-3 border-t border-dashed border-muted-foreground/20 pt-3">
-                    <p className="text-xs text-muted-foreground/60 italic">Hover for implementation details</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-sm">
-              <p className="text-sm">{MOCK_EXPLANATIONS.serverInfo}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+            {/* Admin Endpoint */}
+            {adminBaseUrl && (
+              <div className="flex items-center justify-between border-t pt-2">
+                <span className="text-sm text-muted-foreground">Admin Endpoint:</span>
+                <code className="rounded bg-muted px-2 py-1 text-xs">{adminBaseUrl}</code>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -176,7 +176,7 @@ export function InvitesDialog({
                   <div className="text-xs font-medium text-muted-foreground/70">Users by Invite:</div>
                   <Badge variant="outline" className="border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
-                    Mock
+                    Soon
                   </Badge>
                 </div>
                 <div className="space-y-1">
