@@ -8,13 +8,6 @@ import {
   UsageResponse,
 } from './admin.types';
 
-const defaultHeaders = (token?: string) =>
-  token
-    ? {
-        'X-Admin-Password': token,
-      }
-    : {};
-
 export class AdminService {
   private baseUrl: string;
   private token?: string;
@@ -32,13 +25,17 @@ export class AdminService {
     }
 
     try {
+      const headers = new Headers(init?.headers);
+      if (!headers.has('content-type')) {
+        headers.set('content-type', 'application/json');
+      }
+      if (this.token) {
+        headers.set('X-Admin-Password', this.token);
+      }
+
       const res = await fetch(`${this.baseUrl}${path}`, {
         ...init,
-        headers: {
-          'content-type': 'application/json',
-          ...defaultHeaders(this.token),
-          ...(init?.headers || {}),
-        },
+        headers,
       });
 
       if (!res.ok) {
@@ -82,11 +79,12 @@ export class AdminService {
     if (this.mock) {
       return { token: 'MOCK-INVITE-TOKEN-' + Date.now() };
     }
-    const token = await fetch(`${this.baseUrl}/generate_signup_token`, {
-      headers: {
-        ...defaultHeaders(this.token),
-      },
-    }).then((res) => {
+    const headers = new Headers();
+    if (this.token) {
+      headers.set('X-Admin-Password', this.token);
+    }
+
+    const token = await fetch(`${this.baseUrl}/generate_signup_token`, { headers }).then((res) => {
       if (!res.ok) throw new Error(`Failed to generate invite: ${res.status}`);
       return res.text();
     });
