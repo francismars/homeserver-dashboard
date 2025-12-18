@@ -2,13 +2,11 @@
 
 import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAdminInfo, useAdminUsage, useAdminActions } from '@/hooks/admin';
+import { useAdminInfo, useAdminActions } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
-import { DashboardUsage } from '@/components/organisms/DashboardUsage';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
-import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { UserManagement } from '@/components/organisms/UserManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
@@ -21,16 +19,22 @@ import Link from 'next/link';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
-  const { data: usage, isLoading: usageLoading, error: usageError } = useAdminUsage();
   const {
     disableUser,
     enableUser,
     generateInvite,
     isGeneratingInvite,
     isDisablingUser,
-    disableUserError,
     generatedInvites,
   } = useAdminActions();
+
+  const usage = info
+    ? {
+        usersTotal: info.num_users,
+        numUnusedSignupCodes: info.num_unused_signup_codes,
+        totalDiskUsedMB: info.total_disk_used_mb,
+      }
+    : null;
 
   // Memoize callback to prevent UserManagement rerenders
   const handleViewUserFiles = useCallback((pubkey: string) => {
@@ -79,9 +83,8 @@ export default function DashboardPage() {
           />
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="usage">Usage</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="api">API</TabsTrigger>
@@ -90,15 +93,6 @@ export default function DashboardPage() {
           <TabsContent value="overview" className="space-y-4">
             <DashboardOverview info={info} isLoading={infoLoading} error={infoError} />
           </TabsContent>
-
-                  <TabsContent value="usage" className="space-y-4">
-                    <DashboardUsage
-                      usage={usage}
-                      isLoading={usageLoading}
-                      error={usageError}
-                      info={info}
-                    />
-                  </TabsContent>
 
                   <TabsContent value="users" className="space-y-4">
                     <UserManagement 
