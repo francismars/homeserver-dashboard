@@ -1,3 +1,5 @@
+import type { WebDavService } from '../webdav';
+
 export type User = {
   pubkey: string;
   displayName: string; // Shortened pubkey for display
@@ -14,6 +16,5 @@ export type UserListResponse = {
 };
 
 export type UserServiceDeps = {
-  webdavService: any; // WebDavService instance
+  webdavService: WebDavService;
 };
-

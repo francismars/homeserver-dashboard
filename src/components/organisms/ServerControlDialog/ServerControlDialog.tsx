@@ -47,8 +47,8 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>{title}</DialogTitle>
-            <Badge variant="outline" className="text-xs font-normal border-dashed">
-              <Info className="h-3 w-3 mr-1" />
+            <Badge variant="outline" className="border-dashed text-xs font-normal">
+              <Info className="mr-1 h-3 w-3" />
               Mock
             </Badge>
           </div>
@@ -56,17 +56,15 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
         </DialogHeader>
 
         <div className="py-4">
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
             {isRestart ? (
               <RotateCw className="h-5 w-5 text-blue-500" />
             ) : (
               <Power className="h-5 w-5 text-destructive" />
             )}
             <div className="flex-1">
-              <p className="text-sm font-medium">
-                {isRestart ? 'Server will restart' : 'Server will shutdown'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm font-medium">{isRestart ? 'Server will restart' : 'Server will shutdown'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {isRestart
                   ? 'The homeserver will restart automatically after shutdown.'
                   : 'The homeserver will stop and will not restart automatically.'}
@@ -74,23 +72,16 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
             </div>
           </div>
           <div className="mt-4 text-xs text-muted-foreground/70 italic">
-            This is mock functionality. In production, this would call the backend API to control the homeserver process.
+            This is mock functionality. In production, this would call the backend API to control the homeserver
+            process.
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             Cancel
           </Button>
-          <Button
-            variant={isRestart ? 'default' : 'destructive'}
-            onClick={handleConfirm}
-            disabled={isProcessing}
-          >
+          <Button variant={isRestart ? 'default' : 'destructive'} onClick={handleConfirm} disabled={isProcessing}>
             {isProcessing ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -100,12 +91,12 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
               <>
                 {isRestart ? (
                   <>
-                    <RotateCw className="h-4 w-4 mr-2" />
+                    <RotateCw className="mr-2 h-4 w-4" />
                     Restart
                   </>
                 ) : (
                   <>
-                    <Power className="h-4 w-4 mr-2" />
+                    <Power className="mr-2 h-4 w-4" />
                     Shutdown
                   </>
                 )}
@@ -117,4 +108,3 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
     </Dialog>
   );
 }
-

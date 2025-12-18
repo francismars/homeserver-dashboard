@@ -20,14 +20,14 @@ export class UserService {
     try {
       // List root directory to get all user directories (single DAV call)
       const rootDir = await this.webdavService.listDirectory('/', 1);
-      
+
       const users: User[] = [];
-      
+
       for (const item of rootDir.files) {
         if (item.isCollection) {
           // Extract pubkey from path (e.g., "/abc123..." -> "abc123...")
           let pubkey = item.path.replace(/^\//, '').replace(/\/$/, '');
-          
+
           // Skip if it's not a valid pubkey format (z-base-32, typically 52 chars)
           // But allow shorter paths in case of nested structures or different formats
           if (pubkey.length < 20 || pubkey.length > 60) {
@@ -51,4 +51,3 @@ export class UserService {
     }
   }
 }
-

@@ -23,4 +23,3 @@ export type WebDavError = {
   message: string;
   status: number;
 };
-

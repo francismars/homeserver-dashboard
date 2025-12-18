@@ -25,7 +25,7 @@ export class WebDavService {
     const response = await fetch(url, {
       ...init,
       headers: {
-        'Authorization': this.getAuthHeader(),
+        Authorization: this.getAuthHeader(),
         ...(init?.headers || {}),
       },
     });
@@ -48,11 +48,11 @@ export class WebDavService {
    */
   async listDirectory(path: string, depth: 0 | 1 | 'infinity' = 1): Promise<WebDavDirectory> {
     const normalizedPath = path.endsWith('/') ? path : `${path}/`;
-    
+
     const response = await this.request(normalizedPath, {
       method: 'PROPFIND',
       headers: {
-        'Depth': depth.toString(),
+        Depth: depth.toString(),
         'Content-Type': 'application/xml',
       },
       body: `<?xml version="1.0" encoding="utf-8"?>
@@ -69,7 +69,7 @@ export class WebDavService {
 
     const xmlText = await response.text();
     const files = this.parsePropfindResponse(xmlText, normalizedPath);
-    
+
     return {
       path: normalizedPath,
       files,
@@ -133,7 +133,7 @@ export class WebDavService {
     await this.request(sourcePath, {
       method: 'MOVE',
       headers: {
-        'Destination': `${this.baseUrl}${destinationPath}`,
+        Destination: `${this.baseUrl}${destinationPath}`,
       },
     });
   }
@@ -147,7 +147,7 @@ export class WebDavService {
     await this.request(sourcePath, {
       method: 'COPY',
       headers: {
-        'Destination': `${this.baseUrl}${destinationPath}`,
+        Destination: `${this.baseUrl}${destinationPath}`,
       },
     });
   }
@@ -158,7 +158,7 @@ export class WebDavService {
   private parsePropfindResponse(xmlText: string, basePath: string): WebDavFile[] {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'application/xml');
-    
+
     // Check for parsing errors
     const parserError = doc.querySelector('parsererror');
     if (parserError) {
@@ -195,7 +195,7 @@ export class WebDavService {
           // Invalid URL, use as-is
         }
       }
-      
+
       // Remove any leading /dav/ from normalizedHref
       while (normalizedHref.startsWith('/dav/')) {
         normalizedHref = normalizedHref.substring(5);
@@ -203,7 +203,7 @@ export class WebDavService {
       if (normalizedHref === '/dav') {
         normalizedHref = '/';
       }
-      
+
       // Extract relative path from href first (before filtering)
       let path = href;
       if (href.startsWith(this.baseUrl)) {
@@ -221,7 +221,7 @@ export class WebDavService {
           // Invalid URL, use as-is
         }
       }
-      
+
       // Remove any leading /dav/ from path (shouldn't be there since baseUrl includes /dav)
       // This handles cases where the server returns paths with /dav/ prefix
       while (path.startsWith('/dav/')) {
@@ -230,12 +230,12 @@ export class WebDavService {
       if (path === '/dav') {
         path = '/';
       }
-      
+
       // Ensure path starts with /
       if (!path.startsWith('/')) {
         path = '/' + path;
       }
-      
+
       // Normalize paths for comparison (remove trailing slashes and normalize)
       const normalizeForCompare = (p: string): string => {
         let normalized = p.replace(/\/$/, '') || '/';
@@ -245,28 +245,28 @@ export class WebDavService {
         }
         return normalized;
       };
-      
+
       const basePathForCompare = normalizeForCompare(basePath);
       const pathForCompare = normalizeForCompare(path);
-      
+
       // Skip if this is the base path itself (the directory we're listing)
       // This is the first item that WebDAV returns - the directory itself
       if (pathForCompare === basePathForCompare) {
         return;
       }
-      
+
       // Also check if the displayName matches the last part of the basePath
       // This catches cases where the path normalization might differ
       const basePathLastPart = basePath.split('/').filter(Boolean).pop() || '';
       if (basePathLastPart && displayName === basePathLastPart && pathForCompare === basePathForCompare) {
         return;
       }
-      
+
       // Skip if path is just "/dav" or "/dav/" - this shouldn't appear as a folder
       if (path === '/dav' || path === '/dav/') {
         return;
       }
-      
+
       // Ensure directories end with /
       if (isCollection && !path.endsWith('/')) {
         path = path + '/';
@@ -293,4 +293,3 @@ export class WebDavService {
     return files;
   }
 }
-

@@ -18,9 +18,8 @@ export function StatCard({ label, value, helper, icon: Icon, intent = 'default' 
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold">{value}</p>
-        {helper && <p className="text-xs text-muted-foreground mt-1">{helper}</p>}
+        {helper && <p className="mt-1 text-xs text-muted-foreground">{helper}</p>}
       </CardContent>
     </Card>
   );
 }
-

@@ -57,4 +57,3 @@ export async function copyToClipboard({ text }: CopyToClipboardProps) {
     document.body.removeChild(textarea);
   }
 }
-

@@ -79,9 +79,7 @@ export function DisabledUsersManagement({
   const filteredDisabledUsers = useMemo(() => {
     if (!searchQuery) return disabledUsers;
     const q = searchQuery.toLowerCase();
-    return disabledUsers.filter(
-      (u) => u.pubkey.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)
-    );
+    return disabledUsers.filter((u) => u.pubkey.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q));
   }, [disabledUsers, searchQuery]);
 
   const handlePaste = useCallback(async () => {
@@ -170,7 +168,7 @@ export function DisabledUsersManagement({
         setProcessingAction(null);
       }
     },
-    [targetDisabledCount]
+    [targetDisabledCount],
   );
 
   const isProcessing = processingAction !== null;
@@ -189,7 +187,7 @@ export function DisabledUsersManagement({
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={refreshUsers} disabled={isLoading}>
-                <RefreshCw className={isLoading ? 'h-4 w-4 mr-2 animate-spin' : 'h-4 w-4 mr-2'} />
+                <RefreshCw className={isLoading ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
                 Refresh
               </Button>
               {onOpenInvites && (
@@ -225,7 +223,7 @@ export function DisabledUsersManagement({
               }}
               className="pr-20"
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
               {pubkeyToDisable && (
                 <Button
                   variant="ghost"
@@ -237,11 +235,16 @@ export function DisabledUsersManagement({
                   }}
                   title="Clear"
                 >
-                  <span className="sr-only">Clear</span>
-                  ✕
+                  <span className="sr-only">Clear</span>✕
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePaste} title="Paste from clipboard">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handlePaste}
+                title="Paste from clipboard"
+              >
                 <Clipboard className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -260,7 +263,7 @@ export function DisabledUsersManagement({
                 </>
               ) : (
                 <>
-                  <ShieldOff className="h-4 w-4 mr-2" />
+                  <ShieldOff className="mr-2 h-4 w-4" />
                   Disable
                 </>
               )}
@@ -278,7 +281,7 @@ export function DisabledUsersManagement({
                 </>
               ) : (
                 <>
-                  <Shield className="h-4 w-4 mr-2" />
+                  <Shield className="mr-2 h-4 w-4" />
                   Enable
                 </>
               )}
@@ -291,10 +294,10 @@ export function DisabledUsersManagement({
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 Disabled Users
-                <Badge variant="outline" className="text-xs font-normal border-dashed">
-                  <Info className="h-3 w-3 mr-1" />
+                <Badge variant="outline" className="border-dashed text-xs font-normal">
+                  <Info className="mr-1 h-3 w-3" />
                   Mock
                 </Badge>
               </CardTitle>
@@ -308,7 +311,7 @@ export function DisabledUsersManagement({
         <CardContent className="space-y-3">
           {disabledUsers.length > 0 && (
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search disabled users..."
                 value={searchQuery}
@@ -319,21 +322,21 @@ export function DisabledUsersManagement({
           )}
 
           {filteredDisabledUsers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <ShieldOff className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <div className="py-8 text-center text-muted-foreground">
+              <ShieldOff className="mx-auto mb-2 h-12 w-12 opacity-50" />
               <p>{disabledUsers.length === 0 ? 'No disabled users' : 'No matches'}</p>
             </div>
           ) : (
             <div className="space-y-2">
               {filteredDisabledUsers.map((user) => (
                 <div key={user.pubkey} className="flex items-center justify-between rounded-md border bg-muted/50 p-3">
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono truncate">{user.displayName}</code>
+                      <code className="truncate font-mono text-sm">{user.displayName}</code>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-5 w-5 p-0 shrink-0"
+                        className="h-5 w-5 shrink-0 p-0"
                         onClick={() => handleCopyPubkey(user.pubkey)}
                         title="Copy full pubkey"
                       >
@@ -344,7 +347,7 @@ export function DisabledUsersManagement({
                         )}
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">{user.pubkey}</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{user.pubkey}</p>
                   </div>
                   <Button
                     variant="default"
@@ -352,7 +355,7 @@ export function DisabledUsersManagement({
                     onClick={() => handleEnableUser(user.pubkey)}
                     disabled={isProcessing || isDisablingUser}
                   >
-                    <Shield className="h-4 w-4 mr-2" />
+                    <Shield className="mr-2 h-4 w-4" />
                     Enable
                   </Button>
                 </div>
@@ -364,5 +367,3 @@ export function DisabledUsersManagement({
     </div>
   );
 }
-
-

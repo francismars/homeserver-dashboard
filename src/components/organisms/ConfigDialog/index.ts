@@ -1,2 +1,1 @@
 export { ConfigDialog } from './ConfigDialog';
-

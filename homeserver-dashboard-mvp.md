@@ -7,6 +7,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 ## 🎯 Implementation Status
 
 **Progress Breakdown:**
+
 - **UI Implementation**: ~95% Complete (all components built, some polish remaining)
 - **Backend Integration**: ~50% Complete (many features use mock data, waiting for API endpoints)
 - **Testing**: 0% Complete (not started)
@@ -22,7 +23,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
   - `.env.example` created with proper `NEXT_PUBLIC_` prefixes
   - Favicon added
 
-- ✅ **Phase 1**: Services & Hooks - COMPLETE  
+- ✅ **Phase 1**: Services & Hooks - COMPLETE
   - `AdminService` with all endpoints (info, usage, config, delete, disable, enable, invite)
   - `WebDavService` with PROPFIND, GET, PUT, DELETE, MKCOL, MOVE, COPY operations
   - `UserService` for user listing and management
@@ -69,6 +70,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 ### MVP Core Features Status
 
 **✅ FULLY FUNCTIONAL (Real API Integration):**
+
 - ✅ **Basic Info Display** - Real data from `/info` endpoint (users, disk usage, signup codes)
 - ✅ **Admin Actions** - Real API integration:
   - Delete URL with confirmation (`/webdav/{*entry_path}` DELETE)
@@ -97,6 +99,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 - ✅ **Copy-to-clipboard** - For invite codes and pubkeys with visual feedback
 
 **✅ FULLY FUNCTIONAL (Mock Data - Ready for Backend):**
+
 - ✅ **Logs Viewer** - Complete UI implementation:
   - Level and event type filtering
   - Full-text search
@@ -124,6 +127,7 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
   - ⚠️ Mock implementation (requires backend endpoints)
 
 **⚠️ PARTIALLY FUNCTIONAL (Mock Data for Some Features):**
+
 - ⚠️ **Overview Tab**:
   - ✅ Real: User counts, disk usage, signup codes
   - ⚠️ Mock: Server pubkey, address, version (not in `/info` endpoint)
@@ -141,11 +145,13 @@ High-level blueprint for a Shadcn/Franky-style homeserver admin UI plus required
 **Current State**: Dashboard UI is complete and functional for development/testing. Many features use mock data and require backend API endpoints to be production-ready. Can connect to real homeserver when `NEXT_PUBLIC_ADMIN_BASE_URL` and `NEXT_PUBLIC_ADMIN_TOKEN` env vars are set. All mock features are clearly marked with badges.
 
 **Production Readiness**: Not production-ready until:
+
 1. Backend API endpoints are implemented (see "Known Limitations" below)
 2. Testing is completed
 3. Packaging/deployment documentation is added
 
-**Next Priority**: 
+**Next Priority**:
+
 1. Write tests (Phase 5)
 2. Add packaging/deployment docs (Phase 6)
 3. Optional: Toast notifications (Phase 4 enhancement)
@@ -206,12 +212,14 @@ All features using mock data are clearly marked with "Mock" badges and tooltips 
    - **Backend Required**: Implement `POST /restart` and `POST /shutdown` endpoints
 
 **Other Limitations:**
+
 - **WebDAV path restrictions**: Paths must follow `/dav/{pubkey}/pub/{path}` structure (enforced by file browser)
 - **User authentication**: Mock implementation using localStorage (ready for backend AuthToken integration)
 
 **Post-MVP Features (Not Blocking):**
 
 See `FEATURE_IDEAS.md` for detailed feature ideas. High-priority future features:
+
 - **Login & Connection Management** (CRITICAL) - Enable flexible deployment without env vars, multi-homeserver support
 - Activity feed / event stream
 - Real-time metrics dashboard
@@ -224,10 +232,10 @@ See `FEATURE_IDEAS.md` for detailed feature ideas. High-priority future features
 - Toast notifications (currently using Alert components)
 - Config conflict handling (409 responses)
 
-
 ## Project Structure
 
 **Standalone Next.js project** using atomic design (atoms → molecules → organisms):
+
 - `src/services/` - HTTP clients (admin, user, webdav)
 - `src/hooks/` - React hooks for data fetching
 - `src/components/` - UI components (atoms, molecules, organisms)
@@ -238,6 +246,7 @@ See `FEATURE_IDEAS.md` for detailed feature ideas. High-priority future features
 ## Tech Stack
 
 **Same as Franky:**
+
 - **Next.js 16** (App Router)
 - **React 19**
 - **TypeScript**
@@ -249,6 +258,7 @@ See `FEATURE_IDEAS.md` for detailed feature ideas. High-priority future features
 - **@synonymdev/pubky** - Pubky SDK
 
 **Simplified from Franky:**
+
 - No Dexie/IndexedDB (no local-first storage needed)
 - No Zustand (use React state/hooks)
 - No complex core layer (services + hooks only)
@@ -284,18 +294,19 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 
 ### Existing Endpoints (No Backend Changes Needed)
 
-| Backend Route | Method | Frontend Service Method | Purpose |
-|--------------|--------|------------------------|---------|
-| `/info` | GET | `AdminService.getInfo()` | Server stats (users, disk, signup codes) |
-| `/generate_signup_token` | GET | `AdminService.generateInvite()` | Generate single invite token |
-| `/users/{pubkey}/disable` | POST | `AdminService.disableUser(pubkey)` | Disable user account |
-| `/users/{pubkey}/enable` | POST | `AdminService.enableUser(pubkey)` | Enable user account |
-| `/webdav/{*entry_path}` | DELETE | `AdminService.deleteUrl(path)` | Delete entry by WebDAV path |
-| `/dav/*` | PROPFIND/GET/PUT/DELETE/MKCOL/MOVE/COPY | `WebDavService.*()` | WebDAV file operations |
+| Backend Route             | Method                                  | Frontend Service Method            | Purpose                                  |
+| ------------------------- | --------------------------------------- | ---------------------------------- | ---------------------------------------- |
+| `/info`                   | GET                                     | `AdminService.getInfo()`           | Server stats (users, disk, signup codes) |
+| `/generate_signup_token`  | GET                                     | `AdminService.generateInvite()`    | Generate single invite token             |
+| `/users/{pubkey}/disable` | POST                                    | `AdminService.disableUser(pubkey)` | Disable user account                     |
+| `/users/{pubkey}/enable`  | POST                                    | `AdminService.enableUser(pubkey)`  | Enable user account                      |
+| `/webdav/{*entry_path}`   | DELETE                                  | `AdminService.deleteUrl(path)`     | Delete entry by WebDAV path              |
+| `/dav/*`                  | PROPFIND/GET/PUT/DELETE/MKCOL/MOVE/COPY | `WebDavService.*()`                | WebDAV file operations                   |
 
 ### Auth Model
 
 **Current Implementation:**
+
 - ✅ Reads `NEXT_PUBLIC_ADMIN_TOKEN` from env
 - ✅ Sends as `X-Admin-Password: <token>` header for admin endpoints
 - ✅ Uses HTTP Basic Auth (`admin:password`) for WebDAV endpoints
@@ -303,20 +314,18 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 - ✅ Error messages filtered to avoid showing HTML error pages
 
 **Backend Compatibility:**
+
 - Backend uses `AdminAuthLayer` (password-based)
 - Frontend sends `X-Admin-Password` header (matches backend)
 - 401 responses handled as auth failures
 
-
-
-
 ## Architecture
 
 **Data flow**: Services → Hooks → Components
+
 - Services handle HTTP requests and error normalization
 - Hooks manage React state, loading, error handling
 - Components consume hooks and render UI
-
 
 ## Testing Strategy
 
@@ -325,6 +334,7 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 **Follow Franky's testing patterns** (reference `franky/.cursor/rules/component-testing.mdc`):
 
 **Planned Tests:**
+
 - **Component tests**: Sanity render, click/hover handlers, single-expect snapshots for key states (loading, error, populated)
   - `StatCard.test.tsx` - Render with different props, icon, intent variants
   - `DashboardOverview.test.tsx`, `DashboardUsage.test.tsx`, etc. - Loading/error/data states
@@ -349,6 +359,7 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 ## Delivery & Run Modes
 
 **Current Status:**
+
 - ✅ Config via env: `NEXT_PUBLIC_ADMIN_BASE_URL`, `NEXT_PUBLIC_ADMIN_TOKEN`, `NEXT_PUBLIC_ADMIN_MOCK`
 - ✅ Local dev: **Auto-enables mock mode when `baseUrl` is empty** (no env vars needed for development)
 - ✅ Real mode: Enabled when `NEXT_PUBLIC_ADMIN_BASE_URL` and `NEXT_PUBLIC_ADMIN_TOKEN` are set
@@ -358,17 +369,20 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 - ✅ **Performance optimizations**: React.memo, useMemo, useCallback, debouncing throughout
 
 **Remaining:**
+
 - ❌ Packaging: Dockerfile, docker-compose.yml, deployment documentation
 
 ## File Storage
 
 **Default Location:**
+
 - **Windows**: `C:\Users\{USERNAME}\.pubky\data\files\`
 - **macOS/Linux**: `~/.pubky/data/files/`
 
 **Structure**: Files are organized by user pubkey: `{data_dir}/data/files/{pubkey}/pub/{file_path}`
 
 **Access**: Files can be accessed via:
+
 - WebDAV file browser in dashboard
 - Direct filesystem access (not recommended while homeserver is running)
 - WebDAV clients (Windows Explorer, macOS Finder, rclone, etc.)
@@ -376,11 +390,13 @@ The homeserver already exposes admin endpoints (see `pubky-core/pubky-homeserver
 ## Remaining Work
 
 **High Priority:**
+
 1. **Backend API Endpoints** - 8+ endpoints needed (see "Known Limitations" above)
 2. **Testing** - Write component, hook, and snapshot tests
 3. **Packaging** - Dockerfile, docker-compose.yml, deployment docs
 
 **Optional Enhancements:**
+
 - Toast notifications (currently using Alert components)
 - Config conflict handling (409 responses)
 - Login & Connection Management (see FEATURE_IDEAS.md)

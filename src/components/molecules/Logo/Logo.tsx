@@ -9,17 +9,12 @@ interface LogoProps {
   className?: string;
 }
 
-export function Logo({
-  width = 109,
-  height = 36,
-  noLink = false,
-  className,
-}: LogoProps) {
+export function Logo({ width = 109, height = 36, noLink = false, className }: LogoProps) {
   const logoImage = (
     <Image
       src="/pubky-logo.svg"
       alt="Pubky"
-      className={cn('w-auto h-auto -mt-1', className)}
+      className={cn('-mt-1 h-auto w-auto', className)}
       width={width}
       height={height}
       style={{ width: `${width}px`, height: `${height}px` }}
@@ -40,4 +35,3 @@ export function Logo({
     </div>
   );
 }
-
