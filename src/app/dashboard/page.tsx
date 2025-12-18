@@ -8,12 +8,10 @@ import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
-import { UserManagement } from '@/components/organisms/UserManagement';
+import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
-import { UserStatsDialog } from '@/components/organisms/UserStatsDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { DisabledUsersDialog } from '@/components/organisms/DisabledUsersDialog';
 import { UserProfileDialog } from '@/components/organisms/UserProfileDialog';
 import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -29,26 +27,9 @@ export default function DashboardPage() {
     generatedInvites,
   } = useAdminActions();
 
-  const usage = info
-    ? {
-        usersTotal: info.num_users,
-        numUnusedSignupCodes: info.num_unused_signup_codes,
-        totalDiskUsedMB: info.total_disk_used_mb,
-      }
-    : null;
-
-  // Memoize callback to prevent UserManagement rerenders
-  const handleViewUserFiles = useCallback((pubkey: string) => {
-    // This will be handled by UserManagement component internally
-    // by navigating to the user's /pub/ directory
-  }, []);
-
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
-  const [isUserStatsDialogOpen, setIsUserStatsDialogOpen] = useState(false);
-  const [isDisabledUsersDialogOpen, setIsDisabledUsersDialogOpen] = useState(false);
   const [isUserProfileDialogOpen, setIsUserProfileDialogOpen] = useState(false);
-  const [disabledUsersData, setDisabledUsersData] = useState<{ all: any[]; disabled: any[] } | null>(null);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
 
   const handleSettingsClick = useCallback(() => {
@@ -57,10 +38,6 @@ export default function DashboardPage() {
 
   const handleUserClick = useCallback(() => {
     setIsUserProfileDialogOpen(true);
-  }, []);
-
-  const handleOpenStats = useCallback(() => {
-    setIsUserStatsDialogOpen(true);
   }, []);
 
   const handleRestartServer = useCallback(() => {
@@ -97,17 +74,11 @@ export default function DashboardPage() {
           </TabsContent>
 
                   <TabsContent value="users" className="space-y-4">
-                    <UserManagement 
-                      onViewUserFiles={handleViewUserFiles}
+                    <DisabledUsersManagement
                       onDisableUser={disableUser}
                       onEnableUser={enableUser}
                       isDisablingUser={isDisablingUser}
                       onOpenInvites={() => setIsInvitesDialogOpen(true)}
-                      onOpenStats={handleOpenStats}
-                      onOpenDisabledUsers={(data) => {
-                        setDisabledUsersData(data);
-                        setIsDisabledUsersDialogOpen(true);
-                      }}
                       numDisabledUsers={info?.num_disabled_users}
                     />
                   </TabsContent>
@@ -145,44 +116,12 @@ export default function DashboardPage() {
           isGenerating={isGeneratingInvite}
         />
 
-        {/* User Stats Dialog */}
-        <UserStatsDialog
-          open={isUserStatsDialogOpen}
-          onOpenChange={setIsUserStatsDialogOpen}
-          usage={usage}
-          info={info}
-        />
-
         {/* Server Control Dialog */}
         <ServerControlDialog
           open={!!serverControlAction}
           onOpenChange={(open) => !open && setServerControlAction(null)}
           action={serverControlAction}
         />
-
-        {/* Disabled Users Dialog */}
-        {disabledUsersData && (
-          <DisabledUsersDialog
-            open={isDisabledUsersDialogOpen}
-            onOpenChange={(open) => {
-              setIsDisabledUsersDialogOpen(open);
-              if (!open) {
-                setDisabledUsersData(null);
-              }
-            }}
-            users={disabledUsersData.all}
-            disabledUsers={disabledUsersData.disabled}
-            onDisableUser={async (pubkey) => {
-              await disableUser(pubkey);
-              // Refresh users list - this will be handled by UserManagement's refresh
-            }}
-            onEnableUser={async (pubkey) => {
-              await enableUser(pubkey);
-              // Refresh users list - this will be handled by UserManagement's refresh
-            }}
-            isDisablingUser={isDisablingUser}
-          />
-        )}
 
         {/* User Profile Dialog */}
         <UserProfileDialog

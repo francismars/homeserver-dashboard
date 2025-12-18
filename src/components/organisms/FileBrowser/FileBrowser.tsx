@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useWebDav } from '@/hooks/webdav';
+import { useAdminActions } from '@/hooks/admin';
 import type { WebDavFile } from '@/services/webdav';
 import {
   Folder,
@@ -36,6 +37,7 @@ type SortOption = { field: SortField; direction: SortDirection };
 
 export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
+  const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [files, setFiles] = useState<WebDavFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<WebDavFile | null>(null);
@@ -46,6 +48,9 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
   const [showCreateDirDialog, setShowCreateDirDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showDeleteByPathDialog, setShowDeleteByPathDialog] = useState(false);
+  const [deleteByPathInput, setDeleteByPathInput] = useState('');
+  const [deleteByPathValidationError, setDeleteByPathValidationError] = useState<string | null>(null);
   const [fileToDelete, setFileToDelete] = useState<WebDavFile | null>(null);
   const [fileToRename, setFileToRename] = useState<WebDavFile | null>(null);
   const [newFileName, setNewFileName] = useState('');
@@ -190,6 +195,53 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
     setCurrentPath(path);
   };
 
+  const normalizeAdminDeletePath = (raw: string): string => {
+    let value = raw.trim();
+    if (!value) return '';
+
+    // Support pasting full URLs
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        value = new URL(value).pathname;
+      } catch {
+        // fall through
+      }
+    }
+
+    // Allow users to paste /dav/... or /webdav/... paths; normalize to entry_path
+    const davMarker = '/dav/';
+    const webdavMarker = '/webdav/';
+    if (value.includes(davMarker)) {
+      value = value.split(davMarker).slice(1).join(davMarker);
+    }
+    if (value.includes(webdavMarker)) {
+      value = value.split(webdavMarker).slice(1).join(webdavMarker);
+    }
+
+    value = value.replace(/^\/+/, '');
+    value = value.replace(/^dav\/+/, '');
+    value = value.replace(/^webdav\/+/, '');
+
+    return value;
+  };
+
+  const handleDeleteByPath = async () => {
+    const normalized = normalizeAdminDeletePath(deleteByPathInput);
+    if (!normalized) {
+      setDeleteByPathValidationError('Please enter a WebDAV entry path to delete.');
+      return;
+    }
+
+    setDeleteByPathValidationError(null);
+    try {
+      await deleteUrl(normalized);
+      setShowDeleteByPathDialog(false);
+      setDeleteByPathInput('');
+    } catch {
+      // error surfaced via deleteUrlError
+    }
+  };
+
   const handleRename = async () => {
     if (!fileToRename || !renameValue.trim()) return;
     
@@ -307,25 +359,40 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               >
                 <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
               </Button>
+              {canCreateFiles && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCreateDirDialog(true)}
+                    disabled={isLoading}
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    New Folder
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUploadDialog(true)}
+                    disabled={isLoading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload File
+                  </Button>
+                </>
+              )}
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                onClick={() => setShowCreateDirDialog(true)}
-                disabled={isLoading || !canCreateFiles}
-                title={!canCreateFiles ? 'Can only create directories inside user /pub/ directories' : ''}
+                onClick={() => {
+                  setDeleteByPathValidationError(null);
+                  setShowDeleteByPathDialog(true);
+                }}
+                disabled={isDeletingUrl}
+                title="Delete an entry by pasting its path"
               >
-                <FolderPlus className="h-4 w-4 mr-2" />
-                New Folder
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUploadDialog(true)}
-                disabled={isLoading || !canCreateFiles}
-                title={!canCreateFiles ? 'Can only create files inside user /pub/ directories' : ''}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
               </Button>
             </div>
           </div>
@@ -675,6 +742,63 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
             </Button>
             <Button onClick={handleRename} disabled={!renameValue.trim() || isSaving}>
               {isSaving ? 'Renaming...' : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete by Path Dialog (Admin) */}
+      <Dialog open={showDeleteByPathDialog} onOpenChange={setShowDeleteByPathDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete</DialogTitle>
+            <DialogDescription>
+              Paste a WebDAV entry path to delete (destructive). You can paste a full URL or a path like{' '}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">/dav/&lt;pubkey&gt;/pub/file.txt</code>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(deleteByPathValidationError || deleteUrlError) && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{deleteByPathValidationError || deleteUrlError?.message}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            <Label>Path</Label>
+            <Input
+              value={deleteByPathInput}
+              onChange={(e) => setDeleteByPathInput(e.target.value)}
+              placeholder="/dav/<pubkey>/pub/file.txt"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleDeleteByPath();
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Will delete: <code className="bg-muted px-1 py-0.5 rounded">{normalizeAdminDeletePath(deleteByPathInput) || '-'}</code>
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteByPathDialog(false);
+                setDeleteByPathValidationError(null);
+              }}
+              disabled={isDeletingUrl}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteByPath}
+              disabled={isDeletingUrl}
+            >
+              {isDeletingUrl ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
