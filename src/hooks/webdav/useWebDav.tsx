@@ -13,7 +13,7 @@ export function useWebDav() {
     const password = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
 
     if (!baseUrl || !password) {
-      setError({ message: 'WebDAV credentials not configured', status: 0 });
+      setError({ message: 'File access not configured', status: 0 });
       return null;
     }
 

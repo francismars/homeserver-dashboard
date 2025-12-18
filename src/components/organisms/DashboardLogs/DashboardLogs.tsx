@@ -277,12 +277,11 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
 
   return (
     <div className="space-y-4">
-      <Card className="border-2 border-dashed border-muted-foreground/30">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
                 Homeserver Logs
                 <Badge variant="outline" className="border-dashed text-xs font-normal">
                   <Info className="mr-1 h-3 w-3" />
@@ -445,7 +444,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
             </ScrollArea>
           )}
 
-          <div className="border-t border-dashed pt-2 text-xs text-muted-foreground">
+          <div className="border-t pt-2 text-xs text-muted-foreground">
             <Badge variant="outline" className="border-dashed text-xs font-normal">
               <Info className="mr-1 h-3 w-3" />
               Soon
