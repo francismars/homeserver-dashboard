@@ -12,21 +12,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Copy, Check, Plus, Key, Info } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 
-// Mock invite stats
-const MOCK_INVITE_STATS = {
-  totalGenerated: 12,
-  totalUsed: 8,
-  totalUnused: 4,
-  usersByInvite: [
-    { inviteCode: 'INV-2024-001', userCount: 3 },
-    { inviteCode: 'INV-2024-002', userCount: 2 },
-    { inviteCode: 'INV-2024-003', userCount: 2 },
-    { inviteCode: 'INV-2024-004', userCount: 1 },
-  ],
-};
+const MOCK_USERS_BY_INVITE = [
+  { inviteCode: 'INV-2024-001', userCount: 3 },
+  { inviteCode: 'INV-2024-002', userCount: 2 },
+  { inviteCode: 'INV-2024-003', userCount: 2 },
+  { inviteCode: 'INV-2024-004', userCount: 1 },
+] as const;
 
 interface InvitesDialogProps {
   open: boolean;
@@ -34,10 +29,27 @@ interface InvitesDialogProps {
   invites: string[];
   onGenerate: () => Promise<void>;
   isGenerating?: boolean;
+  signupCodesTotal?: number;
+  signupCodesUnused?: number;
+  isStatsLoading?: boolean;
 }
 
-export function InvitesDialog({ open, onOpenChange, invites, onGenerate, isGenerating }: InvitesDialogProps) {
+export function InvitesDialog({
+  open,
+  onOpenChange,
+  invites,
+  onGenerate,
+  isGenerating,
+  signupCodesTotal,
+  signupCodesUnused,
+  isStatsLoading,
+}: InvitesDialogProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const hasStats = typeof signupCodesTotal === 'number' && typeof signupCodesUnused === 'number';
+  const totalGenerated = hasStats ? signupCodesTotal : undefined;
+  const totalUnused = hasStats ? signupCodesUnused : undefined;
+  const totalUsed = hasStats ? Math.max(0, signupCodesTotal - signupCodesUnused) : undefined;
 
   const handleCopy = async (invite: string, index: number) => {
     try {
@@ -119,44 +131,56 @@ export function InvitesDialog({ open, onOpenChange, invites, onGenerate, isGener
           </Card>
 
           {/* Mock Stats Section */}
-          <Card className="border-2 border-dashed border-muted-foreground/30">
+          <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base">Invite Statistics</CardTitle>
-                <Badge variant="outline" className="border-dashed text-xs font-normal">
-                  <Info className="mr-1 h-3 w-3" />
-                  Mock
-                </Badge>
+                {!hasStats && (
+                  <Badge variant="outline" className="border-dashed text-xs font-normal">
+                    <Info className="mr-1 h-3 w-3" />
+                    Unavailable
+                  </Badge>
+                )}
               </div>
-              <CardDescription className="text-xs text-muted-foreground/70 italic">
-                Statistics require backend tracking of invite usage
+              <CardDescription className="text-xs text-muted-foreground/70">
+                Counts are provided by the homeserver. Per-invite usage breakdown requires additional backend endpoints.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalGenerated}
+                  <div className="text-2xl font-bold">
+                    {isStatsLoading ? (
+                      <Skeleton className="mx-auto h-7 w-12" />
+                    ) : (
+                      (totalGenerated ?? '—')
+                    )}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground/70 italic">Total Generated</div>
+                  <div className="mt-1 text-xs text-muted-foreground/70">Total Generated</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalUsed}
+                  <div className="text-2xl font-bold">
+                    {isStatsLoading ? <Skeleton className="mx-auto h-7 w-12" /> : (totalUsed ?? '—')}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground/70 italic">Used</div>
+                  <div className="mt-1 text-xs text-muted-foreground/70">Used</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-muted-foreground/70 italic">
-                    {MOCK_INVITE_STATS.totalUnused}
+                  <div className="text-2xl font-bold">
+                    {isStatsLoading ? <Skeleton className="mx-auto h-7 w-12" /> : (totalUnused ?? '—')}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground/70 italic">Unused</div>
+                  <div className="mt-1 text-xs text-muted-foreground/70">Unused</div>
                 </div>
               </div>
-              <div className="mt-4 border-t border-dashed border-muted-foreground/20 pt-4">
-                <div className="mb-2 text-xs font-medium text-muted-foreground/70 italic">Users by Invite:</div>
+              <div className="mt-4 border-t border-muted-foreground/20 pt-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <div className="text-xs font-medium text-muted-foreground/70">Users by Invite:</div>
+                  <Badge variant="outline" className="border-dashed text-xs font-normal">
+                    <Info className="mr-1 h-3 w-3" />
+                    Mock
+                  </Badge>
+                </div>
                 <div className="space-y-1">
-                  {MOCK_INVITE_STATS.usersByInvite.map((item) => (
+                  {MOCK_USERS_BY_INVITE.map((item) => (
                     <div key={item.inviteCode} className="flex justify-between text-xs text-muted-foreground/70 italic">
                       <span className="font-mono">{item.inviteCode}:</span>
                       <span>{item.userCount} users</span>
@@ -177,3 +201,4 @@ export function InvitesDialog({ open, onOpenChange, invites, onGenerate, isGener
     </Dialog>
   );
 }
+

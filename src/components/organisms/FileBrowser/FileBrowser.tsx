@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -42,7 +43,7 @@ type SortField = 'name' | 'size' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 type SortOption = { field: SortField; direction: SortDirection };
 
-export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
+export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
   const [currentPath, setCurrentPath] = useState(initialPath);
@@ -363,21 +364,31 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
               <CardDescription>Browse and manage files via WebDAV</CardDescription>
             </div>
             <div className="flex gap-2">
+              {typeof diskUsedMB === 'number' && (
+                <Badge variant="secondary" className="text-xs font-normal">
+                  Disk Used: {diskUsedMB} MB
+                </Badge>
+              )}
               <Button variant="outline" size="sm" onClick={() => loadDirectory(currentPath)} disabled={isLoading}>
                 <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
               </Button>
-              {canCreateFiles && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => setShowCreateDirDialog(true)} disabled={isLoading}>
-                    <FolderPlus className="mr-2 h-4 w-4" />
-                    New Folder
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} disabled={isLoading}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload File
-                  </Button>
-                </>
-              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search + Actions */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative sm:flex-1">
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search files..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
               <Button
                 variant="destructive"
                 size="sm"
@@ -387,35 +398,39 @@ export function FileBrowser({ initialPath = '/' }: FileBrowserProps) {
                 }}
                 disabled={isDeletingUrl}
                 title="Delete an entry by pasting its path"
+                aria-label="Delete"
+                className="w-9 px-0"
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search files..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
 
           {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 text-sm">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={index} className="flex items-center gap-2">
-                {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-                <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-2">
-                  {crumb.name}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {breadcrumbs.map((crumb, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                  <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-2">
+                    {crumb.name}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {canCreateFiles && (
+              <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+                <Button variant="outline" size="sm" onClick={() => setShowCreateDirDialog(true)} disabled={isLoading}>
+                  <FolderPlus className="mr-2 h-4 w-4" />
+                  New Folder
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} disabled={isLoading}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload File
                 </Button>
               </div>
-            ))}
+            )}
           </div>
 
           {/* Error Alert */}
