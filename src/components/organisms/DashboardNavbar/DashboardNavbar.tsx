@@ -92,7 +92,6 @@ export function DashboardNavbar({
                     </Badge>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
