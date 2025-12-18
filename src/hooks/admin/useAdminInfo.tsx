@@ -27,16 +27,16 @@ export function useAdminInfo() {
       const result = await service.getInfo();
       if (!isMountedRef.current) return;
       if (fetchId !== fetchIdRef.current) return;
-      setData(result);
+          setData(result);
     } catch (err) {
       if (!isMountedRef.current) return;
       if (fetchId !== fetchIdRef.current) return;
-      setError(err instanceof Error ? err : new Error('Failed to load server info'));
+          setError(err instanceof Error ? err : new Error('Failed to load server info'));
     } finally {
       if (!isMountedRef.current) return;
       if (fetchId !== fetchIdRef.current) return;
-      setIsLoading(false);
-    }
+          setIsLoading(false);
+        }
   }, []);
 
   useEffect(() => {

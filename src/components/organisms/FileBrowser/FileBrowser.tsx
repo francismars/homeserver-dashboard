@@ -242,7 +242,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
   const handleDeleteByPath = async () => {
     const normalized = normalizeAdminDeletePath(deleteByPathInput);
     if (!normalized) {
-      setDeleteByPathValidationError('Please enter a WebDAV entry path to delete.');
+      setDeleteByPathValidationError('Please enter an entry path to delete.');
       return;
     }
 
@@ -361,7 +361,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>File Browser</CardTitle>
-              <CardDescription>Browse and manage files via WebDAV</CardDescription>
+              <CardDescription>Browse and manage files</CardDescription>
             </div>
             <div className="flex gap-2">
               {typeof diskUsedMB === 'number' && (
@@ -745,7 +745,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           <DialogHeader>
             <DialogTitle>Delete</DialogTitle>
             <DialogDescription>
-              Paste a WebDAV entry path to delete (destructive). You can paste a full URL or a path like{' '}
+              Paste an entry path to delete (destructive). You can paste a full URL or a path like{' '}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">/dav/&lt;pubkey&gt;/pub/file.txt</code>.
             </DialogDescription>
           </DialogHeader>

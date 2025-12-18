@@ -70,6 +70,7 @@ export default function DashboardPage() {
                 onEnableUser={enableUser}
                 isDisablingUser={isDisablingUser}
                 onOpenInvites={() => setIsInvitesDialogOpen(true)}
+                numUsersTotal={info?.num_users}
                 numDisabledUsers={info?.num_disabled_users}
               />
             </TabsContent>

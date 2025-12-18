@@ -32,7 +32,7 @@ export class WebDavService {
 
     if (!response.ok) {
       const error: WebDavError = {
-        message: `WebDAV request failed: ${response.status} ${response.statusText}`,
+        message: `Request failed: ${response.status} ${response.statusText}`,
         status: response.status,
       };
       throw error;

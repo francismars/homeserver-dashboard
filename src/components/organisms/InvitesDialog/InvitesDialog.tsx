@@ -17,10 +17,10 @@ import { Copy, Check, Plus, Key, Info } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 
 const MOCK_USERS_BY_INVITE = [
-  { inviteCode: 'INV-2024-001', userCount: 3 },
-  { inviteCode: 'INV-2024-002', userCount: 2 },
-  { inviteCode: 'INV-2024-003', userCount: 2 },
-  { inviteCode: 'INV-2024-004', userCount: 1 },
+    { inviteCode: 'INV-2024-001', userCount: 3 },
+    { inviteCode: 'INV-2024-002', userCount: 2 },
+    { inviteCode: 'INV-2024-003', userCount: 2 },
+    { inviteCode: 'INV-2024-004', userCount: 1 },
 ] as const;
 
 interface InvitesDialogProps {
@@ -136,10 +136,10 @@ export function InvitesDialog({
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base">Invite Statistics</CardTitle>
                 {!hasStats && (
-                  <Badge variant="outline" className="border-dashed text-xs font-normal">
-                    <Info className="mr-1 h-3 w-3" />
+                <Badge variant="outline" className="border-dashed text-xs font-normal">
+                  <Info className="mr-1 h-3 w-3" />
                     Unavailable
-                  </Badge>
+                </Badge>
                 )}
               </div>
               <CardDescription className="text-xs text-muted-foreground/70">
