@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
 import type { AdminInfoResponse } from '@/services/admin/admin.types';
 
@@ -13,32 +13,39 @@ export function useAdminInfo() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
+  const isMountedRef = useRef(true);
+  const fetchIdRef = useRef(0);
+
+  const refetch = useCallback(async () => {
     const service = getService();
-    let cancelled = false;
+    const fetchId = ++fetchIdRef.current;
 
     setIsLoading(true);
     setError(null);
 
-    service
-      .getInfo()
-      .then((result) => {
-        if (!cancelled) {
-          setData(result);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error('Failed to load server info'));
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const result = await service.getInfo();
+      if (!isMountedRef.current) return;
+      if (fetchId !== fetchIdRef.current) return;
+      setData(result);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      if (fetchId !== fetchIdRef.current) return;
+      setError(err instanceof Error ? err : new Error('Failed to load server info'));
+    } finally {
+      if (!isMountedRef.current) return;
+      if (fetchId !== fetchIdRef.current) return;
+      setIsLoading(false);
+    }
   }, []);
 
-  return { data, isLoading, error };
+  useEffect(() => {
+    isMountedRef.current = true;
+    void refetch();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [refetch]);
+
+  return { data, isLoading, error, refetch };
 }

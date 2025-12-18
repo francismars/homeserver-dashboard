@@ -16,7 +16,7 @@ import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const { data: info, isLoading: infoLoading, error: infoError } = useAdminInfo();
+  const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
   const { disableUser, enableUser, generateInvite, isGeneratingInvite, isDisablingUser, generatedInvites } =
     useAdminActions();
 
@@ -35,6 +35,11 @@ export default function DashboardPage() {
   const handleShutdownServer = useCallback(() => {
     setServerControlAction('shutdown');
   }, []);
+
+  const handleGenerateInvite = useCallback(async () => {
+    await generateInvite();
+    await refetchInfo();
+  }, [generateInvite, refetchInfo]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -70,7 +75,7 @@ export default function DashboardPage() {
             </TabsContent>
 
             <TabsContent value="files" className="space-y-4">
-              <FileBrowser initialPath="/" />
+              <FileBrowser initialPath="/" diskUsedMB={info?.total_disk_used_mb} />
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4">
@@ -99,8 +104,11 @@ export default function DashboardPage() {
             open={isInvitesDialogOpen}
             onOpenChange={setIsInvitesDialogOpen}
             invites={generatedInvites}
-            onGenerate={generateInvite}
+            onGenerate={handleGenerateInvite}
             isGenerating={isGeneratingInvite}
+            signupCodesTotal={info?.num_signup_codes}
+            signupCodesUnused={info?.num_unused_signup_codes}
+            isStatsLoading={infoLoading}
           />
 
           {/* Server Control Dialog */}
