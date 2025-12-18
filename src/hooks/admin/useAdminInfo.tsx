@@ -5,9 +5,7 @@ import type { AdminInfoResponse } from '@/services/admin/admin.types';
 const getService = () => {
   const baseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
   const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-  // Default to mock mode if no baseUrl is provided
-  const mock = process.env.NEXT_PUBLIC_ADMIN_MOCK === '1' || !baseUrl;
-  return new AdminService({ baseUrl, token, mock });
+  return new AdminService({ baseUrl, token });
 };
 
 export function useAdminInfo() {

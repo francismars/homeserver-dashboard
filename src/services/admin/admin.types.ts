@@ -35,5 +35,4 @@ export type AdminConfig = AdminConfigResponse; // Alias for backward compatibili
 export type AdminServiceDeps = {
   baseUrl: string;
   token?: string;
-  mock?: boolean;
 };

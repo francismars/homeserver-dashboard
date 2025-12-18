@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { StatCard } from '@/components/atoms/StatCard';
-import { Users, HardDrive, Shield, Key, Server, Info, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Users, HardDrive, Shield, Key, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
@@ -56,15 +56,13 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
   const adminBaseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
   const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-  const adminMock = process.env.NEXT_PUBLIC_ADMIN_MOCK === '1';
-  const isMockMode = adminMock || !adminBaseUrl;
   const hasConfig = adminBaseUrl && adminToken;
-  const isConfigured = hasConfig && !isMockMode;
+  const isConfigured = !!hasConfig;
 
   const homeserverPubkey = info.pubkey || MOCK_SERVER_INFO.pubkey;
   const homeserverVersion = info.version || MOCK_SERVER_INFO.version;
-  const isPubkeyMock = isMockMode || !info.pubkey;
-  const isVersionMock = isMockMode || !info.version;
+  const isPubkeyMock = !info.pubkey;
+  const isVersionMock = !info.version;
 
   return (
     <div className="space-y-4">
@@ -106,11 +104,6 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                       <Badge variant="default" className="bg-green-600">
                         <CheckCircle2 className="mr-1 h-3 w-3" />
                         Connected
-                      </Badge>
-                    ) : isMockMode ? (
-                      <Badge variant="secondary">
-                        <Server className="mr-1 h-3 w-3" />
-                        Mock Mode
                       </Badge>
                     ) : (
                       <Badge variant="destructive">

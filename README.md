@@ -25,7 +25,7 @@ Also in the navbar “Settings” menu:
 ## 🚀 Prerequisites
 
 - Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
-- A running Pubky homeserver (or use mock mode for development)
+- A running Pubky homeserver (required for real data; some UI sections are still mock placeholders)
 
 ## 📦 Quick Start
 
@@ -49,10 +49,6 @@ Edit `.env.local` with your homeserver details:
 # Homeserver admin endpoint
 NEXT_PUBLIC_ADMIN_BASE_URL=http://localhost:6288
 NEXT_PUBLIC_ADMIN_TOKEN=your-admin-password
-
-# Optional: Mock mode (use mock data instead of real API)
-# Set to 1 to force mock mode, or leave unset/0 to use real API.
-NEXT_PUBLIC_ADMIN_MOCK=0
 ```
 
 ### 3. Run Development Server
@@ -78,13 +74,12 @@ npm start
 | ---------------------------- | ----------------------------- | -------- | ------- |
 | `NEXT_PUBLIC_ADMIN_BASE_URL` | Homeserver admin API base URL | Yes\*    | -       |
 | `NEXT_PUBLIC_ADMIN_TOKEN`    | Admin password/token          | Yes\*    | -       |
-| `NEXT_PUBLIC_ADMIN_MOCK`     | Force mock mode (`1` or `0`)  | No       | `0`     |
 
-\* Required unless using mock mode
+\* Required to use the real homeserver APIs
 
 ### Mock Mode
 
-If `NEXT_PUBLIC_ADMIN_BASE_URL` is not set, the dashboard automatically enables mock mode. Features using mock data are clearly marked with "Mock" badges.
+There is **no global “mock mode” switch**. Features that are not backed by real endpoints yet (logs/config/server control/disabled-users list) are explicitly marked as “Mock” in the UI.
 
 ## 🏗️ Project Structure
 
