@@ -284,13 +284,17 @@ export function DashboardLogs({ isLoading, error }: DashboardLogsProps) {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-dashed border-2 border-muted-foreground/30">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Homeserver Logs
+                <Badge variant="outline" className="text-xs font-normal border-dashed">
+                  <Info className="h-3 w-3 mr-1" />
+                  Mock
+                </Badge>
               </CardTitle>
               <CardDescription>View and filter homeserver event logs</CardDescription>
             </div>
