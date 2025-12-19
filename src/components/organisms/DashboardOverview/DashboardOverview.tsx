@@ -71,7 +71,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Connection Status:</span>
               {isConfigured ? (
-                <Badge variant="default" className="bg-lime-500">
+                <Badge variant="default" className="bg-brand">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   Connected
                 </Badge>

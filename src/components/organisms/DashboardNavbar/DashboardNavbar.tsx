@@ -1,9 +1,8 @@
 'use client';
 
-import { Settings, Info, Power, RotateCw } from 'lucide-react';
+import { Settings, Power, RotateCw } from 'lucide-react';
 import { Logo } from '@/components/molecules/Logo';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,43 +53,47 @@ export function DashboardNavbar({
                   <Settings className="size-6" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-38">
                 <DropdownMenuLabel>Settings</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onSettingsClick} className="flex items-center justify-between">
+                <DropdownMenuItem onClick={onSettingsClick}>
                   <span>Configuration</span>
-                  <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
-                    <Info className="mr-1 h-3 w-3" />
-                    Soon
-                  </Badge>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {onRestartServer && (
-                  <DropdownMenuItem onClick={onRestartServer} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <RotateCw className="h-4 w-4" />
-                      <span>Restart Homeserver</span>
-                    </div>
-                    <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
-                      <Info className="mr-1 h-3 w-3" />
-                      Soon
-                    </Badge>
-                  </DropdownMenuItem>
-                )}
-                {onShutdownServer && (
-                  <DropdownMenuItem
-                    onClick={onShutdownServer}
-                    className="flex items-center justify-between text-destructive focus:text-destructive"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Power className="h-4 w-4" />
-                      <span>Shutdown Homeserver</span>
-                    </div>
-                    <Badge variant="outline" className="ml-2 border-dashed text-xs font-normal">
-                      <Info className="mr-1 h-3 w-3" />
-                      Soon
-                    </Badge>
-                  </DropdownMenuItem>
+                {(onRestartServer || onShutdownServer) && (
+                  <div className="flex items-center gap-0 p-1">
+                    {onRestartServer && (
+                      <DropdownMenuItem asChild className="flex-1 p-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRestartServer();
+                          }}
+                          aria-label="Restart Homeserver"
+                        >
+                          <RotateCw className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuItem>
+                    )}
+                      {onShutdownServer && (
+                        <DropdownMenuItem asChild className="flex-1 p-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onShutdownServer();
+                            }}
+                            aria-label="Shutdown Homeserver"
+                          >
+                            <Power className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuItem>
+                      )}
+                  </div>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
