@@ -77,22 +77,22 @@ export function DashboardNavbar({
                         </Button>
                       </DropdownMenuItem>
                     )}
-                      {onShutdownServer && (
-                        <DropdownMenuItem asChild className="flex-1 p-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onShutdownServer();
-                            }}
-                            aria-label="Shutdown Homeserver"
-                          >
-                            <Power className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuItem>
-                      )}
+                    {onShutdownServer && (
+                      <DropdownMenuItem asChild className="flex-1 p-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onShutdownServer();
+                          }}
+                          aria-label="Shutdown Homeserver"
+                        >
+                          <Power className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuItem>
+                    )}
                   </div>
                 )}
               </DropdownMenuContent>

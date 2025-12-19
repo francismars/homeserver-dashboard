@@ -306,10 +306,22 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs} aria-label="Refresh logs">
                 <RefreshCw className={cn('h-4 w-4', isLoadingLogs && 'animate-spin')} />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadLogs} disabled={filteredLogs.length === 0} aria-label="Download logs">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadLogs}
+                disabled={filteredLogs.length === 0}
+                aria-label="Download logs"
+              >
                 <Download className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleClearLogs} disabled={logs.length === 0} aria-label="Clear logs">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearLogs}
+                disabled={logs.length === 0}
+                aria-label="Clear logs"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>

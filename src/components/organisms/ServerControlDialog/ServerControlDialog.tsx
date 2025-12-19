@@ -83,9 +83,7 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
                 {isRestart ? 'Restarting...' : 'Shutting down...'}
               </>
             ) : (
-              <>
-                {isRestart ? 'Restart' : 'Shutdown'}
-              </>
+              <>{isRestart ? 'Restart' : 'Shutdown'}</>
             )}
           </Button>
         </DialogFooter>

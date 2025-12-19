@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
 import { useUserManagement } from '@/hooks/user';
 import { Check, Clipboard, Copy, Info, Key, RefreshCw, Search, ShieldOff } from 'lucide-react';
@@ -255,89 +262,92 @@ export function DisabledUsersManagement({
               </div>
             </div>
 
-          <div className="space-y-3">
-            {disabledUsers.length > 0 && (
-              <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search disabled users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-20"
-                />
-                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
-                  {searchQuery && (
+            <div className="space-y-3">
+              {disabledUsers.length > 0 && (
+                <div className="relative">
+                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search disabled users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pr-20 pl-9"
+                  />
+                  <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                    {searchQuery && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSearchQuery('')}
+                        title="Clear"
+                      >
+                        <span className="sr-only">Clear</span>✕
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => setSearchQuery('')}
-                      title="Clear"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          setSearchQuery(text);
+                        } catch {
+                          // Handle clipboard error silently
+                        }
+                      }}
+                      title="Paste from clipboard"
                     >
-                      <span className="sr-only">Clear</span>✕
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={async () => {
-                      try {
-                        const text = await navigator.clipboard.readText();
-                        setSearchQuery(text);
-                      } catch {
-                        // Handle clipboard error silently
-                      }
-                    }}
-                    title="Paste from clipboard"
-                  >
-                    <Clipboard className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {filteredDisabledUsers.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <ShieldOff className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                <p>{disabledUsers.length === 0 ? 'No disabled users' : 'No matches'}</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredDisabledUsers.map((user) => (
-                  <div key={user.pubkey} className="flex items-center justify-between rounded-md border bg-muted/50 p-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <code className="truncate font-mono text-sm">{user.displayName}</code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 shrink-0 p-0"
-                          onClick={() => handleCopyPubkey(user.pubkey)}
-                          title="Copy full pubkey"
-                        >
-                          {copiedPubkey === user.pubkey ? (
-                            <Check className="h-3 w-3 text-green-600" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{user.pubkey}</p>
-                    </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleEnableUser(user.pubkey)}
-                      disabled={isProcessing || isDisablingUser}
-                    >
-                      Enable
+                      <Clipboard className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+
+              {filteredDisabledUsers.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <ShieldOff className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                  <p>{disabledUsers.length === 0 ? 'No disabled users' : 'No matches'}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredDisabledUsers.map((user) => (
+                    <div
+                      key={user.pubkey}
+                      className="flex items-center justify-between rounded-md border bg-muted/50 p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <code className="truncate font-mono text-sm">{user.displayName}</code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 shrink-0 p-0"
+                            onClick={() => handleCopyPubkey(user.pubkey)}
+                            title="Copy full pubkey"
+                          >
+                            {copiedPubkey === user.pubkey ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{user.pubkey}</p>
+                      </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleEnableUser(user.pubkey)}
+                        disabled={isProcessing || isDisablingUser}
+                      >
+                        Enable
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -419,21 +429,21 @@ export function DisabledUsersManagement({
                   'Disable'
                 )}
               </Button>
-                <Button
-                  onClick={handleEnableByPubkey}
-                  disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
-                  className="w-full"
-                  variant="outline"
-                >
-                  {processingAction === 'enable' ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Enabling...
-                    </>
-                  ) : (
-                    'Enable'
-                  )}
-                </Button>
+              <Button
+                onClick={handleEnableByPubkey}
+                disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
+                className="w-full"
+                variant="outline"
+              >
+                {processingAction === 'enable' ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Enabling...
+                  </>
+                ) : (
+                  'Enable'
+                )}
+              </Button>
             </div>
           </div>
 
