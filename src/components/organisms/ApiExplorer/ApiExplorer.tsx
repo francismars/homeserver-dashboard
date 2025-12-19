@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Play, Copy, Check, Server, Globe, BarChart3 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Play, Copy, Check, Server, Globe, BarChart3, Info } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import { copyToClipboard } from '@/libs/utils';
 import type { ApiExplorerProps, ApiEndpoint, EndpointGroup } from './ApiExplorer.types';
@@ -400,7 +401,13 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
     <div className="space-y-4">
       <Card>
         <CardHeader className="border-b pb-4">
-          <CardTitle>API Explorer</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            API Explorer
+            <Badge variant="outline" className="border-dashed text-xs font-normal">
+              <Info className="mr-1 h-3 w-3" />
+              Temporary
+            </Badge>
+          </CardTitle>
           <CardDescription>Test homeserver API endpoints across all servers</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">

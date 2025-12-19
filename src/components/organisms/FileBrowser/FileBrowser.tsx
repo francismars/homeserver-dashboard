@@ -513,7 +513,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           {file.isCollection ? (
-                            <Folder className="h-4 w-4 text-lime-500" />
+                            <Folder className="h-4 w-4 text-brand" />
                           ) : (
                             <File className="h-4 w-4 text-muted-foreground" />
                           )}

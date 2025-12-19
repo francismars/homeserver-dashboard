@@ -7,6 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -169,6 +177,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
   const [eventTypeFilter, setEventTypeFilter] = useState<LogEventType>('all');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load logs
@@ -242,9 +251,12 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
   }, [logs, levelFilter, eventTypeFilter, searchQuery]);
 
   const handleClearLogs = useCallback(() => {
-    if (confirm('Are you sure you want to clear all logs? This action cannot be undone.')) {
-      setLogs([]);
-    }
+    setIsClearDialogOpen(true);
+  }, []);
+
+  const handleConfirmClear = useCallback(() => {
+    setLogs([]);
+    setIsClearDialogOpen(false);
   }, []);
 
   const handleDownloadLogs = useCallback(() => {
@@ -291,17 +303,14 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               <CardDescription>View and filter homeserver event logs</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs}>
-                <RefreshCw className={cn('mr-2 h-4 w-4', isLoadingLogs && 'animate-spin')} />
-                Refresh
+              <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs} aria-label="Refresh logs">
+                <RefreshCw className={cn('h-4 w-4', isLoadingLogs && 'animate-spin')} />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadLogs} disabled={filteredLogs.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
+              <Button variant="outline" size="sm" onClick={handleDownloadLogs} disabled={filteredLogs.length === 0} aria-label="Download logs">
+                <Download className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleClearLogs} disabled={logs.length === 0}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Clear
+              <Button variant="outline" size="sm" onClick={handleClearLogs} disabled={logs.length === 0} aria-label="Clear logs">
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -456,6 +465,25 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear Logs</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to clear all logs? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmClear}>
+              Clear Logs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

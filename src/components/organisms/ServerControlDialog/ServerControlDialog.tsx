@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Info, Power, RotateCw } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 interface ServerControlDialogProps {
   open: boolean;
@@ -57,11 +57,6 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
 
         <div className="py-4">
           <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
-            {isRestart ? (
-              <RotateCw className="h-5 w-5 text-blue-500" />
-            ) : (
-              <Power className="h-5 w-5 text-destructive" />
-            )}
             <div className="flex-1">
               <p className="text-sm font-medium">{isRestart ? 'Server will restart' : 'Server will shutdown'}</p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -89,17 +84,7 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
               </>
             ) : (
               <>
-                {isRestart ? (
-                  <>
-                    <RotateCw className="mr-2 h-4 w-4" />
-                    Restart
-                  </>
-                ) : (
-                  <>
-                    <Power className="mr-2 h-4 w-4" />
-                    Shutdown
-                  </>
-                )}
+                {isRestart ? 'Restart' : 'Shutdown'}
               </>
             )}
           </Button>
