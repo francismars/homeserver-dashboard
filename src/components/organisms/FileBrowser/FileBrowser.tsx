@@ -357,7 +357,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>File Browser</CardTitle>
@@ -375,7 +375,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           {/* Search + Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative sm:flex-1">
@@ -390,7 +390,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
 
             <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={() => {
                   setDeleteByPathValidationError(null);
@@ -513,7 +513,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           {file.isCollection ? (
-                            <Folder className="h-4 w-4 text-blue-500" />
+                            <Folder className="h-4 w-4 text-lime-500" />
                           ) : (
                             <File className="h-4 w-4 text-muted-foreground" />
                           )}
@@ -548,7 +548,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                               setFileToDelete(file);
                               setShowDeleteDialog(true);
                             }}
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            className="h-7 w-7 p-0"
                             title="Delete"
                           >
                             <Trash2 className="h-3 w-3" />

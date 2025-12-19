@@ -278,7 +278,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
@@ -306,7 +306,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           {/* Filters */}
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">

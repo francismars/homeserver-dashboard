@@ -399,11 +399,11 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="border-b pb-4">
           <CardTitle>API Explorer</CardTitle>
           <CardDescription>Test homeserver API endpoints across all servers</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           {/* Server Selection */}
           <div className="space-y-2">
             <Label>Server</Label>

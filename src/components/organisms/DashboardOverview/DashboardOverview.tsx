@@ -58,7 +58,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     <div className="space-y-4">
       <div className="grid gap-4">
         <Card>
-          <CardHeader>
+          <CardHeader className="border-b pb-4">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">Server & Connection</CardTitle>
@@ -66,12 +66,12 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 pt-4">
             {/* Connection Status */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Connection Status:</span>
               {isConfigured ? (
-                <Badge variant="default" className="bg-green-600">
+                <Badge variant="default" className="bg-lime-500">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   Connected
                 </Badge>
@@ -113,7 +113,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
             {/* Admin Endpoint */}
             {adminBaseUrl && (
-              <div className="flex items-center justify-between border-t pt-2">
+              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Admin Endpoint:</span>
                 <code className="rounded bg-muted px-2 py-1 text-xs">{adminBaseUrl}</code>
               </div>

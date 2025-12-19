@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
 import { useUserManagement } from '@/hooks/user';
-import { Check, Clipboard, Copy, Info, Key, RefreshCw, Search, Shield, ShieldOff } from 'lucide-react';
+import { Check, Clipboard, Copy, Info, Key, RefreshCw, Search, ShieldOff } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
@@ -182,7 +182,7 @@ export function DisabledUsersManagement({
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="border-b pb-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
@@ -195,13 +195,13 @@ export function DisabledUsersManagement({
                 </Badge>
               )}
               {onOpenInvites && (
-                <Button variant="default" size="icon" onClick={onOpenInvites} title="Invites" aria-label="Invites">
+                <Button variant="outline" size="sm" onClick={onOpenInvites} title="Invites" aria-label="Invites">
                   <Key className="h-4 w-4" />
                 </Button>
               )}
               <Button
                 variant="outline"
-                size="icon"
+                size="sm"
                 onClick={refreshUsers}
                 disabled={isLoading}
                 title="Refresh"
@@ -213,7 +213,7 @@ export function DisabledUsersManagement({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-4">
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Error</AlertTitle>
@@ -240,8 +240,8 @@ export function DisabledUsersManagement({
                   Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsers.length}
                 </Badge>
                 <Button
-                  variant="destructive"
-                  size="icon"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setLocalError(null);
                     setPubkeyToDisable('');
@@ -263,8 +263,37 @@ export function DisabledUsersManagement({
                   placeholder="Search disabled users..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 pr-20"
                 />
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setSearchQuery('')}
+                      title="Clear"
+                    >
+                      <span className="sr-only">Clear</span>✕
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        setSearchQuery(text);
+                      } catch {
+                        // Handle clipboard error silently
+                      }
+                    }}
+                    title="Paste from clipboard"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -302,7 +331,6 @@ export function DisabledUsersManagement({
                       onClick={() => handleEnableUser(user.pubkey)}
                       disabled={isProcessing || isDisablingUser}
                     >
-                      <Shield className="mr-2 h-4 w-4" />
                       Enable
                     </Button>
                   </div>
@@ -388,30 +416,24 @@ export function DisabledUsersManagement({
                     Disabling...
                   </>
                 ) : (
-                  <>
-                    <ShieldOff className="mr-2 h-4 w-4" />
-                    Disable
-                  </>
+                  'Disable'
                 )}
               </Button>
-              <Button
-                onClick={handleEnableByPubkey}
-                disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
-                className="w-full"
-                variant="outline"
-              >
-                {processingAction === 'enable' ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Enabling...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Enable
-                  </>
-                )}
-              </Button>
+                <Button
+                  onClick={handleEnableByPubkey}
+                  disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
+                  className="w-full"
+                  variant="outline"
+                >
+                  {processingAction === 'enable' ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Enabling...
+                    </>
+                  ) : (
+                    'Enable'
+                  )}
+                </Button>
             </div>
           </div>
 
