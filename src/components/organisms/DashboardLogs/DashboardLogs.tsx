@@ -302,7 +302,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">View and filter homeserver event logs</CardDescription>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex shrink-0 gap-2">
               <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs} aria-label="Refresh logs">
                 <RefreshCw className={cn('h-4 w-4', isLoadingLogs && 'animate-spin')} />
               </Button>
@@ -372,7 +372,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
           </div>
 
           {/* Auto-refresh controls */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center rounded-md bg-muted/50 p-3">
+          <div className="flex flex-col gap-3 rounded-md bg-muted/50 p-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -423,13 +423,13 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               )}
             </div>
           ) : (
-            <ScrollArea className="h-[400px] sm:h-[500px] md:h-[600px] w-full rounded-md border p-3 sm:p-4">
+            <ScrollArea className="h-[400px] w-full rounded-md border p-3 sm:h-[500px] sm:p-4 md:h-[600px]">
               <div className="space-y-2">
                 {filteredLogs.map((log) => (
                   <div
                     key={log.id}
                     className={cn(
-                      'flex items-start gap-2 sm:gap-3 rounded-md border p-2 sm:p-3 text-xs sm:text-sm',
+                      'flex items-start gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm',
                       log.level === 'error' && 'border-destructive/20 bg-destructive/10',
                       log.level === 'warn' && 'border-yellow-500/20 bg-yellow-500/10',
                       log.level === 'info' && 'border-blue-500/20 bg-blue-500/10',
@@ -452,12 +452,12 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
                           <span className="sm:hidden">{new Date(log.timestamp).toLocaleTimeString()}</span>
                         </span>
                         {log.source && (
-                          <code className="ml-auto text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-none">
+                          <code className="ml-auto max-w-[120px] truncate text-xs text-muted-foreground sm:max-w-none">
                             {log.source}
                           </code>
                         )}
                       </div>
-                      <p className="text-foreground wrap-break-word">{log.message}</p>
+                      <p className="wrap-break-word text-foreground">{log.message}</p>
                       {log.details && (
                         <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs text-muted-foreground">
                           {JSON.stringify(log.details, null, 2)}

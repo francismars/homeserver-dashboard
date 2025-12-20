@@ -67,13 +67,15 @@ export function InvitesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-[calc(100vw-2rem)] sm:max-w-[min(48rem,calc(100vw-4rem))] flex-col">
+      <DialogContent className="flex max-h-[90vh] max-w-[calc(100vw-2rem)] flex-col sm:max-w-[min(48rem,calc(100vw-4rem))]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Key className="h-4 w-4 sm:h-5 sm:w-5" />
             Invite Management
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">Generate signup tokens and view invite statistics</DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
+            Generate signup tokens and view invite statistics
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto">
@@ -109,9 +111,17 @@ export function InvitesDialog({
               ) : (
                 <div className="space-y-2">
                   {invites.map((invite, index) => (
-                    <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border bg-muted/50 p-3">
-                      <code className="flex-1 font-mono text-xs sm:text-sm break-all sm:break-normal">{invite}</code>
-                      <Button variant="ghost" size="sm" onClick={() => handleCopy(invite, index)} className="w-full sm:w-auto sm:ml-2 shrink-0">
+                    <div
+                      key={index}
+                      className="flex flex-col gap-2 rounded-md border bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <code className="flex-1 font-mono text-xs break-all sm:text-sm sm:break-normal">{invite}</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopy(invite, index)}
+                        className="w-full shrink-0 sm:ml-2 sm:w-auto"
+                      >
                         {copiedIndex === index ? (
                           <>
                             <Check className="mr-2 h-4 w-4" />

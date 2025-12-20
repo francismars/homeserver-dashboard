@@ -27,27 +27,33 @@ export function DashboardNavbar({
   onShutdownServer,
 }: DashboardNavbarProps) {
   return (
-    <header className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-4 sm:py-6 backdrop-blur-sm', className)}>
-      <nav className="flex w-full items-center justify-between gap-1.5 sm:gap-2 md:gap-3 min-w-0">
+    <header
+      className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-4 backdrop-blur-sm sm:py-6', className)}
+    >
+      <nav className="flex w-full min-w-0 items-center justify-between gap-1.5 sm:gap-2 md:gap-3">
         {/* Logo and title grouped together - single line, never wrap */}
-        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden sm:gap-1.5">
           <div className="shrink-0">
-            <Logo noLink width={32} height={32} className="sm:w-10 sm:h-10" />
+            <Logo noLink width={32} height={32} className="sm:h-10 sm:w-10" />
           </div>
           <div className="min-w-0 flex-1 overflow-hidden">
-            <h1 className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-semibold truncate whitespace-nowrap">Pubky Homeserver Dashboard</h1>
-            <p className="text-xs text-muted-foreground truncate whitespace-nowrap">Manage your homeserver settings and monitor usage</p>
+            <h1 className="truncate text-sm font-semibold whitespace-nowrap sm:text-base md:text-lg lg:text-xl xl:text-2xl">
+              Pubky Homeserver Dashboard
+            </h1>
+            <p className="truncate text-xs whitespace-nowrap text-muted-foreground">
+              Manage your homeserver settings and monitor usage
+            </p>
           </div>
         </div>
 
         {/* Settings button on the right - always visible, never shrink */}
-        <div className="flex items-center justify-end shrink-0">
+        <div className="flex shrink-0 items-center justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="secondary"
                 size="icon"
-                className="h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full border bg-transparent shrink-0"
+                className="h-9 w-9 shrink-0 rounded-full border bg-transparent sm:h-10 sm:w-10 md:h-12 md:w-12"
                 aria-label="Settings"
               >
                 <Settings className="size-4 sm:size-5 md:size-6" />

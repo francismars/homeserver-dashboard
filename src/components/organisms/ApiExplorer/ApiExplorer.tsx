@@ -432,7 +432,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground break-all sm:break-normal">
+            <p className="text-xs break-all text-muted-foreground sm:break-normal">
               Base URL: <code className="font-mono break-all">{currentGroup.baseUrl}</code>
             </p>
           </div>
@@ -465,7 +465,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Method</Label>
               <Select

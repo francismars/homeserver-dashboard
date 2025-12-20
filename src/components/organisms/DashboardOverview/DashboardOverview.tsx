@@ -61,15 +61,17 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
           <CardHeader className="border-b pb-3 sm:pb-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">Server & Connection</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Homeserver details and dashboard connection</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Server & Connection</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Homeserver details and dashboard connection
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3 sm:space-y-3 pt-3 sm:pt-4">
+          <CardContent className="space-y-3 pt-3 sm:space-y-3 sm:pt-4">
             {/* Connection Status */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Connection Status:</span>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>
               <div className="flex-shrink-0">
                 {isConfigured ? (
                   <Badge variant="default" className="bg-brand text-xs">
@@ -87,9 +89,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
             {/* Server Pubkey */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Homeserver Pubkey:</span>
-              <div className="flex min-w-0 items-center gap-2 flex-1 sm:flex-initial">
-                <span className="truncate font-mono text-xs text-muted-foreground/70 italic break-all">{homeserverPubkey}</span>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
+                <span className="truncate font-mono text-xs break-all text-muted-foreground/70 italic">
+                  {homeserverPubkey}
+                </span>
                 {isPubkeySoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -101,9 +105,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
             {/* Server Version */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Version:</span>
-              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-                <span className="text-xs sm:text-sm text-muted-foreground/70 italic break-words">{homeserverVersion}</span>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Version:</span>
+              <div className="flex flex-1 items-center gap-2 sm:flex-initial">
+                <span className="text-xs break-words text-muted-foreground/70 italic sm:text-sm">
+                  {homeserverVersion}
+                </span>
                 {isVersionSoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -116,8 +122,8 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             {/* Admin Endpoint */}
             {adminBaseUrl && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Admin Endpoint:</span>
-                <code className="rounded bg-muted px-2 py-1 text-xs break-all min-w-0">{adminBaseUrl}</code>
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Admin Endpoint:</span>
+                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all">{adminBaseUrl}</code>
               </div>
             )}
           </CardContent>

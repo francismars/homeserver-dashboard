@@ -408,11 +408,16 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
 
           {/* Breadcrumbs */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm overflow-x-auto pb-2 sm:pb-0">
+            <div className="flex flex-wrap items-center gap-1 overflow-x-auto pb-2 text-xs sm:gap-2 sm:pb-0 sm:text-sm">
               {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <div key={index} className="flex shrink-0 items-center gap-1 sm:gap-2">
                   {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-                  <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-1.5 sm:px-2 text-xs sm:text-sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateToPath(crumb.path)}
+                    className="h-6 px-1.5 text-xs sm:px-2 sm:text-sm"
+                  >
                     {crumb.name}
                   </Button>
                 </div>
@@ -456,7 +461,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           ) : (
             <>
               {/* Desktop Table View */}
-              <div className="hidden md:block rounded-md border overflow-x-auto">
+              <div className="hidden overflow-x-auto rounded-md border md:block">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
@@ -519,7 +524,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                             ) : (
                               <File className="h-4 w-4 text-muted-foreground" />
                             )}
-                            <span className="font-medium truncate">{file.displayName}</span>
+                            <span className="truncate font-medium">{file.displayName}</span>
                           </div>
                         </td>
                         <td className="p-2 text-sm text-muted-foreground">
@@ -564,7 +569,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden space-y-2">
+              <div className="space-y-2 md:hidden">
                 {filteredAndSortedFiles.map((file) => (
                   <div
                     key={file.path}
@@ -572,22 +577,22 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                     onClick={() => handleFileClick(file)}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
                         {file.isCollection ? (
-                          <Folder className="h-4 w-4 text-brand shrink-0" />
+                          <Folder className="h-4 w-4 shrink-0 text-brand" />
                         ) : (
-                          <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <File className="h-4 w-4 shrink-0 text-muted-foreground" />
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{file.displayName}</div>
-                          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <div className="truncate font-medium">{file.displayName}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             {!file.isCollection && <span>{formatFileSize(file.contentLength)}</span>}
                             {!file.isCollection && file.contentLength && <span>•</span>}
                             <span>{formatDate(file.lastModified)}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -637,12 +642,12 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               <Textarea
                 value={fileContent}
                 onChange={(e) => setFileContent(e.target.value)}
-                className="min-h-[300px] sm:min-h-[400px] font-mono text-xs sm:text-sm"
+                className="min-h-[300px] font-mono text-xs sm:min-h-[400px] sm:text-sm"
                 placeholder="File content..."
               />
             ) : (
-              <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-3 sm:p-4">
-                <pre className="font-mono text-xs sm:text-sm whitespace-pre-wrap break-words">{fileContent}</pre>
+              <div className="max-h-[50vh] overflow-auto rounded-md border bg-muted/50 p-3 sm:max-h-[60vh] sm:p-4">
+                <pre className="font-mono text-xs break-words whitespace-pre-wrap sm:text-sm">{fileContent}</pre>
               </div>
             )}
           </div>
