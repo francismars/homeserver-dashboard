@@ -195,7 +195,7 @@ export function DisabledUsersManagement({
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
               <CardDescription className="text-xs sm:text-sm">Manage invites and user access</CardDescription>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               {typeof numUsersTotal === 'number' && (
                 <Badge variant="secondary" className="shrink-0 text-xs font-normal">
                   Users: {numUsersTotal}
@@ -242,7 +242,7 @@ export function DisabledUsersManagement({
                 <div className="text-xs text-muted-foreground">List of disabled users</div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="secondary" className="shrink-0 text-xs">
                   Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsers.length}
                 </Badge>
@@ -314,7 +314,7 @@ export function DisabledUsersManagement({
                   {filteredDisabledUsers.map((user) => (
                     <div
                       key={user.pubkey}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-md border bg-muted/50 p-3"
+                      className="flex flex-col gap-3 rounded-md border bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -333,14 +333,16 @@ export function DisabledUsersManagement({
                             )}
                           </Button>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground break-all sm:break-normal">{user.pubkey}</p>
+                        <p className="mt-1 truncate text-xs break-all text-muted-foreground sm:break-normal">
+                          {user.pubkey}
+                        </p>
                       </div>
                       <Button
                         variant="default"
                         size="sm"
                         onClick={() => handleEnableUser(user.pubkey)}
                         disabled={isProcessing || isDisablingUser}
-                        className="w-full sm:w-auto shrink-0"
+                        className="w-full shrink-0 sm:w-auto"
                       >
                         Enable
                       </Button>
@@ -414,7 +416,7 @@ export function DisabledUsersManagement({
               </div>
             </div>
 
-            <div className="grid gap-2 grid-cols-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleDisableByPubkey}
                 disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}

@@ -44,7 +44,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 sm:gap-6 px-4 sm:px-6 py-6 sm:py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-10">
           <DashboardNavbar
             onSettingsClick={handleSettingsClick}
             onRestartServer={handleRestartServer}
@@ -52,12 +52,22 @@ export default function DashboardPage() {
           />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="flex w-full flex-nowrap overflow-x-auto md:grid md:grid-cols-5 gap-1 md:gap-0">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm whitespace-nowrap shrink-0 md:shrink">Overview</TabsTrigger>
-              <TabsTrigger value="users" className="text-xs sm:text-sm whitespace-nowrap shrink-0 md:shrink">Users</TabsTrigger>
-              <TabsTrigger value="files" className="text-xs sm:text-sm whitespace-nowrap shrink-0 md:shrink">Files</TabsTrigger>
-              <TabsTrigger value="logs" className="text-xs sm:text-sm whitespace-nowrap shrink-0 md:shrink">Logs</TabsTrigger>
-              <TabsTrigger value="api" className="text-xs sm:text-sm whitespace-nowrap shrink-0 md:shrink">API</TabsTrigger>
+            <TabsList className="flex w-full flex-nowrap gap-1 overflow-x-auto md:grid md:grid-cols-5 md:gap-0">
+              <TabsTrigger value="overview" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="users" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+                Users
+              </TabsTrigger>
+              <TabsTrigger value="files" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+                Files
+              </TabsTrigger>
+              <TabsTrigger value="logs" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+                Logs
+              </TabsTrigger>
+              <TabsTrigger value="api" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+                API
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
@@ -122,21 +132,21 @@ export default function DashboardPage() {
 
         {/* Footer */}
         <footer className="mt-6 pt-4 pb-6 sm:pb-8">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:px-6 text-sm text-muted-foreground">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 text-sm text-muted-foreground sm:px-6">
             {/* Copyright and version */}
-            <div className="flex flex-col items-center justify-between gap-3 sm:gap-4 sm:flex-row">
-              <div className="flex flex-col items-center gap-2 sm:gap-4 sm:flex-row text-center sm:text-left">
+            <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
+              <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:gap-4 sm:text-left">
                 <span className="text-xs sm:text-sm">Homeserver Dashboard</span>
                 <span className="text-xs">{info?.version ? `v${info.version}` : 'v0.1.0-dev'}</span>
               </div>
-              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-xs text-center sm:text-left">
+              <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
                 <span>Powered by Pubky</span>
                 <span>© {new Date().getFullYear()} Synonym Software Ltd.</span>
               </div>
             </div>
 
             {/* Links */}
-            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-4 sm:gap-6 text-xs">
+            <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:justify-end sm:gap-6">
               <Link
                 href="https://github.com/synonymdev/pubky"
                 target="_blank"
