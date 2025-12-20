@@ -291,18 +291,18 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
     <div className="space-y-4">
       <Card>
         <CardHeader className="border-b pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex flex-wrap items-center gap-2">
                 Homeserver Logs
                 <Badge variant="outline" className="border-dashed text-xs font-normal">
                   <Info className="mr-1 h-3 w-3" />
                   Soon
                 </Badge>
               </CardTitle>
-              <CardDescription>View and filter homeserver event logs</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">View and filter homeserver event logs</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <Button variant="outline" size="sm" onClick={loadLogs} disabled={isLoadingLogs} aria-label="Refresh logs">
                 <RefreshCw className={cn('h-4 w-4', isLoadingLogs && 'animate-spin')} />
               </Button>
@@ -372,7 +372,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
           </div>
 
           {/* Auto-refresh controls */}
-          <div className="flex items-center gap-3 rounded-md bg-muted/50 p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center rounded-md bg-muted/50 p-3">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -381,7 +381,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="rounded"
               />
-              <Label htmlFor="autoRefresh" className="cursor-pointer text-sm">
+              <Label htmlFor="autoRefresh" className="cursor-pointer text-xs sm:text-sm">
                 Auto-refresh every
               </Label>
             </div>
@@ -390,7 +390,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               onValueChange={(value) => setAutoRefreshInterval(Number(value))}
               disabled={!autoRefresh}
             >
-              <SelectTrigger className="w-[100px]">
+              <SelectTrigger className="w-full sm:w-[100px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -423,36 +423,41 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
               )}
             </div>
           ) : (
-            <ScrollArea className="h-[600px] w-full rounded-md border p-4">
+            <ScrollArea className="h-[400px] sm:h-[500px] md:h-[600px] w-full rounded-md border p-3 sm:p-4">
               <div className="space-y-2">
                 {filteredLogs.map((log) => (
                   <div
                     key={log.id}
                     className={cn(
-                      'flex items-start gap-3 rounded-md border p-3 text-sm',
+                      'flex items-start gap-2 sm:gap-3 rounded-md border p-2 sm:p-3 text-xs sm:text-sm',
                       log.level === 'error' && 'border-destructive/20 bg-destructive/10',
                       log.level === 'warn' && 'border-yellow-500/20 bg-yellow-500/10',
                       log.level === 'info' && 'border-blue-500/20 bg-blue-500/10',
                       log.level === 'debug' && 'border-muted-foreground/20 bg-muted',
                     )}
                   >
-                    <div className="mt-0.5 flex-shrink-0">{getLogLevelIcon(log.level)}</div>
+                    <div className="mt-0.5 shrink-0">{getLogLevelIcon(log.level)}</div>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <Badge variant={getLogLevelBadgeVariant(log.level)} className="text-xs">
                           {log.level.toUpperCase()}
                         </Badge>
                         <Badge variant="outline" className="flex items-center gap-1 text-xs">
                           {getEventTypeIcon(log.eventType)}
-                          {log.eventType}
+                          <span className="hidden sm:inline">{log.eventType}</span>
                         </Badge>
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {formatTimestamp(log.timestamp)}
+                          <span className="hidden sm:inline">{formatTimestamp(log.timestamp)}</span>
+                          <span className="sm:hidden">{new Date(log.timestamp).toLocaleTimeString()}</span>
                         </span>
-                        {log.source && <code className="ml-auto text-xs text-muted-foreground">{log.source}</code>}
+                        {log.source && (
+                          <code className="ml-auto text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-none">
+                            {log.source}
+                          </code>
+                        )}
                       </div>
-                      <p className="text-foreground">{log.message}</p>
+                      <p className="text-foreground wrap-break-word">{log.message}</p>
                       {log.details && (
                         <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs text-muted-foreground">
                           {JSON.stringify(log.details, null, 2)}

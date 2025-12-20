@@ -408,11 +408,11 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
 
           {/* Breadcrumbs */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm overflow-x-auto pb-2 sm:pb-0">
               {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex items-center gap-1 sm:gap-2 shrink-0">
                   {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-                  <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-2">
+                  <Button variant="ghost" size="sm" onClick={() => navigateToPath(crumb.path)} className="h-6 px-1.5 sm:px-2 text-xs sm:text-sm">
                     {crumb.name}
                   </Button>
                 </div>
@@ -454,119 +454,180 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               <p>{files.length === 0 ? 'This directory is empty' : `No files match "${debouncedSearchQuery}"`}</p>
             </div>
           ) : (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th
-                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                      onClick={() => handleSort('type')}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>Name</span>
-                        {sortOption.field === 'type' &&
-                          (sortOption.direction === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          ))}
-                      </div>
-                    </th>
-                    <th
-                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                      onClick={() => handleSort('size')}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>Size</span>
-                        {sortOption.field === 'size' &&
-                          (sortOption.direction === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          ))}
-                      </div>
-                    </th>
-                    <th
-                      className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                      onClick={() => handleSort('date')}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>Modified</span>
-                        {sortOption.field === 'date' &&
-                          (sortOption.direction === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          ))}
-                      </div>
-                    </th>
-                    <th className="p-2 text-right text-sm font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAndSortedFiles.map((file) => (
-                    <tr
-                      key={file.path}
-                      className="cursor-pointer border-b hover:bg-muted/50"
-                      onClick={() => handleFileClick(file)}
-                    >
-                      <td className="p-2">
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-md border overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th
+                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
+                        onClick={() => handleSort('type')}
+                      >
                         <div className="flex items-center gap-2">
-                          {file.isCollection ? (
-                            <Folder className="h-4 w-4 text-brand" />
-                          ) : (
-                            <File className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <span className="font-medium">{file.displayName}</span>
+                          <span>Name</span>
+                          {sortOption.field === 'type' &&
+                            (sortOption.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            ))}
                         </div>
-                      </td>
-                      <td className="p-2 text-sm text-muted-foreground">
-                        {file.isCollection ? '-' : formatFileSize(file.contentLength)}
-                      </td>
-                      <td className="p-2 text-sm text-muted-foreground">{formatDate(file.lastModified)}</td>
-                      <td className="p-2">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFileToRename(file);
-                              setRenameValue(file.displayName);
-                              setShowRenameDialog(true);
-                            }}
-                            className="h-7 w-7 p-0"
-                            title="Rename"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFileToDelete(file);
-                              setShowDeleteDialog(true);
-                            }}
-                            className="h-7 w-7 p-0"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                      </th>
+                      <th
+                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
+                        onClick={() => handleSort('size')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>Size</span>
+                          {sortOption.field === 'size' &&
+                            (sortOption.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            ))}
                         </div>
-                      </td>
+                      </th>
+                      <th
+                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
+                        onClick={() => handleSort('date')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>Modified</span>
+                          {sortOption.field === 'date' &&
+                            (sortOption.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            ))}
+                        </div>
+                      </th>
+                      <th className="p-2 text-right text-sm font-semibold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredAndSortedFiles.map((file) => (
+                      <tr
+                        key={file.path}
+                        className="cursor-pointer border-b hover:bg-muted/50"
+                        onClick={() => handleFileClick(file)}
+                      >
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            {file.isCollection ? (
+                              <Folder className="h-4 w-4 text-brand" />
+                            ) : (
+                              <File className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="font-medium truncate">{file.displayName}</span>
+                          </div>
+                        </td>
+                        <td className="p-2 text-sm text-muted-foreground">
+                          {file.isCollection ? '-' : formatFileSize(file.contentLength)}
+                        </td>
+                        <td className="p-2 text-sm text-muted-foreground">{formatDate(file.lastModified)}</td>
+                        <td className="p-2">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFileToRename(file);
+                                setRenameValue(file.displayName);
+                                setShowRenameDialog(true);
+                              }}
+                              className="h-7 w-7 p-0"
+                              title="Rename"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFileToDelete(file);
+                                setShowDeleteDialog(true);
+                              }}
+                              className="h-7 w-7 p-0"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-2">
+                {filteredAndSortedFiles.map((file) => (
+                  <div
+                    key={file.path}
+                    className="cursor-pointer rounded-md border bg-muted/50 p-3 hover:bg-muted"
+                    onClick={() => handleFileClick(file)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {file.isCollection ? (
+                          <Folder className="h-4 w-4 text-brand shrink-0" />
+                        ) : (
+                          <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{file.displayName}</div>
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            {!file.isCollection && <span>{formatFileSize(file.contentLength)}</span>}
+                            {!file.isCollection && file.contentLength && <span>•</span>}
+                            <span>{formatDate(file.lastModified)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFileToRename(file);
+                            setRenameValue(file.displayName);
+                            setShowRenameDialog(true);
+                          }}
+                          className="h-7 w-7 p-0"
+                          title="Rename"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFileToDelete(file);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="h-7 w-7 p-0"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* File Viewer/Editor Dialog */}
       <Dialog open={isViewingFile} onOpenChange={setIsViewingFile}>
-        <DialogContent className="max-h-[80vh] max-w-4xl">
+        <DialogContent className="max-h-[80vh] max-w-[calc(100vw-2rem)] sm:max-w-[min(56rem,calc(100vw-4rem))]">
           <DialogHeader>
             <DialogTitle>{selectedFile?.displayName}</DialogTitle>
             <DialogDescription>{selectedFile?.path}</DialogDescription>
@@ -576,12 +637,12 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               <Textarea
                 value={fileContent}
                 onChange={(e) => setFileContent(e.target.value)}
-                className="min-h-[400px] font-mono text-sm"
+                className="min-h-[300px] sm:min-h-[400px] font-mono text-xs sm:text-sm"
                 placeholder="File content..."
               />
             ) : (
-              <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
-                <pre className="font-mono text-sm whitespace-pre-wrap">{fileContent}</pre>
+              <div className="max-h-[50vh] sm:max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-3 sm:p-4">
+                <pre className="font-mono text-xs sm:text-sm whitespace-pre-wrap break-words">{fileContent}</pre>
               </div>
             )}
           </div>
@@ -630,8 +691,8 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                 value={newFileContent}
                 onChange={(e) => setNewFileContent(e.target.value)}
                 placeholder="File content..."
-                rows={10}
-                className="font-mono text-sm"
+                rows={8}
+                className="font-mono text-xs sm:text-sm"
               />
             </div>
           </div>

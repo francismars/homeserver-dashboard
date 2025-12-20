@@ -27,79 +27,78 @@ export function DashboardNavbar({
   onShutdownServer,
 }: DashboardNavbarProps) {
   return (
-    <header className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-6 backdrop-blur-sm', className)}>
-      <div className="flex w-full flex-row flex-wrap items-center justify-between gap-4 sm:gap-6">
-        <nav className="flex w-full flex-row flex-wrap items-center gap-4 sm:flex-nowrap sm:items-center sm:gap-6">
-          {/* Logo and title grouped together */}
-          <div className="flex flex-1 flex-col gap-2">
-            <div className="flex flex-row items-center gap-4">
-              <Logo noLink />
-              <h1 className="text-2xl font-semibold">Homeserver Dashboard</h1>
-            </div>
-            <p className="text-sm text-muted-foreground">Manage your homeserver settings and monitor usage</p>
+    <header className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-4 sm:py-6 backdrop-blur-sm', className)}>
+      <nav className="flex w-full items-center justify-between gap-1.5 sm:gap-2 md:gap-3 min-w-0">
+        {/* Logo and title grouped together - single line, never wrap */}
+        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-hidden">
+          <div className="shrink-0">
+            <Logo noLink width={32} height={32} className="sm:w-10 sm:h-10" />
           </div>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <h1 className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-semibold truncate whitespace-nowrap">Pubky Homeserver Dashboard</h1>
+            <p className="text-xs text-muted-foreground truncate whitespace-nowrap">Manage your homeserver settings and monitor usage</p>
+          </div>
+        </div>
 
-          {/* Settings and User buttons on the right */}
-          <div className="flex flex-row items-center justify-end gap-3">
-            {/* Settings dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-12 w-12 rounded-full border bg-transparent"
-                  aria-label="Settings"
-                >
-                  <Settings className="size-6" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-38">
-                <DropdownMenuLabel>Settings</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onSettingsClick}>
-                  <span>Configuration</span>
-                </DropdownMenuItem>
-                {(onRestartServer || onShutdownServer) && (
-                  <div className="flex items-center gap-0 p-1">
-                    {onRestartServer && (
-                      <DropdownMenuItem asChild className="flex-1 p-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRestartServer();
-                          }}
-                          aria-label="Restart Homeserver"
-                        >
-                          <RotateCw className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuItem>
-                    )}
-                    {onShutdownServer && (
-                      <DropdownMenuItem asChild className="flex-1 p-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onShutdownServer();
-                          }}
-                          aria-label="Shutdown Homeserver"
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuItem>
-                    )}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </nav>
-      </div>
+        {/* Settings button on the right - always visible, never shrink */}
+        <div className="flex items-center justify-end shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-full border bg-transparent shrink-0"
+                aria-label="Settings"
+              >
+                <Settings className="size-4 sm:size-5 md:size-6" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-38">
+              <DropdownMenuLabel>Settings</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSettingsClick}>
+                <span>Configuration</span>
+              </DropdownMenuItem>
+              {(onRestartServer || onShutdownServer) && (
+                <div className="flex items-center gap-0 p-1">
+                  {onRestartServer && (
+                    <DropdownMenuItem asChild className="flex-1 p-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRestartServer();
+                        }}
+                        aria-label="Restart Homeserver"
+                      >
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuItem>
+                  )}
+                  {onShutdownServer && (
+                    <DropdownMenuItem asChild className="flex-1 p-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShutdownServer();
+                        }}
+                        aria-label="Shutdown Homeserver"
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuItem>
+                  )}
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </nav>
     </header>
   );
 }

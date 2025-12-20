@@ -190,12 +190,12 @@ export function DisabledUsersManagement({
     <>
       <Card>
         <CardHeader className="border-b pb-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
-              <CardDescription>Manage invites and user access</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Manage invites and user access</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {typeof numUsersTotal === 'number' && (
                 <Badge variant="secondary" className="shrink-0 text-xs font-normal">
                   Users: {numUsersTotal}
@@ -230,9 +230,9 @@ export function DisabledUsersManagement({
 
           {/* Disabled Users */}
           <div>
-            <div className="mb-3 flex items-start justify-between gap-4">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="text-sm font-medium">Disabled Users</div>
                   <Badge variant="outline" className="border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -242,8 +242,8 @@ export function DisabledUsersManagement({
                 <div className="text-xs text-muted-foreground">List of disabled users</div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant="secondary" className="shrink-0 text-xs">
                   Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsers.length}
                 </Badge>
                 <Button
@@ -314,11 +314,11 @@ export function DisabledUsersManagement({
                   {filteredDisabledUsers.map((user) => (
                     <div
                       key={user.pubkey}
-                      className="flex items-center justify-between rounded-md border bg-muted/50 p-3"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-md border bg-muted/50 p-3"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <code className="truncate font-mono text-sm">{user.displayName}</code>
+                          <code className="truncate font-mono text-xs sm:text-sm">{user.displayName}</code>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -333,13 +333,14 @@ export function DisabledUsersManagement({
                             )}
                           </Button>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{user.pubkey}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground break-all sm:break-normal">{user.pubkey}</p>
                       </div>
                       <Button
                         variant="default"
                         size="sm"
                         onClick={() => handleEnableUser(user.pubkey)}
                         disabled={isProcessing || isDisablingUser}
+                        className="w-full sm:w-auto shrink-0"
                       >
                         Enable
                       </Button>
@@ -413,7 +414,7 @@ export function DisabledUsersManagement({
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 grid-cols-2">
               <Button
                 onClick={handleDisableByPubkey}
                 disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
@@ -423,7 +424,8 @@ export function DisabledUsersManagement({
                 {processingAction === 'disable' ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Disabling...
+                    <span className="hidden sm:inline">Disabling...</span>
+                    <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   'Disable'
@@ -438,7 +440,8 @@ export function DisabledUsersManagement({
                 {processingAction === 'enable' ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Enabling...
+                    <span className="hidden sm:inline">Enabling...</span>
+                    <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   'Enable'

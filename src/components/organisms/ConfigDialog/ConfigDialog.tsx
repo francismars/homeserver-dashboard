@@ -76,11 +76,11 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-5xl flex-col">
+      <DialogContent className="flex h-[85vh] sm:h-[90vh] max-h-[90vh] max-w-[calc(100vw-2rem)] sm:max-w-[min(64rem,calc(100vw-4rem))] flex-col">
         <DialogHeader>
-          <div className="flex items-center justify-between pr-8">
-            <div className="flex items-center gap-2">
-              <DialogTitle className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:pr-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                 <Code className="h-4 w-4" />
                 Homeserver Configuration
               </DialogTitle>
@@ -93,7 +93,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
               </Badge>
             </div>
           </div>
-          <DialogDescription>View the homeserver configuration file (TOML). Editing is disabled.</DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">View the homeserver configuration file (TOML). Editing is disabled.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-1 flex-col gap-2 overflow-hidden">
@@ -103,7 +103,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
           <Textarea
             value={configValue}
             readOnly
-            className={cn('flex-1 resize-none font-mono text-sm', 'border-2 border-dashed border-muted-foreground/30')}
+            className={cn('flex-1 resize-none font-mono text-xs sm:text-sm', 'border-2 border-dashed border-muted-foreground/30')}
             placeholder="Configuration file content..."
           />
           <div className="border-t border-dashed border-muted-foreground/20 pt-2 text-xs text-muted-foreground/60 italic">
