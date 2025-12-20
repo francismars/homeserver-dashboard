@@ -45,14 +45,14 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <DialogTitle>{title}</DialogTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <DialogTitle className="text-base sm:text-lg">{title}</DialogTitle>
             <Badge variant="outline" className="border-dashed text-xs font-normal">
               <Info className="mr-1 h-3 w-3" />
               Soon
             </Badge>
           </div>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">{description}</DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
@@ -80,7 +80,8 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
             {isProcessing ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                {isRestart ? 'Restarting...' : 'Shutting down...'}
+                <span className="hidden sm:inline">{isRestart ? 'Restarting...' : 'Shutting down...'}</span>
+                <span className="sm:hidden">...</span>
               </>
             ) : (
               <>{isRestart ? 'Restart' : 'Shutdown'}</>

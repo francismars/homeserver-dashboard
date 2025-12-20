@@ -432,8 +432,8 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Base URL: <code className="font-mono">{currentGroup.baseUrl}</code>
+            <p className="text-xs text-muted-foreground break-all sm:break-normal">
+              Base URL: <code className="font-mono break-all">{currentGroup.baseUrl}</code>
             </p>
           </div>
 
@@ -465,7 +465,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Method</Label>
               <Select
@@ -494,7 +494,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                 value={customPath}
                 onChange={(e) => setCustomPath(e.target.value)}
                 placeholder="/info"
-                className="font-mono"
+                className="font-mono text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -593,13 +593,13 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
                   <>
                     <div>
                       <span className="text-sm font-semibold">Headers:</span>
-                      <pre className="mt-1 max-h-32 overflow-auto rounded bg-background p-2 font-mono text-xs">
+                      <pre className="mt-1 max-h-32 overflow-x-auto rounded bg-background p-2 font-mono text-xs">
                         {JSON.stringify(response.headers, null, 2)}
                       </pre>
                     </div>
                     <div>
                       <span className="text-sm font-semibold">Body:</span>
-                      <pre className="mt-1 max-h-96 overflow-auto rounded bg-background p-2 font-mono text-xs">
+                      <pre className="mt-1 max-h-96 overflow-x-auto rounded bg-background p-2 font-mono text-xs break-words">
                         {response.body || '(empty)'}
                       </pre>
                     </div>

@@ -58,36 +58,38 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     <div className="space-y-4">
       <div className="grid gap-4">
         <Card>
-          <CardHeader className="border-b pb-4">
+          <CardHeader className="border-b pb-3 sm:pb-4">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">Server & Connection</CardTitle>
-                <CardDescription>Homeserver details and dashboard connection</CardDescription>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">Server & Connection</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Homeserver details and dashboard connection</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3 pt-4">
+          <CardContent className="space-y-3 sm:space-y-3 pt-3 sm:pt-4">
             {/* Connection Status */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Connection Status:</span>
-              {isConfigured ? (
-                <Badge variant="default" className="bg-brand">
-                  <CheckCircle2 className="mr-1 h-3 w-3" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="destructive">
-                  <AlertCircle className="mr-1 h-3 w-3" />
-                  Not Configured
-                </Badge>
-              )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Connection Status:</span>
+              <div className="flex-shrink-0">
+                {isConfigured ? (
+                  <Badge variant="default" className="bg-brand text-xs">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs">
+                    <AlertCircle className="mr-1 h-3 w-3" />
+                    Not Configured
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Server Pubkey */}
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">Homeserver Pubkey:</span>
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-mono text-xs text-muted-foreground/70 italic">{homeserverPubkey}</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Homeserver Pubkey:</span>
+              <div className="flex min-w-0 items-center gap-2 flex-1 sm:flex-initial">
+                <span className="truncate font-mono text-xs text-muted-foreground/70 italic break-all">{homeserverPubkey}</span>
                 {isPubkeySoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -98,10 +100,10 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             </div>
 
             {/* Server Version */}
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">Version:</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground/70 italic">{homeserverVersion}</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Version:</span>
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <span className="text-xs sm:text-sm text-muted-foreground/70 italic break-words">{homeserverVersion}</span>
                 {isVersionSoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -113,9 +115,9 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
             {/* Admin Endpoint */}
             {adminBaseUrl && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Admin Endpoint:</span>
-                <code className="rounded bg-muted px-2 py-1 text-xs">{adminBaseUrl}</code>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs sm:text-sm text-muted-foreground shrink-0">Admin Endpoint:</span>
+                <code className="rounded bg-muted px-2 py-1 text-xs break-all min-w-0">{adminBaseUrl}</code>
               </div>
             )}
           </CardContent>
