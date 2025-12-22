@@ -4,7 +4,7 @@ A small web-based admin dashboard for Pubky homeservers. Built with **Next.js (A
 
 The UI lives under a single route: **`/dashboard`** (the home page redirects there).
 
-## Current UI (what exists today)
+## Current UI
 
 The dashboard has 5 tabs:
 
