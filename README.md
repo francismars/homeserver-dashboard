@@ -77,26 +77,6 @@ npm start
 
 \* Required to use the real homeserver APIs
 
-### Mock Mode
-
-There is **no global “mock mode” switch**. Features that are not backed by real endpoints yet (logs/config/server control/disabled-users list) are explicitly marked as “Mock” in the UI.
-
-## Project Structure
-
-```
-homeserver-dashboard/
-├── src/
-│   ├── app/                    # Next.js app router
-│   ├── components/             # React components (atoms/molecules/organisms)
-│   ├── hooks/                  # React hooks (admin/user/webdav)
-│   ├── services/               # API clients (admin/user/webdav)
-│   └── libs/                   # Utility functions
-├── public/                     # Static assets
-├── .env.example
-├── FEATURE_IDEAS.md
-└── package.json
-```
-
 ## Development
 
 ### Tech Stack
@@ -122,46 +102,6 @@ homeserver-dashboard/
 - `npm run knip` - Check for unused files/deps/exports (see `knip.json`)
 - `npm test` - Run Vitest
 
-## API Integration
-
-### Implemented Endpoints (Real API)
-
-| Endpoint                  | Method   | Service Method                    | Status  |
-| ------------------------- | -------- | --------------------------------- | ------- |
-| `/info`                   | GET      | `AdminService.getInfo()`          | ✅ Real |
-| `/generate_signup_token`  | GET      | `AdminService.generateInvite()`   | ✅ Real |
-| `/users/{pubkey}/disable` | POST     | `AdminService.disableUser()`      | ✅ Real |
-| `/users/{pubkey}/enable`  | POST     | `AdminService.enableUser()`       | ✅ Real |
-| `/webdav/{*entry_path}`   | DELETE   | `AdminService.deleteUrl()`        | ✅ Real |
-| `/dav/*`                  | PROPFIND | `WebDavService.listDirectory()`   | ✅ Real |
-| `/dav/*`                  | GET      | `WebDavService.readFile()`        | ✅ Real |
-| `/dav/*`                  | PUT      | `WebDavService.writeFile()`       | ✅ Real |
-| `/dav/*`                  | DELETE   | `WebDavService.deleteFile()`      | ✅ Real |
-| `/dav/*`                  | MKCOL    | `WebDavService.createDirectory()` | ✅ Real |
-| `/dav/*`                  | MOVE     | `WebDavService.moveFile()`        | ✅ Real |
-
-### Mocked Endpoints
-
-| Feature / endpoint area               | Status  | Notes |
-| ------------------------------------- | ------- | ----- |
-| Configuration read/edit (`/config`)   | 🟡 Mock | UI is read-only mock; backend endpoints required |
-| Logs API (`/logs`)                    | 🟡 Mock | UI generates mock logs |
-| Server control (restart/shutdown)     | 🟡 Mock | UI only; backend control endpoints required |
-| Disabled users list endpoint          | 🟡 Mock | UI shows a mock list sized to match `/info.num_disabled_users` |
-
-## Known Limitations
-
-The following features use mock data and require backend implementation:
-
-1. **Configuration Management**: backend endpoints for reading/writing `config.toml`
-2. **Logs Viewer**: backend `/logs` endpoint (or SSE) for real logs
-3. **Server Control**: backend endpoints for restart/shutdown
-4. **Disabled users list**: backend endpoint to list actual disabled users (UI currently shows mock entries)
-
-See the [Mocked Endpoints](#mocked-endpoints) table for API-specific details.
-
-## Contributing
-
 This is a standalone project. Contributions are welcome! Please ensure:
 
 - Code follows the existing patterns
@@ -171,18 +111,7 @@ This is a standalone project. Contributions are welcome! Please ensure:
 - Mock data is clearly marked with badges
 - Real vs mock implementations are documented
 
-## License
-
-[Add your license here]
-
 ## Related Projects
 
 - [Pubky Homeserver](https://github.com/synonymdev/pubky) - The homeserver this dashboard manages
 - [Franky](https://github.com/synonymdev/franky) - Reference UI implementation (design system source)
-
-## Support
-
-For issues related to:
-
-- **Dashboard**: Open an issue in this repository
-- **Homeserver**: See [Pubky Homeserver issues](https://github.com/synonymdev/pubky/issues)
