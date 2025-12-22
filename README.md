@@ -4,7 +4,7 @@ A small web-based admin dashboard for Pubky homeservers. Built with **Next.js (A
 
 The UI lives under a single route: **`/dashboard`** (the home page redirects there).
 
-## 🎯 Current UI (what exists today)
+## Current UI (what exists today)
 
 The dashboard has 5 tabs:
 
@@ -22,12 +22,12 @@ Also in the navbar “Settings” menu:
 - **Configuration**: mock, read-only TOML viewer (no real config endpoints yet)
 - **Restart / Shutdown**: mock dialogs (no backend control endpoint yet)
 
-## 🚀 Prerequisites
+## Prerequisites
 
 - Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
 - A running Pubky homeserver (required for real data; some UI sections are still mock placeholders)
 
-## 📦 Quick Start
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -66,7 +66,7 @@ npm run build
 npm start
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -81,7 +81,7 @@ npm start
 
 There is **no global “mock mode” switch**. Features that are not backed by real endpoints yet (logs/config/server control/disabled-users list) are explicitly marked as “Mock” in the UI.
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 homeserver-dashboard/
@@ -97,7 +97,7 @@ homeserver-dashboard/
 └── package.json
 ```
 
-## 🛠️ Development
+## Development
 
 ### Tech Stack
 
@@ -122,7 +122,7 @@ homeserver-dashboard/
 - `npm run knip` - Check for unused files/deps/exports (see `knip.json`)
 - `npm test` - Run Vitest
 
-## 📡 API Integration
+## API Integration
 
 ### Implemented Endpoints (Real API)
 
@@ -149,7 +149,7 @@ homeserver-dashboard/
 | Server control (restart/shutdown)     | 🟡 Mock | UI only; backend control endpoints required |
 | Disabled users list endpoint          | 🟡 Mock | UI shows a mock list sized to match `/info.num_disabled_users` |
 
-## 📝 Known Limitations
+## Known Limitations
 
 The following features use mock data and require backend implementation:
 
@@ -160,7 +160,7 @@ The following features use mock data and require backend implementation:
 
 See the [Mocked Endpoints](#mocked-endpoints) table for API-specific details.
 
-## 🤝 Contributing
+## Contributing
 
 This is a standalone project. Contributions are welcome! Please ensure:
 
@@ -171,16 +171,16 @@ This is a standalone project. Contributions are welcome! Please ensure:
 - Mock data is clearly marked with badges
 - Real vs mock implementations are documented
 
-## 📄 License
+## License
 
 [Add your license here]
 
-## 🔗 Related Projects
+## Related Projects
 
 - [Pubky Homeserver](https://github.com/synonymdev/pubky) - The homeserver this dashboard manages
 - [Franky](https://github.com/synonymdev/franky) - Reference UI implementation (design system source)
 
-## 💬 Support
+## Support
 
 For issues related to:
 
