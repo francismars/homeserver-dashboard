@@ -6,28 +6,55 @@ import type { WebDavFile, WebDavDirectory, WebDavServiceDeps, WebDavError } from
  */
 export class WebDavService {
   private baseUrl: string;
-  private username: string;
-  private password: string;
 
   constructor({ baseUrl, username, password }: WebDavServiceDeps) {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.username = username;
-    this.password = password;
-  }
-
-  private getAuthHeader(): string {
-    const credentials = btoa(`${this.username}:${this.password}`);
-    return `Basic ${credentials}`;
+    // Use API route instead of direct homeserver URL
+    // Remove /dav from baseUrl if present, as the API route will add it
+    let apiBaseUrl = '/api/webdav';
+    if (baseUrl.includes('/dav')) {
+      // Extract the path after /dav if any
+      const davIndex = baseUrl.indexOf('/dav');
+      const afterDav = baseUrl.substring(davIndex + 4);
+      if (afterDav) {
+        apiBaseUrl = `/api/webdav${afterDav}`;
+      }
+    }
+    this.baseUrl = apiBaseUrl;
+    // Username and password are now handled server-side by the API route
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
-    const url = `${this.baseUrl}${path}`;
+    // Normalize path - remove /dav prefix if present since API route handles it
+    let normalizedPath = path;
+    if (normalizedPath.startsWith('/dav')) {
+      normalizedPath = normalizedPath.substring(4);
+    }
+    if (!normalizedPath.startsWith('/')) {
+      normalizedPath = '/' + normalizedPath;
+    }
+
+    const url = `${this.baseUrl}${normalizedPath}`;
+    
+    // For WebDAV methods that aren't standard HTTP methods, use POST with override header
+    const method = init?.method || 'GET';
+    const isWebDavMethod = ['PROPFIND', 'MKCOL', 'MOVE', 'COPY'].includes(method);
+    
+    const headers: Record<string, string> = {
+      ...(Object.fromEntries(new Headers(init?.headers).entries())),
+    };
+    
+    // Add method override header for WebDAV methods
+    if (isWebDavMethod) {
+      headers['X-HTTP-Method-Override'] = method;
+    }
+
+    // Use POST for WebDAV methods, otherwise use the original method
+    const httpMethod = isWebDavMethod ? 'POST' : method;
+
     const response = await fetch(url, {
       ...init,
-      headers: {
-        Authorization: this.getAuthHeader(),
-        ...(init?.headers || {}),
-      },
+      method: httpMethod,
+      headers,
     });
 
     if (!response.ok) {
@@ -130,10 +157,21 @@ export class WebDavService {
    * @param destinationPath Destination WebDAV path
    */
   async move(sourcePath: string, destinationPath: string): Promise<void> {
+    // Normalize destination path for API route
+    let normalizedDest = destinationPath;
+    if (normalizedDest.startsWith('/dav')) {
+      normalizedDest = normalizedDest.substring(4);
+    }
+    if (!normalizedDest.startsWith('/')) {
+      normalizedDest = '/' + normalizedDest;
+    }
+    // Use relative path for destination header
+    const destUrl = `${this.baseUrl}${normalizedDest}`;
+    
     await this.request(sourcePath, {
       method: 'MOVE',
       headers: {
-        Destination: `${this.baseUrl}${destinationPath}`,
+        Destination: destUrl,
       },
     });
   }
@@ -144,10 +182,21 @@ export class WebDavService {
    * @param destinationPath Destination WebDAV path
    */
   async copy(sourcePath: string, destinationPath: string): Promise<void> {
+    // Normalize destination path for API route
+    let normalizedDest = destinationPath;
+    if (normalizedDest.startsWith('/dav')) {
+      normalizedDest = normalizedDest.substring(4);
+    }
+    if (!normalizedDest.startsWith('/')) {
+      normalizedDest = '/' + normalizedDest;
+    }
+    // Use relative path for destination header
+    const destUrl = `${this.baseUrl}${normalizedDest}`;
+    
     await this.request(sourcePath, {
       method: 'COPY',
       headers: {
-        Destination: `${this.baseUrl}${destinationPath}`,
+        Destination: destUrl,
       },
     });
   }

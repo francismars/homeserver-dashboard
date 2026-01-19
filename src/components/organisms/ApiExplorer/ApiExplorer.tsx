@@ -259,8 +259,29 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
       const endpoint = currentEndpoints.find(
         (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
       );
-      const baseUrl = currentGroup.baseUrl;
-      const url = `${baseUrl}${path}`;
+      
+      // For admin endpoints, use API route proxy; for others, use direct URL
+      let baseUrl = currentGroup.baseUrl;
+      let actualPath = path;
+      
+      if (selectedServer === 'admin') {
+        // WebDAV endpoints use the WebDAV API route
+        if (path.startsWith('/dav')) {
+          baseUrl = '/api/webdav';
+          // Remove /dav prefix since API route handles it
+          actualPath = path.substring(4) || '/';
+        } else {
+          // Regular admin endpoints use the admin API route (handles auth server-side)
+          baseUrl = '/api/admin';
+          // Remove leading slash from path, API route will add it
+          actualPath = path.startsWith('/') ? path.substring(1) : path;
+        }
+      }
+      
+      // Construct URL - ensure there's a / between baseUrl and actualPath
+      const url = actualPath 
+        ? `${baseUrl}/${actualPath}`.replace(/\/+/g, '/') // Remove duplicate slashes
+        : baseUrl;
       const headers: Record<string, string> = {};
 
       // Set content type only if there's a body
@@ -273,31 +294,28 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
         }
       }
 
-      // Add admin auth for admin server endpoints
-      if (selectedServer === 'admin' && adminToken && endpoint?.requiresAuth !== false) {
-        // WebDAV endpoints use Basic Auth, not X-Admin-Password
-        if (path.startsWith('/dav')) {
-          // HTTP Basic Auth: base64("admin:password")
-          const credentials = btoa(`admin:${adminToken}`);
-          headers['Authorization'] = `Basic ${credentials}`;
-        } else {
-          // Regular admin endpoints use X-Admin-Password header
-          headers['X-Admin-Password'] = adminToken;
-        }
-      }
+      // Admin auth is now handled server-side by API routes, so no need to add headers
+      // For client/metrics endpoints, they would need their own auth (not implemented yet)
 
       // Note: Client server endpoints would need session cookies for authenticated requests
       // This is a limitation of the API Explorer - it can't easily test authenticated client endpoints
-
-      const init: RequestInit = {
-        method,
-        headers,
-      };
 
       // WebDAV methods that may need XML bodies
       const webdavMethods = ['PROPFIND', 'MKCOL', 'MOVE', 'COPY'];
       const needsBody = method !== 'GET' && method !== 'HEAD' && requestBody.trim();
       const isWebDAV = webdavMethods.includes(method);
+      
+      // For WebDAV methods, use POST with X-HTTP-Method-Override header
+      let httpMethod = method;
+      if (isWebDAV && selectedServer === 'admin') {
+        headers['X-HTTP-Method-Override'] = method;
+        httpMethod = 'POST';
+      }
+
+      const init: RequestInit = {
+        method: httpMethod,
+        headers,
+      };
 
       if (needsBody) {
         // For binary endpoints, try to handle base64 or send as-is

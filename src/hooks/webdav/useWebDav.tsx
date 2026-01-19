@@ -8,19 +8,12 @@ export function useWebDav() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<WebDavError | null>(null);
 
-  const getService = useCallback((): WebDavService | null => {
-    const baseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
-    const password = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-
-    if (!baseUrl || !password) {
-      setError({ message: 'File access not configured', status: 0 });
-      return null;
-    }
-
+  const getService = useCallback((): WebDavService => {
+    // WebDAV service now uses API routes, so credentials are handled server-side
     return new WebDavService({
-      baseUrl: `${baseUrl}/dav`,
-      username: 'admin',
-      password,
+      baseUrl: '/api/webdav/dav', // API route handles /dav prefix
+      username: 'admin', // Not used anymore, but kept for compatibility
+      password: '', // Not used anymore, but kept for compatibility
     });
   }, []);
 
@@ -31,8 +24,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return null;
-
         const directory = await service.listDirectory(path);
         return directory;
       } catch (err) {
@@ -54,8 +45,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return null;
-
         const content = await service.readFile(path);
         return content;
       } catch (err) {
@@ -77,8 +66,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return false;
-
         await service.writeFile(path, content, contentType);
         return true;
       } catch (err) {
@@ -100,8 +87,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return false;
-
         await service.delete(path);
         return true;
       } catch (err) {
@@ -123,8 +108,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return false;
-
         await service.createDirectory(path);
         return true;
       } catch (err) {
@@ -146,8 +129,6 @@ export function useWebDav() {
 
       try {
         const service = getService();
-        if (!service) return false;
-
         await service.move(sourcePath, destinationPath);
         return true;
       } catch (err) {

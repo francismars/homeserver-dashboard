@@ -2,9 +2,8 @@ import { useCallback, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
 
 const getService = () => {
-  const baseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
-  const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-  return new AdminService({ baseUrl, token });
+  // AdminService now uses API routes, no need for baseUrl/token
+  return new AdminService({ baseUrl: '', token: '' });
 };
 
 export function useAdminActions() {
