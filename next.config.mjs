@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone', // Enable standalone output for Docker optimization
   webpack: (config, { isServer }) => {
     // Externalize @synonymdev/pubky on the server side because it uses WASM
     // which can only run in the browser
