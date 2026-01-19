@@ -13,23 +13,20 @@ export class AdminService {
   private token?: string;
 
   constructor({ baseUrl, token }: AdminServiceDeps) {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.token = token;
+    // Use API route instead of direct homeserver URL
+    // Token is handled server-side, not sent from client
+    this.baseUrl = '/api/admin';
+    this.token = ''; // Not needed, handled by API route
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    if (!this.baseUrl) {
-      throw new Error('Admin API not configured. Set NEXT_PUBLIC_ADMIN_BASE_URL.');
-    }
-
+    // Always use API route - no need to check baseUrl
     try {
       const headers = new Headers(init?.headers);
       if (!headers.has('content-type')) {
         headers.set('content-type', 'application/json');
       }
-      if (this.token) {
-        headers.set('X-Admin-Password', this.token);
-      }
+      // Don't set X-Admin-Password - API route handles it server-side
 
       const res = await fetch(`${this.baseUrl}${path}`, {
         ...init,
@@ -73,17 +70,14 @@ export class AdminService {
   }
 
   async generateInvite(): Promise<GenerateInviteResponse> {
-    // Backend returns plain string, not JSON
-    const headers = new Headers();
-    if (this.token) {
-      headers.set('X-Admin-Password', this.token);
+    // Use API route which handles token server-side
+    const res = await fetch(`${this.baseUrl}/generate_signup_token`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: `Failed to generate invite: ${res.status}` }));
+      throw new Error(error.error || `Failed to generate invite: ${res.status}`);
     }
-
-    const token = await fetch(`${this.baseUrl}/generate_signup_token`, { headers }).then((res) => {
-      if (!res.ok) throw new Error(`Failed to generate invite: ${res.status}`);
-      return res.text();
-    });
-    return { token };
+    const data = await res.json();
+    return { token: data.token };
   }
 
   async getUsage(): Promise<UsageResponse> {

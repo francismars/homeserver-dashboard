@@ -15,38 +15,20 @@ export function useUserManagement() {
   // Initialize services once
   useEffect(() => {
     if (!servicesRef.current) {
-      const adminBaseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
-      const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-
-      console.log('[useUserManagement] Initializing services...', {
-        hasAdminBaseUrl: !!adminBaseUrl,
-        hasAdminToken: !!adminToken,
-        adminBaseUrl,
+      // WebDAV service now uses API routes, so credentials are handled server-side
+      // We still need to provide a baseUrl for path construction, but it's not used for actual requests
+      const webdavService = new WebDavService({
+        baseUrl: '/api/webdav/dav', // API route handles /dav prefix
+        username: 'admin', // Not used anymore, but kept for compatibility
+        password: '', // Not used anymore, but kept for compatibility
       });
 
-      if (adminBaseUrl && adminToken) {
-        const webdavService = new WebDavService({
-          baseUrl: `${adminBaseUrl}/dav`,
-          username: 'admin',
-          password: adminToken,
-        });
-
-        servicesRef.current = {
-          userService: new UserService({
-            webdavService,
-          }),
-        };
-        console.log('[useUserManagement] Services initialized successfully');
-      } else {
-        console.error('[useUserManagement] Missing configuration:', {
-          adminBaseUrl: adminBaseUrl || 'MISSING',
-          adminToken: adminToken ? 'SET' : 'MISSING',
-        });
-        const errorMsg =
-          'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
-        setError(new Error(errorMsg));
-        setIsLoading(false);
-      }
+      servicesRef.current = {
+        userService: new UserService({
+          webdavService,
+        }),
+      };
+      console.log('[useUserManagement] Services initialized successfully');
     }
   }, []);
 

@@ -95,14 +95,10 @@ export default function DashboardPage() {
 
             <TabsContent value="api" className="space-y-4">
               <ApiExplorer
-                adminBaseUrl={process.env.NEXT_PUBLIC_ADMIN_BASE_URL || 'http://127.0.0.1:6288'}
-                clientBaseUrl={
-                  process.env.NEXT_PUBLIC_ADMIN_BASE_URL?.replace(':6288', ':6286') || 'http://127.0.0.1:6286'
-                }
-                metricsBaseUrl={
-                  process.env.NEXT_PUBLIC_ADMIN_BASE_URL?.replace(':6288', ':6289') || 'http://127.0.0.1:6289'
-                }
-                adminToken={process.env.NEXT_PUBLIC_ADMIN_TOKEN}
+                adminBaseUrl="/api/admin"
+                clientBaseUrl="http://homeserver:6286"
+                metricsBaseUrl="http://homeserver:6289"
+                adminToken=""
               />
             </TabsContent>
           </Tabs>

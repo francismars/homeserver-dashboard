@@ -43,10 +43,8 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     return null;
   }
 
-  const adminBaseUrl = process.env.NEXT_PUBLIC_ADMIN_BASE_URL || '';
-  const adminToken = process.env.NEXT_PUBLIC_ADMIN_TOKEN || '';
-  const hasConfig = adminBaseUrl && adminToken;
-  const isConfigured = !!hasConfig;
+  // Using API routes now, so always configured
+  const isConfigured = true;
 
   const isPubkeySoon = !info.pubkey;
   const isVersionSoon = !info.version;
@@ -119,11 +117,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
               </div>
             </div>
 
-            {/* Admin Endpoint */}
-            {adminBaseUrl && (
+            {/* Admin Endpoint - Using API routes, endpoint configured server-side */}
+            {isConfigured && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Admin Endpoint:</span>
-                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all">{adminBaseUrl}</code>
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Admin API:</span>
+                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all">Configured via API routes</code>
               </div>
             )}
           </CardContent>
