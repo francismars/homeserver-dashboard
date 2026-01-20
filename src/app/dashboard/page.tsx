@@ -116,6 +116,7 @@ export default function DashboardPage() {
             signupCodesTotal={info?.num_signup_codes}
             signupCodesUnused={info?.num_unused_signup_codes}
             isStatsLoading={infoLoading}
+            homeserverPubkey={info?.public_key ?? info?.pubkey}
           />
 
           {/* Server Control Dialog */}
