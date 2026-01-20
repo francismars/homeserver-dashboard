@@ -13,8 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Copy, Check, Plus, Key, Info } from 'lucide-react';
+import { Plus, Key, Info } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
+import { QRCodeSVG } from 'qrcode.react';
 
 const MOCK_USERS_BY_INVITE = [
   { inviteCode: 'INV-2024-001', userCount: 3 },
@@ -32,6 +33,7 @@ interface InvitesDialogProps {
   signupCodesTotal?: number;
   signupCodesUnused?: number;
   isStatsLoading?: boolean;
+  homeserverPubkey?: string;
 }
 
 export function InvitesDialog({
@@ -43,8 +45,11 @@ export function InvitesDialog({
   signupCodesTotal,
   signupCodesUnused,
   isStatsLoading,
+  homeserverPubkey,
 }: InvitesDialogProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedUrlIndex, setCopiedUrlIndex] = useState<number | null>(null);
+  const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
 
   const hasStats = typeof signupCodesTotal === 'number' && typeof signupCodesUnused === 'number';
   const totalGenerated = hasStats ? signupCodesTotal : undefined;
@@ -56,6 +61,23 @@ export function InvitesDialog({
       await copyToClipboard({ text: invite });
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
+    } catch {
+      // Handle copy error silently
+    }
+  };
+
+  const generateSignupUrl = (inviteCode: string): string | null => {
+    if (!homeserverPubkey) return null;
+    return `pubkyauth://signup?hs=${encodeURIComponent(homeserverPubkey)}&st=${encodeURIComponent(inviteCode)}`;
+  };
+
+  const handleCopyUrl = async (inviteCode: string, index: number) => {
+    const url = generateSignupUrl(inviteCode);
+    if (!url) return;
+    try {
+      await copyToClipboard({ text: url });
+      setCopiedUrlIndex(index);
+      setTimeout(() => setCopiedUrlIndex(null), 2000);
     } catch {
       // Handle copy error silently
     }
@@ -109,33 +131,102 @@ export function InvitesDialog({
                   No invite codes generated yet. Click &quot;Generate&quot; to create one.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {invites.map((invite, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col gap-2 rounded-md border bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <code className="flex-1 font-mono text-xs break-all sm:text-sm sm:break-normal">{invite}</code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(invite, index)}
-                        className="w-full shrink-0 sm:ml-2 sm:w-auto"
-                      >
-                        {copiedIndex === index ? (
-                          <>
-                            <Check className="mr-2 h-4 w-4" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Copy
-                          </>
+                <div className="space-y-3">
+                  {invites.map((invite, index) => {
+                    const signupUrl = generateSignupUrl(invite);
+                    const isExpanded = expandedInviteIndex === index;
+                    return (
+                      <div key={index} className="rounded-md border bg-muted/50 p-3">
+                        {/* Invite Code Row */}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <code className="flex-1 font-mono text-xs break-all sm:text-sm sm:break-normal">
+                            {invite}
+                          </code>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopy(invite, index)}
+                              className="w-full sm:w-auto"
+                            >
+                              {copiedIndex === index ? (
+                                <>
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  Copy Code
+                                </>
+                              )}
+                            </Button>
+                            {signupUrl && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExpandedInviteIndex(isExpanded ? null : index)}
+                                className="w-full sm:w-auto"
+                              >
+                                {isExpanded ? 'Hide QR' : 'Show QR'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expanded QR Code Section */}
+                        {isExpanded && signupUrl && (
+                          <div className="mt-4 space-y-3 border-t border-muted-foreground/20 pt-4">
+                            <div className="text-xs font-medium text-muted-foreground">Signup URL:</div>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                              {/* QR Code */}
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="rounded-lg border-2 border-border bg-white p-3">
+                                  <QRCodeSVG value={signupUrl} size={160} level="M" />
+                                </div>
+                                <p className="text-xs text-muted-foreground">Scan with Pubky app</p>
+                              </div>
+
+                              {/* URL and Actions */}
+                              <div className="flex-1 space-y-2">
+                                <div className="rounded-md bg-background p-2">
+                                  <code className="block break-all text-xs text-muted-foreground">{signupUrl}</code>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopyUrl(invite, index)}
+                                    className="text-xs"
+                                  >
+                                    {copiedUrlIndex === index ? (
+                                      <>
+                                        URL Copied
+                                      </>
+                                    ) : (
+                                      <>
+                                        Copy URL
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopy(invite, index)}
+                                    className="text-xs"
+                                  >
+                                    Copy Code Only
+                                  </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Share this QR code or URL with new users. They can scan it with the Pubky Ring app
+                                  to sign up.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         )}
-                      </Button>
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
