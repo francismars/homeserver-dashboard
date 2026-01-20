@@ -41,7 +41,7 @@ export function useUserManagement() {
 
     if (!servicesRef.current) {
       const errorMsg =
-        'WebDAV credentials not configured. Please check NEXT_PUBLIC_ADMIN_BASE_URL and NEXT_PUBLIC_ADMIN_TOKEN environment variables.';
+        'WebDAV service not initialized. Please check ADMIN_BASE_URL and ADMIN_TOKEN environment variables on the server.';
       console.error('[useUserManagement]', errorMsg);
       setError(new Error(errorMsg));
       setIsLoading(false);

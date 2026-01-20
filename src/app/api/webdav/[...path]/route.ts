@@ -30,7 +30,7 @@ export async function POST(
 }
 
 // Handle PROPFIND and other WebDAV methods via POST with X-HTTP-Method-Override header
-async function proxyWebDavRequest(
+export async function proxyWebDavRequest(
   request: NextRequest,
   paramsPromise: Promise<{ path: string[] }>,
   method: string
@@ -57,7 +57,8 @@ async function proxyWebDavRequest(
 
   // Construct WebDAV URL: /dav + path segments
   const pathSegments = path.join('/');
-  const webdavPath = `/dav${pathSegments ? '/' + pathSegments : ''}`;
+  // For root path (empty), use /dav/, otherwise /dav/path/segments
+  const webdavPath = pathSegments ? `/dav/${pathSegments}` : '/dav/';
   const url = new URL(webdavPath, adminBaseUrl);
 
   // Forward query parameters
@@ -68,6 +69,14 @@ async function proxyWebDavRequest(
   try {
     // Get the actual HTTP method from headers (for PROPFIND, MKCOL, MOVE, etc.)
     const actualMethod = request.headers.get('X-HTTP-Method-Override') || method;
+    
+    console.log('[WebDAV Proxy]', {
+      method: actualMethod,
+      pathSegments: pathSegments || '(root)',
+      webdavPath,
+      targetUrl: url.toString(),
+      adminBaseUrl,
+    });
     
     // Get request body if present (for POST with override, or PUT/DELETE)
     let body: string | undefined;
