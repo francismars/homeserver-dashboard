@@ -46,10 +46,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
   // Using API routes now, so always configured
   const isConfigured = true;
 
-  const isPubkeySoon = !info.pubkey;
+  const isPubkeySoon = !info.public_key && !info.pubkey;
   const isVersionSoon = !info.version;
 
-  const homeserverPubkey = info.pubkey ?? FALLBACK_HOMESERVER_PUBKEY;
+  // Support both new (public_key) and legacy (pubkey) field names
+  const homeserverPubkey = info.public_key ?? info.pubkey ?? FALLBACK_HOMESERVER_PUBKEY;
   const homeserverVersion = info.version ?? FALLBACK_HOMESERVER_VERSION;
 
   return (
