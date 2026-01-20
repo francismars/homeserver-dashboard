@@ -46,10 +46,12 @@ cp .env.example .env.local
 Edit `.env.local` with your homeserver details:
 
 ```bash
-# Homeserver admin endpoint
-NEXT_PUBLIC_ADMIN_BASE_URL=http://localhost:6288
-NEXT_PUBLIC_ADMIN_TOKEN=your-admin-password
+# Homeserver admin endpoint (server-only variables)
+ADMIN_BASE_URL=http://localhost:6288
+ADMIN_TOKEN=your-admin-password
 ```
+
+**Note:** These are server-only environment variables (not prefixed with `NEXT_PUBLIC_*`) to keep sensitive credentials secure. They are only accessible in API routes and server-side code, never exposed to the client browser.
 
 ### 3. Run Development Server
 
@@ -70,12 +72,14 @@ npm start
 
 ### Environment Variables
 
-| Variable                     | Description                   | Required | Default |
-| ---------------------------- | ----------------------------- | -------- | ------- |
-| `NEXT_PUBLIC_ADMIN_BASE_URL` | Homeserver admin API base URL | Yes\*    | -       |
-| `NEXT_PUBLIC_ADMIN_TOKEN`    | Admin password/token          | Yes\*    | -       |
+| Variable          | Description                   | Required | Default | Notes                                    |
+| ----------------- | ----------------------------- | -------- | ------- | ---------------------------------------- |
+| `ADMIN_BASE_URL`  | Homeserver admin API base URL | Yes\*    | -       | Server-only (not exposed to client)      |
+| `ADMIN_TOKEN`     | Admin password/token          | Yes\*    | -       | Server-only (not exposed to client)     |
 
 \* Required to use the real homeserver APIs
+
+**Security Note:** These variables are server-only (not prefixed with `NEXT_PUBLIC_*`) to prevent exposing sensitive credentials to the browser. They are automatically loaded from `.env.local` in development and from environment variables in production/Docker.
 
 ## Development
 

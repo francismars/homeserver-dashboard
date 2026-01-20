@@ -11,11 +11,8 @@ RUN npm ci
 COPY . .
 
 # Build the Next.js app
-# Set empty values for NEXT_PUBLIC_ variables at build time
-# These will be set at runtime via docker-compose environment variables
+# Server-only environment variables (ADMIN_BASE_URL, ADMIN_TOKEN) are set at runtime via docker-compose
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_ADMIN_BASE_URL=""
-ENV NEXT_PUBLIC_ADMIN_TOKEN=""
 RUN npm run build
 
 # Production stage

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   // Read from server-only environment variables
-  const baseUrl = process.env.ADMIN_BASE_URL || process.env.NEXT_PUBLIC_ADMIN_BASE_URL;
-  const token = process.env.ADMIN_TOKEN || process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+  const baseUrl = process.env.ADMIN_BASE_URL;
+  const token = process.env.ADMIN_TOKEN;
 
   if (!baseUrl || !token) {
     return NextResponse.json(

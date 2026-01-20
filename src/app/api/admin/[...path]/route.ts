@@ -37,9 +37,9 @@ async function proxyRequest(
   pathSegments: string[],
   method: string
 ) {
-  // Read from server-only environment variables (not NEXT_PUBLIC_*)
-  const baseUrl = process.env.ADMIN_BASE_URL || process.env.NEXT_PUBLIC_ADMIN_BASE_URL;
-  const token = process.env.ADMIN_TOKEN || process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+  // Read from server-only environment variables
+  const baseUrl = process.env.ADMIN_BASE_URL;
+  const token = process.env.ADMIN_TOKEN;
 
   if (!baseUrl || !token) {
     console.error('Missing configuration:', { baseUrl, hasToken: !!token, envKeys: Object.keys(process.env).filter(k => k.includes('ADMIN')) });
