@@ -11,14 +11,8 @@ const FALLBACK_HOMESERVER_PUBKEY = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniae
 const FALLBACK_HOMESERVER_VERSION = '0.1.0-dev';
 
 export function DashboardOverview({ info, isLoading, error }: DashboardOverviewProps) {
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Error loading server info</AlertTitle>
-        <AlertDescription>{error.message || 'Failed to load server information'}</AlertDescription>
-      </Alert>
-    );
-  }
+  const isConnected = !error && !!info;
+  const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
   if (isLoading) {
     return (
@@ -39,12 +33,53 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     );
   }
 
+  // Only show server details if we have info
   if (!info) {
-    return null;
+    return (
+      <Card>
+        <CardHeader className="border-b pb-3 sm:pb-4">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Server & Connection</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Homeserver details and dashboard connection
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-3 sm:space-y-3 sm:pt-4">
+          {/* Connection Status */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>
+            <div className="shrink-0">
+              <Badge variant="destructive" className="text-xs">
+                <AlertCircle className="mr-1 h-3 w-3" />
+                Not Connected
+              </Badge>
+            </div>
+          </div>
+          {connectionError && (
+            <Alert variant="destructive">
+              <AlertTitle>Connection Error</AlertTitle>
+              <AlertDescription className="text-xs">
+                {connectionError}
+                {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
+                  <div className="mt-2">
+                    <p className="font-medium">Possible causes:</p>
+                    <ul className="mt-1 list-disc list-inside space-y-0.5">
+                      <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
+                      <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
+                      <li>Homeserver is not running or unreachable</li>
+                    </ul>
+                  </div>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
-
-  // Using API routes now, so always configured
-  const isConfigured = true;
 
   const isPubkeySoon = !info.public_key && !info.pubkey;
   const isVersionSoon = !info.version;
@@ -71,8 +106,8 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             {/* Connection Status */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>
-              <div className="flex-shrink-0">
-                {isConfigured ? (
+              <div className="shrink-0">
+                {isConnected ? (
                   <Badge variant="default" className="bg-brand text-xs">
                     <CheckCircle2 className="mr-1 h-3 w-3" />
                     Connected
@@ -80,11 +115,31 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                 ) : (
                   <Badge variant="destructive" className="text-xs">
                     <AlertCircle className="mr-1 h-3 w-3" />
-                    Not Configured
+                    Not Connected
                   </Badge>
                 )}
               </div>
             </div>
+
+            {/* Connection Error Message */}
+            {connectionError && (
+              <Alert variant="destructive">
+                <AlertTitle>Connection Error</AlertTitle>
+                <AlertDescription className="text-xs">
+                  {connectionError}
+                  {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
+                    <div className="mt-2">
+                      <p className="font-medium">Possible causes:</p>
+                      <ul className="mt-1 list-disc list-inside space-y-0.5">
+                        <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
+                        <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
+                        <li>Homeserver is not running or unreachable</li>
+                      </ul>
+                    </div>
+                  ) : null}
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Server Pubkey */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -118,11 +173,23 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
               </div>
             </div>
 
-            {/* Admin Endpoint - Using API routes, endpoint configured server-side */}
-            {isConfigured && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Admin API:</span>
-                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all">Configured via API routes</code>
+            {/* PKARR Pubky Address */}
+            {info.pkarr_pubky_address && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Address:</span>
+                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all font-mono">
+                  {info.pkarr_pubky_address}
+                </code>
+              </div>
+            )}
+
+            {/* PKARR ICANN Domain */}
+            {info.pkarr_icann_domain && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Domain:</span>
+                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all font-mono">
+                  {info.pkarr_icann_domain}
+                </code>
               </div>
             )}
           </CardContent>
