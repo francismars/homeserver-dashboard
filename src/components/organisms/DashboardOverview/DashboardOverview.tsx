@@ -37,7 +37,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
   if (!info) {
     return (
       <Card>
-        <CardHeader className="border-b pb-3 sm:pb-4">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Server & Connection</CardTitle>
@@ -47,7 +47,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 pt-3 sm:space-y-3 sm:pt-4">
+
+        {/* Inset separator between the header and the content (lighter than a full divider) */}
+        <div className="mx-6 h-px bg-border/60" />
+
+        <CardContent className="space-y-3 pt-4">
           {/* Connection Status */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>
@@ -92,7 +96,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
     <div className="space-y-4">
       <div className="grid gap-4">
         <Card>
-          <CardHeader className="border-b pb-3 sm:pb-4">
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Server & Connection</CardTitle>
@@ -102,7 +106,11 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3 pt-3 sm:space-y-3 sm:pt-4">
+
+          {/* Inset separator between the header and the content (lighter than a full divider) */}
+          <div className="mx-6 h-px bg-border/60" />
+
+          <CardContent className="space-y-3 pt-4">
             {/* Connection Status */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>

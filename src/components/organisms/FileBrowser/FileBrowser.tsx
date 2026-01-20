@@ -355,7 +355,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="border-b pb-4">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>File Browser</CardTitle>
@@ -373,6 +373,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </div>
           </div>
         </CardHeader>
+
+        {/* Inset separator between the header and the content (lighter than a full divider) */}
+        <div className="mx-6 h-px bg-border/60" />
+
         <CardContent className="space-y-4 pt-4">
           {/* Search + Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
