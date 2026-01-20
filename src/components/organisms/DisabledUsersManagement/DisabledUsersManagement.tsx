@@ -15,8 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { useUserManagement } from '@/hooks/user';
-import { Check, Clipboard, Copy, Info, Key, RefreshCw, Search, ShieldOff } from 'lucide-react';
+import { Check, Clipboard, Copy, Info, Key, Search, ShieldOff } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
@@ -52,8 +51,6 @@ export function DisabledUsersManagement({
   numUsersTotal,
   numDisabledUsers,
 }: DisabledUsersManagementProps) {
-  const { users, isLoading, error, refreshUsers } = useUserManagement();
-
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [pubkeyToDisable, setPubkeyToDisable] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
@@ -64,10 +61,6 @@ export function DisabledUsersManagement({
   // Mock disabled users list (until we have an API). We intentionally use mock pubkeys only.
   const [mockDisabledPubkeys, setMockDisabledPubkeys] = useState<string[]>([]);
   const mockNextIndexRef = useRef(0);
-
-  const usersByPubkey = useMemo(() => {
-    return new Map(users.map((u) => [u.pubkey, u]));
-  }, [users]);
 
   const targetDisabledCount = useMemo(() => {
     if (typeof numDisabledUsers === 'number') return Math.max(0, Math.floor(numDisabledUsers));
@@ -116,12 +109,6 @@ export function DisabledUsersManagement({
       return;
     }
 
-    // If we have a user list, validate against it to catch obvious mistakes early.
-    if (users.length > 0 && !usersByPubkey.has(pubkey)) {
-      setLocalError('User not found. Please make sure the pubkey is correct.');
-      return;
-    }
-
     setProcessingAction('disable');
     setLocalError(null);
     try {
@@ -133,18 +120,12 @@ export function DisabledUsersManagement({
     } finally {
       setProcessingAction(null);
     }
-  }, [pubkeyToDisable, users.length, usersByPubkey, onDisableUser]);
+  }, [pubkeyToDisable, onDisableUser]);
 
   const handleEnableByPubkey = useCallback(async () => {
     const pubkey = pubkeyToDisable.trim();
     if (!pubkey) {
       setLocalError('Please enter a pubkey');
-      return;
-    }
-
-    // If we have a user list, validate against it to catch obvious mistakes early.
-    if (users.length > 0 && !usersByPubkey.has(pubkey)) {
-      setLocalError('User not found. Please make sure the pubkey is correct.');
       return;
     }
 
@@ -159,7 +140,7 @@ export function DisabledUsersManagement({
     } finally {
       setProcessingAction(null);
     }
-  }, [pubkeyToDisable, users.length, usersByPubkey, onEnableUser]);
+  }, [pubkeyToDisable, onEnableUser]);
 
   const handleEnableUser = useCallback(
     async (pubkey: string) => {
@@ -189,7 +170,7 @@ export function DisabledUsersManagement({
   return (
     <>
       <Card>
-        <CardHeader className="border-b pb-4">
+        <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
@@ -206,28 +187,14 @@ export function DisabledUsersManagement({
                   <Key className="h-4 w-4" />
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshUsers}
-                disabled={isLoading}
-                title="Refresh"
-                aria-label="Refresh"
-              >
-                <RefreshCw className={isLoading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              </Button>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6 pt-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error.message}</AlertDescription>
-            </Alert>
-          )}
+        {/* Inset separator between the header and the content (lighter than a full divider) */}
+        <div className="mx-6 h-px bg-border/60" />
 
+        <CardContent className="space-y-6 pt-4">
           {/* Disabled Users */}
           <div>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
