@@ -57,8 +57,14 @@ export async function proxyWebDavRequest(
 
   // Construct WebDAV URL: /dav + path segments
   const pathSegments = path.join('/');
-  // For root path (empty), use /dav/, otherwise /dav/path/segments
-  const webdavPath = pathSegments ? `/dav/${pathSegments}` : '/dav/';
+  // Get the actual HTTP method to determine if this is a directory request
+  const actualMethod = request.headers.get('X-HTTP-Method-Override') || method;
+  // PROPFIND requests (directory listings) need trailing slash
+  const isDirectoryRequest = actualMethod === 'PROPFIND' || actualMethod === 'MKCOL';
+  const needsTrailingSlash = isDirectoryRequest && pathSegments;
+  const webdavPath = pathSegments 
+    ? `/dav/${pathSegments}${needsTrailingSlash && !pathSegments.endsWith('/') ? '/' : ''}` 
+    : '/dav/';
   const url = new URL(webdavPath, adminBaseUrl);
 
   // Forward query parameters
@@ -67,9 +73,7 @@ export async function proxyWebDavRequest(
   });
 
   try {
-    // Get the actual HTTP method from headers (for PROPFIND, MKCOL, MOVE, etc.)
-    const actualMethod = request.headers.get('X-HTTP-Method-Override') || method;
-    
+    // actualMethod was already determined above for path construction
     console.log('[WebDAV Proxy]', {
       method: actualMethod,
       pathSegments: pathSegments || '(root)',
@@ -112,6 +116,14 @@ export async function proxyWebDavRequest(
       headers,
       body,
     });
+
+    // Handle 204 No Content responses (common for PUT/DELETE/MKCOL)
+    // These should not have a body
+    if (response.status === 204) {
+      return new NextResponse(null, {
+        status: 204,
+      });
+    }
 
     const responseText = await response.text();
     const responseContentType = response.headers.get('Content-Type') || 'application/xml';
