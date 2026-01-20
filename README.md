@@ -8,19 +8,19 @@ The UI lives under a single route: **`/dashboard`** (the home page redirects the
 
 The dashboard has 5 tabs:
 
-- **Overview**: shows homeserver stats from `GET /info`
+- **Overview**: Shows homeserver stats from `GET /info` including connection status, public key, addresses, version, and user/storage statistics
 - **Users**:
-  - Generate signup tokens (invites) via `GET /generate_signup_token`
+  - Generate signup tokens (invites) via `GET /generate_signup_token` with QR code display for easy mobile app signup
   - Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`
-  - Shows a **mock** “disabled users list” (the count comes from `/info`, but the list entries are mock until there’s an API)
-- **Files**: WebDAV file browser (list/read/write/delete/move) using the `/dav/*` endpoint (Basic Auth)
-- **Logs**: mock log viewer (no backend logs API wired yet)
+  - Shows a **mock** "disabled users list" (the count comes from `/info`, but the list entries are mock until there's an API)
+- **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth)
+- **Logs**: Mock log viewer (no backend logs API wired yet)
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
 
-Also in the navbar “Settings” menu:
+Also in the navbar "Settings" menu:
 
-- **Configuration**: mock, read-only TOML viewer (no real config endpoints yet)
-- **Restart / Shutdown**: mock dialogs (no backend control endpoint yet)
+- **Configuration**: Mock, read-only TOML viewer (no real config endpoints yet)
+- **Restart / Shutdown**: Mock dialogs (no backend control endpoint yet)
 
 ## Prerequisites
 
@@ -68,6 +68,42 @@ npm run build
 npm start
 ```
 
+## Docker Deployment
+
+The dashboard can be deployed using Docker, either standalone or as part of an Umbrel app.
+
+### Standalone Docker
+
+Build the Docker image:
+
+```bash
+docker build -t homeserver-dashboard .
+```
+
+Run the container:
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e ADMIN_BASE_URL=http://homeserver:6288 \
+  -e ADMIN_TOKEN=your-admin-password \
+  homeserver-dashboard
+```
+
+### Umbrel Deployment
+
+The dashboard is included in the `pubky-homeserver` Umbrel app. When deployed via Umbrel:
+
+- The dashboard runs as the `web` service in `docker-compose.yml`
+- Environment variables (`ADMIN_BASE_URL`, `ADMIN_TOKEN`) are automatically configured
+- The dashboard connects to the homeserver service via Docker networking (`http://homeserver:6288`)
+- Access is provided through Umbrel's app proxy (no direct port exposure needed)
+
+The Dockerfile uses Next.js standalone output for optimal image size and includes:
+- Multi-stage build for smaller production image
+- Non-root user for security
+- Proper handling of server-only environment variables
+
 ## Configuration
 
 ### Environment Variables
@@ -80,6 +116,8 @@ npm start
 \* Required to use the real homeserver APIs
 
 **Security Note:** These variables are server-only (not prefixed with `NEXT_PUBLIC_*`) to prevent exposing sensitive credentials to the browser. They are automatically loaded from `.env.local` in development and from environment variables in production/Docker.
+
+**Docker Note:** In Docker/Umbrel deployments, use the homeserver service name for `ADMIN_BASE_URL` (e.g., `http://homeserver:6288`) instead of `localhost` to connect via Docker networking.
 
 ## Development
 
