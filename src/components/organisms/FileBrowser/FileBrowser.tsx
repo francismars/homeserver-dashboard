@@ -23,8 +23,6 @@ import type { WebDavFile } from '@/services/webdav';
 import {
   Folder,
   File,
-  Upload,
-  FolderPlus,
   Trash2,
   RefreshCw,
   ChevronRight,
@@ -427,12 +425,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             {canCreateFiles && (
               <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
                 <Button variant="outline" size="sm" onClick={() => setShowCreateDirDialog(true)} disabled={isLoading}>
-                  <FolderPlus className="mr-2 h-4 w-4" />
                   New Folder
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)} disabled={isLoading}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload File
+                  New File
                 </Button>
               </div>
             )}
@@ -678,11 +674,11 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
         </DialogContent>
       </Dialog>
 
-      {/* Upload File Dialog */}
+      {/* New File Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload File</DialogTitle>
+            <DialogTitle>New File</DialogTitle>
             <DialogDescription>Create a new file in {currentPath}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -706,7 +702,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               Cancel
             </Button>
             <Button onClick={handleUpload} disabled={!newFileName.trim() || isSaving}>
-              {isSaving ? 'Uploading...' : 'Upload'}
+              {isSaving ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>
