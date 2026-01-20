@@ -418,7 +418,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="border-b pb-4">
+        <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             API Explorer
             <Badge variant="outline" className="border-dashed text-xs font-normal">
@@ -428,6 +428,10 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
           </CardTitle>
           <CardDescription>Test homeserver API endpoints across all servers</CardDescription>
         </CardHeader>
+
+        {/* Inset separator between the header and the content (lighter than a full divider) */}
+        <div className="mx-6 h-px bg-border/60" />
+
         <CardContent className="space-y-4 pt-4">
           {/* Server Selection */}
           <div className="space-y-2">

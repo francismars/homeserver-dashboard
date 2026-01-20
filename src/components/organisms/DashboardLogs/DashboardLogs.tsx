@@ -290,7 +290,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="border-b pb-4">
+        <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex flex-wrap items-center gap-2">
@@ -327,6 +327,10 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
             </div>
           </div>
         </CardHeader>
+
+        {/* Inset separator between the header and the content (lighter than a full divider) */}
+        <div className="mx-6 h-px bg-border/60" />
+
         <CardContent className="space-y-4 pt-4">
           {/* Filters */}
           <div className="flex flex-col gap-3 sm:flex-row">
