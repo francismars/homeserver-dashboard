@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Key, Info } from 'lucide-react';
+import { Info, Copy, Check, QrCode, X } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -91,8 +91,7 @@ export function InvitesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-[calc(100vw-2rem)] flex-col sm:max-w-[min(48rem,calc(100vw-4rem))]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Key className="h-4 w-4 sm:h-5 sm:w-5" />
+          <DialogTitle className="text-base sm:text-lg">
             Invite Management
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
@@ -117,10 +116,7 @@ export function InvitesDialog({
                       <span className="sm:hidden">...</span>
                     </>
                   ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Generate
-                    </>
+                    'Generate'
                   )}
                 </Button>
               </div>
@@ -145,28 +141,30 @@ export function InvitesDialog({
                           <div className="flex shrink-0 gap-2">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleCopy(invite, index)}
-                              className="w-full sm:w-auto"
+                              className="h-8 w-8"
+                              title={copiedIndex === index ? 'Copied!' : 'Copy Code'}
                             >
                               {copiedIndex === index ? (
-                                <>
-                                  Copied
-                                </>
+                                <Check className="h-4 w-4" />
                               ) : (
-                                <>
-                                  Copy Code
-                                </>
+                                <Copy className="h-4 w-4" />
                               )}
                             </Button>
                             {signupUrl && (
                               <Button
                                 variant="outline"
-                                size="sm"
+                                size="icon"
                                 onClick={() => setExpandedInviteIndex(isExpanded ? null : index)}
-                                className="w-full sm:w-auto"
+                                className="h-8 w-8"
+                                title={isExpanded ? 'Hide QR Code' : 'Show QR Code'}
                               >
-                                {isExpanded ? 'Hide QR' : 'Show QR'}
+                                {isExpanded ? (
+                                  <X className="h-4 w-4" />
+                                ) : (
+                                  <QrCode className="h-4 w-4" />
+                                )}
                               </Button>
                             )}
                           </div>
@@ -182,7 +180,7 @@ export function InvitesDialog({
                                 <div className="rounded-lg border-2 border-border bg-white p-3">
                                   <QRCodeSVG value={signupUrl} size={160} level="M" />
                                 </div>
-                                <p className="text-xs text-muted-foreground">Scan with Pubky app</p>
+                                <p className="text-xs text-muted-foreground">Scan with Pubky Ring app</p>
                               </div>
 
                               {/* URL and Actions */}
