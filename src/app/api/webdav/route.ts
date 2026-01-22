@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { proxyWebDavRequest } from './[...path]/route';
+import { proxyWebDavRequest } from './utils';
 
 // Handle root WebDAV requests (/api/webdav without trailing slash)
 // Forward to the catch-all route handler with empty path array
