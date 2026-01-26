@@ -138,14 +138,14 @@ export default function DashboardPage() {
               </div>
               <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
                 <span>Powered by Pubky</span>
-                <span>© {new Date().getFullYear()} Synonym Software Ltd.</span>
+                <span>© {new Date().getFullYear()} Synonym Software, S.A. DE C.V.</span>
               </div>
             </div>
 
             {/* Links */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:justify-end sm:gap-6">
               <Link
-                href="https://github.com/synonymdev/pubky"
+                href="https://github.com/pubky/pubky-core/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 transition-colors hover:text-foreground"
@@ -155,7 +155,7 @@ export default function DashboardPage() {
                 <ExternalLink className="h-3 w-3" />
               </Link>
               <Link
-                href="https://docs.pubky.app"
+                href="https://docs.pubky.org/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 transition-colors hover:text-foreground"
@@ -165,7 +165,7 @@ export default function DashboardPage() {
                 <ExternalLink className="h-3 w-3" />
               </Link>
               <Link
-                href="https://github.com/synonymdev/pubky/issues"
+                href="https://docs.pubky.org/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 transition-colors hover:text-foreground"
