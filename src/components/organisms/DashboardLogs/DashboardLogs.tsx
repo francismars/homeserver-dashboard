@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Clipboard,
+  ClipboardPaste,
   FileText,
   RefreshCw,
   Search,
@@ -369,7 +369,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
                     }}
                     title="Paste from clipboard"
                   >
-                    <Clipboard className="h-3.5 w-3.5" />
+                    <ClipboardPaste className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
