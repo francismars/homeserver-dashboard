@@ -690,7 +690,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New File</DialogTitle>
-            <DialogDescription>Create a new file in {currentPath}</DialogDescription>
+            <DialogDescription className="break-all">
+              Create a new file in {currentPath}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -758,7 +760,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Directory</DialogTitle>
-            <DialogDescription>Create a new directory in {currentPath}</DialogDescription>
+            <DialogDescription className="break-all">
+              Create a new directory in {currentPath}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
