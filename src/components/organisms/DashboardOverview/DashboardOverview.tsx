@@ -153,7 +153,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-                <span className="truncate font-mono text-xs break-all text-muted-foreground/70 italic">
+                <span className="font-mono text-xs break-all text-muted-foreground/70 italic">
                   {homeserverPubkey}
                 </span>
                 {isPubkeySoon && (
