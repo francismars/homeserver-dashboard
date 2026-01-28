@@ -21,6 +21,7 @@ import { useWebDav } from '@/hooks/webdav';
 import { useAdminActions } from '@/hooks/admin';
 import type { WebDavFile } from '@/services/webdav';
 import {
+  Clipboard,
   Folder,
   File,
   Trash2,
@@ -28,7 +29,6 @@ import {
   ChevronRight,
   Edit2,
   Save,
-  X,
   Search,
   ArrowUp,
   ArrowDown,
@@ -123,18 +123,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
       await loadDirectory(currentPath);
     }
     setIsSaving(false);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditingFile(false);
-    // Reload file content
-    if (selectedFile) {
-      readFile(selectedFile.path).then((content) => {
-        if (content !== null) {
-          setFileContent(content);
-        }
-      });
-    }
   };
 
   const handleUpload = async () => {
@@ -384,10 +372,40 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search files"
-                className="pl-9"
+                className="pr-16 pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                {searchQuery ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setSearchQuery('')}
+                    title="Clear"
+                  >
+                    <span className="sr-only">Clear</span>✕
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        setSearchQuery(text);
+                      } catch {
+                        // ignore clipboard errors
+                      }
+                    }}
+                    title="Paste from clipboard"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
@@ -677,7 +695,44 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>File Name</Label>
-              <Input value={newFileName} onChange={(e) => setNewFileName(e.target.value)} placeholder="example.txt" />
+              <div className="relative">
+                <Input
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  placeholder="example.txt"
+                  className="pr-16"
+                />
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                  {newFileName ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={() => setNewFileName('')}
+                      title="Clear"
+                    >
+                      <span className="sr-only">Clear</span>✕
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          setNewFileName(text);
+                        } catch {
+                          // ignore clipboard errors
+                        }
+                      }}
+                      title="Paste from clipboard"
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Content</Label>
@@ -708,7 +763,44 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Directory Name</Label>
-              <Input value={newDirName} onChange={(e) => setNewDirName(e.target.value)} placeholder="new-folder" />
+              <div className="relative">
+                <Input
+                  value={newDirName}
+                  onChange={(e) => setNewDirName(e.target.value)}
+                  placeholder="new-folder"
+                  className="pr-16"
+                />
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                  {newDirName ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={() => setNewDirName('')}
+                      title="Clear"
+                    >
+                      <span className="sr-only">Clear</span>✕
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          setNewDirName(text);
+                        } catch {
+                          // ignore clipboard errors
+                        }
+                      }}
+                      title="Paste from clipboard"
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -754,16 +846,49 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             )}
             <div className="space-y-2">
               <Label>New Name</Label>
-              <Input
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                placeholder={fileToRename?.displayName}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && renameValue.trim()) {
-                    handleRename();
-                  }
-                }}
-              />
+              <div className="relative">
+                <Input
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  placeholder={fileToRename?.displayName}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && renameValue.trim()) {
+                      handleRename();
+                    }
+                  }}
+                  className="pr-16"
+                />
+                <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                  {renameValue ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={() => setRenameValue('')}
+                      title="Clear"
+                    >
+                      <span className="sr-only">Clear</span>✕
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          setRenameValue(text);
+                        } catch {
+                          // ignore clipboard errors
+                        }
+                      }}
+                      title="Paste from clipboard"
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -794,16 +919,49 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
 
           <div className="space-y-2">
             <Label>Path</Label>
-            <Input
-              value={deleteByPathInput}
-              onChange={(e) => setDeleteByPathInput(e.target.value)}
-              placeholder="/dav/<pubkey>/pub/file.txt"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleDeleteByPath();
-                }
-              }}
-            />
+            <div className="relative">
+              <Input
+                value={deleteByPathInput}
+                onChange={(e) => setDeleteByPathInput(e.target.value)}
+                placeholder="/dav/<pubkey>/pub/file.txt"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleDeleteByPath();
+                  }
+                }}
+                className="pr-16"
+              />
+              <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                {deleteByPathInput ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                    onClick={() => setDeleteByPathInput('')}
+                    title="Clear"
+                  >
+                    <span className="sr-only">Clear</span>✕
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        setDeleteByPathInput(text);
+                      } catch {
+                        // ignore clipboard errors
+                      }
+                    }}
+                    title="Paste from clipboard"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
               Will delete:{' '}
               <code className="rounded bg-muted px-1 py-0.5">{normalizeAdminDeletePath(deleteByPathInput) || '-'}</code>
