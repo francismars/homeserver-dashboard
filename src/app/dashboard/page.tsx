@@ -12,7 +12,7 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { ExternalLink, Github, BookOpen, HelpCircle } from 'lucide-react';
+import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, FileText, Activity, Plug } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -44,7 +44,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-10">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 sm:gap-3 sm:px-6 sm:py-10">
           <DashboardNavbar
             onSettingsClick={handleSettingsClick}
             onRestartServer={handleRestartServer}
@@ -52,20 +52,25 @@ export default function DashboardPage() {
           />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="flex w-full flex-nowrap gap-1 overflow-x-auto md:grid md:grid-cols-5 md:gap-0">
-              <TabsTrigger value="overview" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-5">
+              <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <Home className="shrink-0" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="users" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+              <TabsTrigger value="users" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <Users className="shrink-0" />
                 Users
               </TabsTrigger>
-              <TabsTrigger value="files" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+              <TabsTrigger value="files" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <FileText className="shrink-0" />
                 Files
               </TabsTrigger>
-              <TabsTrigger value="logs" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+              <TabsTrigger value="logs" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <Activity className="shrink-0" />
                 Logs
               </TabsTrigger>
-              <TabsTrigger value="api" className="shrink-0 text-xs whitespace-nowrap sm:text-sm md:shrink">
+              <TabsTrigger value="api" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <Plug className="shrink-0" />
                 API
               </TabsTrigger>
             </TabsList>
