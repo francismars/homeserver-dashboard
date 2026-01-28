@@ -383,7 +383,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             <div className="relative sm:flex-1">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search files..."
+                placeholder="Search files"
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

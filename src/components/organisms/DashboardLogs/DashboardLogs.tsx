@@ -337,7 +337,7 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
             <div className="relative flex-1">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
               <Input
-                placeholder="Search logs..."
+                placeholder="Search logs"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"

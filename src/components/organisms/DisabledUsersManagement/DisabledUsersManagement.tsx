@@ -220,8 +220,8 @@ export function DisabledUsersManagement({
                     setPubkeyToDisable('');
                     setIsAccessDialogOpen(true);
                   }}
-                  title="Disable / Enable User"
-                  aria-label="Disable / Enable User"
+                  title="Disable or enable user"
+                  aria-label="Disable or enable user"
                 >
                   <ShieldOff className="h-4 w-4" />
                 </Button>
@@ -233,7 +233,7 @@ export function DisabledUsersManagement({
                 <div className="relative">
                   <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Search disabled users..."
+                    placeholder="Search disabled users"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pr-20 pl-9"
@@ -333,7 +333,7 @@ export function DisabledUsersManagement({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disable / Enable User</DialogTitle>
+            <DialogTitle>Disable or enable user</DialogTitle>
             <DialogDescription>Enter a user pubkey to disable or enable their account</DialogDescription>
           </DialogHeader>
 
@@ -347,7 +347,7 @@ export function DisabledUsersManagement({
           <div className="space-y-3">
             <div className="relative">
               <Input
-                placeholder="Enter pubkey..."
+                placeholder="Enter pubkey"
                 value={pubkeyToDisable}
                 onChange={(e) => {
                   setPubkeyToDisable(e.target.value);
@@ -403,7 +403,7 @@ export function DisabledUsersManagement({
                 onClick={handleEnableByPubkey}
                 disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
                 className="w-full"
-                variant="outline"
+                variant="default"
               >
                 {processingAction === 'enable' ? (
                   <>
