@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { Check, Clipboard, Copy, Info, Key, Search, ShieldOff } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, Info, Key, Search, ShieldOff } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
@@ -264,7 +264,7 @@ export function DisabledUsersManagement({
                         }}
                         title="Paste from clipboard"
                       >
-                        <Clipboard className="h-3.5 w-3.5" />
+                        <ClipboardPaste className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
@@ -385,9 +385,9 @@ export function DisabledUsersManagement({
                       size="icon"
                       className="h-7 w-7 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={handlePaste}
-                      title="Paste from clipboard"
-                    >
-                      <Clipboard className="h-3.5 w-3.5" />
+                    title="Paste from clipboard"
+                  >
+                    <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>

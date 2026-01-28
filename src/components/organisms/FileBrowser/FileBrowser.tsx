@@ -21,7 +21,7 @@ import { useWebDav } from '@/hooks/webdav';
 import { useAdminActions } from '@/hooks/admin';
 import type { WebDavFile } from '@/services/webdav';
 import {
-  Clipboard,
+  ClipboardPaste,
   Folder,
   File,
   Trash2,
@@ -402,7 +402,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                     }}
                     title="Paste from clipboard"
                   >
-                    <Clipboard className="h-3.5 w-3.5" />
+                    <ClipboardPaste className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
@@ -730,7 +730,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       }}
                       title="Paste from clipboard"
                     >
-                      <Clipboard className="h-3.5 w-3.5" />
+                      <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -800,7 +800,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       }}
                       title="Paste from clipboard"
                     >
-                      <Clipboard className="h-3.5 w-3.5" />
+                      <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -888,7 +888,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       }}
                       title="Paste from clipboard"
                     >
-                      <Clipboard className="h-3.5 w-3.5" />
+                      <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -961,7 +961,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                     }}
                     title="Paste from clipboard"
                   >
-                    <Clipboard className="h-3.5 w-3.5" />
+                    <ClipboardPaste className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
