@@ -331,10 +331,14 @@ export function DisabledUsersManagement({
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="space-y-2 sm:space-y-3 pt-5 pb-4 sm:pt-6 sm:pb-5">
           <DialogHeader>
-            <DialogTitle>Disable or enable user</DialogTitle>
-            <DialogDescription>Enter a user pubkey to disable or enable their account</DialogDescription>
+            <DialogTitle className="text-xl font-bold sm:text-2xl">
+              Disable or enable user
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Enter a user pubky to disable or enable their account
+            </DialogDescription>
           </DialogHeader>
 
           {localError && (
@@ -344,49 +348,57 @@ export function DisabledUsersManagement({
             </Alert>
           )}
 
-          <div className="space-y-3">
-            <div className="relative">
-              <Input
-                placeholder="Enter pubkey"
-                value={pubkeyToDisable}
-                onChange={(e) => {
-                  setPubkeyToDisable(e.target.value);
-                  setLocalError(null);
-                }}
-                className="pr-20"
-              />
-              <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
-                {pubkeyToDisable && (
+          <div className="space-y-3 sm:space-y-4">
+            {/* Pubkey field */}
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                User pubky
+              </div>
+              <div className="flex items-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2.5">
+                <Input
+                  placeholder="Enter pubky"
+                  value={pubkeyToDisable}
+                  onChange={(e) => {
+                    setPubkeyToDisable(e.target.value);
+                    setLocalError(null);
+                  }}
+                  className="border-0 bg-transparent px-0 py-0 text-sm shadow-none ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+                <div className="ml-2 flex items-center gap-1">
+                  {pubkeyToDisable && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full bg-secondary/60 text-secondary-foreground hover:bg-secondary"
+                      onClick={() => {
+                        setPubkeyToDisable('');
+                        setLocalError(null);
+                      }}
+                      title="Clear"
+                    >
+                      <span className="sr-only">Clear</span>✕
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
-                    onClick={() => {
-                      setPubkeyToDisable('');
-                      setLocalError(null);
-                    }}
-                    title="Clear"
+                    className="h-7 w-7 rounded-full bg-secondary/60 text-secondary-foreground hover:bg-secondary"
+                    onClick={handlePaste}
+                    title="Paste from clipboard"
                   >
-                    <span className="sr-only">Clear</span>✕
+                    <Clipboard className="h-3.5 w-3.5" />
                   </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={handlePaste}
-                  title="Paste from clipboard"
-                >
-                  <Clipboard className="h-3.5 w-3.5" />
-                </Button>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            {/* Actions */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
                 onClick={handleDisableByPubkey}
                 disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
-                className="w-full"
+                className="w-full justify-center"
+                size="lg"
                 variant="destructive"
               >
                 {processingAction === 'disable' ? (
@@ -396,13 +408,17 @@ export function DisabledUsersManagement({
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
-                  'Disable'
+                  <>
+                    <ShieldOff className="mr-2 h-4 w-4" />
+                    Disable
+                  </>
                 )}
               </Button>
               <Button
                 onClick={handleEnableByPubkey}
                 disabled={!pubkeyToDisable.trim() || isProcessing || isDisablingUser}
-                className="w-full"
+                className="w-full justify-center"
+                size="lg"
                 variant="default"
               >
                 {processingAction === 'enable' ? (
@@ -412,7 +428,10 @@ export function DisabledUsersManagement({
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
-                  'Enable'
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Enable
+                  </>
                 )}
               </Button>
             </div>
