@@ -73,9 +73,6 @@ export function ServerControlDialog({ open, onOpenChange, action }: ServerContro
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-            Cancel
-          </Button>
           <Button variant={isRestart ? 'default' : 'destructive'} onClick={handleConfirm} disabled={isProcessing}>
             {isProcessing ? (
               <>

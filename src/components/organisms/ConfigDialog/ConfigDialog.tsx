@@ -121,9 +121,6 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
             <RefreshCw className={cn('mr-2 h-4 w-4', isReloading && 'animate-spin')} />
             Reload
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

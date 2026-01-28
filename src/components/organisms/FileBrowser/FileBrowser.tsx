@@ -653,26 +653,15 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           </div>
           <DialogFooter>
             {isEditingFile ? (
-              <>
-                <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving}>
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-              </>
+              <Button onClick={handleSave} disabled={isSaving}>
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
             ) : (
-              <>
-                <Button variant="outline" onClick={() => setIsViewingFile(false)}>
-                  Close
-                </Button>
-                <Button onClick={handleEdit}>
-                  <Edit2 className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              </>
+              <Button onClick={handleEdit}>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
             )}
           </DialogFooter>
         </DialogContent>
@@ -702,9 +691,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
-              Cancel
-            </Button>
             <Button onClick={handleUpload} disabled={!newFileName.trim() || isSaving}>
               {isSaving ? 'Creating...' : 'Create'}
             </Button>
@@ -726,9 +712,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDirDialog(false)}>
-              Cancel
-            </Button>
             <Button onClick={handleCreateDirectory} disabled={!newDirName.trim() || isSaving}>
               {isSaving ? 'Creating...' : 'Create'}
             </Button>
@@ -747,9 +730,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSaving}>
               {isSaving ? 'Deleting...' : 'Delete'}
             </Button>
@@ -787,17 +767,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowRenameDialog(false);
-                setFileToRename(null);
-                setRenameValue('');
-                setValidationError(null);
-              }}
-            >
-              Cancel
-            </Button>
             <Button onClick={handleRename} disabled={!renameValue.trim() || isSaving}>
               {isSaving ? 'Renaming...' : 'Rename'}
             </Button>
@@ -842,16 +811,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteByPathDialog(false);
-                setDeleteByPathValidationError(null);
-              }}
-              disabled={isDeletingUrl}
-            >
-              Cancel
-            </Button>
             <Button variant="destructive" onClick={handleDeleteByPath} disabled={isDeletingUrl}>
               {isDeletingUrl ? 'Deleting...' : 'Delete'}
             </Button>

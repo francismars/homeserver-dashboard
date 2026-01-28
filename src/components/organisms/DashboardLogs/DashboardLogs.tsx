@@ -496,9 +496,6 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>
-              Cancel
-            </Button>
             <Button variant="destructive" onClick={handleConfirmClear}>
               Clear Logs
             </Button>

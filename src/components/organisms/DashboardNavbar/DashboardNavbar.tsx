@@ -1,7 +1,6 @@
 'use client';
 
 import { Settings, Power, RotateCw } from 'lucide-react';
-import { Logo } from '@/components/molecules/Logo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -28,35 +27,34 @@ export function DashboardNavbar({
 }: DashboardNavbarProps) {
   return (
     <header
-      className={cn('w-full bg-linear-to-b from-background/95 to-transparent py-4 backdrop-blur-sm sm:py-6', className)}
+      className={cn('w-full bg-background pb-2 pt-4 sm:pb-3 sm:pt-5', className)}
     >
-      <nav className="flex w-full min-w-0 items-center justify-between gap-1.5 sm:gap-2 md:gap-3">
-        {/* Logo and title grouped together - single line, never wrap */}
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden sm:gap-1.5">
-          <div className="shrink-0">
-            <Logo noLink width={32} height={32} className="sm:h-10 sm:w-10" />
-          </div>
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <h1 className="truncate text-sm font-semibold whitespace-nowrap sm:text-base md:text-lg lg:text-xl xl:text-2xl">
-              Pubky Homeserver Dashboard
-            </h1>
-            <p className="truncate text-xs whitespace-nowrap text-muted-foreground">
-              Manage your homeserver settings and monitor usage
-            </p>
-          </div>
+      <nav className="flex w-full min-w-0 items-center justify-between gap-4 sm:gap-6">
+        {/* Left: Pubky Homeserver logo */}
+        <div className="flex min-w-0 shrink-0 items-center">
+          <img
+            src="/PubkyHomeserver.svg"
+            alt="Pubky Homeserver"
+            className="h-8 w-auto sm:h-9"
+            width={262}
+            height={36}
+          />
         </div>
 
-        {/* Settings button on the right - always visible, never shrink */}
-        <div className="flex shrink-0 items-center justify-end">
+        {/* Right: tagline + settings button */}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-4 sm:gap-6">
+          <p className="hidden truncate text-sm text-muted-foreground md:max-w-xs lg:inline lg:max-w-sm">
+            Manage your homeserver settings and monitor usage
+          </p>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-full border bg-transparent sm:h-10 sm:w-10 md:h-12 md:w-12"
+                className="h-9 w-9 shrink-0 rounded-full border border-border bg-secondary/80 text-foreground hover:bg-secondary sm:h-10 sm:w-10"
                 aria-label="Settings"
               >
-                <Settings className="size-4 sm:size-5 md:size-6" />
+                <Settings className="size-4 sm:size-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-38">
