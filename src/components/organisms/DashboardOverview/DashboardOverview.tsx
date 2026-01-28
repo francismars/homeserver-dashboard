@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Info, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Info, CircleCheckBig, AlertCircle } from 'lucide-react';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
 const FALLBACK_HOMESERVER_PUBKEY = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o';
@@ -116,10 +116,10 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Connection Status:</span>
               <div className="shrink-0">
                 {isConnected ? (
-                  <Badge variant="default" className="bg-brand text-xs">
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Connected
-                  </Badge>
+                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand sm:text-sm">
+                    <CircleCheckBig className="h-4 w-4" />
+                    <span>Connected</span>
+                  </div>
                 ) : (
                   <Badge variant="destructive" className="text-xs">
                     <AlertCircle className="mr-1 h-3 w-3" />
@@ -153,7 +153,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-                <span className="font-mono text-xs break-all text-muted-foreground/70 italic">
+                <span className="font-mono text-xs break-all text-foreground sm:text-sm">
                   {homeserverPubkey}
                 </span>
                 {isPubkeySoon && (
@@ -169,7 +169,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Version:</span>
               <div className="flex flex-1 items-center gap-2 sm:flex-initial">
-                <span className="text-xs break-words text-muted-foreground/70 italic sm:text-sm">
+                <span className="text-xs break-words text-foreground sm:text-sm">
                   {homeserverVersion}
                 </span>
                 {isVersionSoon && (
