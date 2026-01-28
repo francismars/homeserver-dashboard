@@ -239,7 +239,7 @@ export function DisabledUsersManagement({
                     className="pr-20 pl-9"
                   />
                   <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
-                    {searchQuery && (
+                    {searchQuery ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -249,23 +249,24 @@ export function DisabledUsersManagement({
                       >
                         <span className="sr-only">Clear</span>✕
                       </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            setSearchQuery(text);
+                          } catch {
+                            // Handle clipboard error silently
+                          }
+                        }}
+                        title="Paste from clipboard"
+                      >
+                        <Clipboard className="h-3.5 w-3.5" />
+                      </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={async () => {
-                        try {
-                          const text = await navigator.clipboard.readText();
-                          setSearchQuery(text);
-                        } catch {
-                          // Handle clipboard error silently
-                        }
-                      }}
-                      title="Paste from clipboard"
-                    >
-                      <Clipboard className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
               )}
@@ -365,11 +366,11 @@ export function DisabledUsersManagement({
                   className="border-0 bg-transparent px-0 py-0 text-sm shadow-none ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
                 <div className="ml-2 flex items-center gap-1">
-                  {pubkeyToDisable && (
+                  {pubkeyToDisable ? (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 rounded-full bg-secondary/60 text-secondary-foreground hover:bg-secondary"
+                      className="h-7 w-7 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={() => {
                         setPubkeyToDisable('');
                         setLocalError(null);
@@ -378,16 +379,17 @@ export function DisabledUsersManagement({
                     >
                       <span className="sr-only">Clear</span>✕
                     </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
+                      onClick={handlePaste}
+                      title="Paste from clipboard"
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                    </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 rounded-full bg-secondary/60 text-secondary-foreground hover:bg-secondary"
-                    onClick={handlePaste}
-                    title="Paste from clipboard"
-                  >
-                    <Clipboard className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
               </div>
             </div>

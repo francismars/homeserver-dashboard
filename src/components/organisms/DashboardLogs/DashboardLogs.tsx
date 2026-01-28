@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  Clipboard,
   FileText,
   RefreshCw,
   Search,
@@ -340,8 +341,38 @@ export function DashboardLogs({ isLoading: _isLoading, error }: DashboardLogsPro
                 placeholder="Search logs"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pr-16 pl-9"
               />
+              <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+                {searchQuery ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setSearchQuery('')}
+                    title="Clear"
+                  >
+                    <span className="sr-only">Clear</span>✕
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        setSearchQuery(text);
+                      } catch {
+                        // ignore clipboard errors
+                      }
+                    }}
+                    title="Paste from clipboard"
+                  >
+                    <Clipboard className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
             <Select value={levelFilter} onValueChange={(value) => setLevelFilter(value as LogLevel | 'all')}>
               <SelectTrigger className="w-full sm:w-[180px]">
