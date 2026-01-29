@@ -355,6 +355,20 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                   Disk Used: {diskUsedMB} MB
                 </Badge>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDeleteByPathValidationError(null);
+                  setShowDeleteByPathDialog(true);
+                }}
+                disabled={isDeletingUrl}
+                title="Delete an entry by pasting its path"
+                aria-label="Delete"
+                className="w-9 px-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="sm" onClick={() => loadDirectory(currentPath)} disabled={isLoading}>
                 <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
               </Button>
@@ -406,23 +420,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                   </Button>
                 )}
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setDeleteByPathValidationError(null);
-                  setShowDeleteByPathDialog(true);
-                }}
-                disabled={isDeletingUrl}
-                title="Delete an entry by pasting its path"
-                aria-label="Delete"
-                className="w-9 px-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
