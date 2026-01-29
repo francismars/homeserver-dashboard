@@ -40,6 +40,7 @@
     "@types/react-dom": "19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
+    "baseline-browser-mapping": "^2.9.19",
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.7",
     "eslint-plugin-react": "^7.37.5",
