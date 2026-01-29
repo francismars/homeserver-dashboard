@@ -365,7 +365,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                 disabled={isDeletingUrl}
                 title="Delete an entry by pasting its path"
                 aria-label="Delete"
-                className="w-9 px-0"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
