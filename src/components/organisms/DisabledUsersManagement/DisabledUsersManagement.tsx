@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { Check, ClipboardPaste, Copy, Info, Key, Search, ShieldBan } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, Info, Search, ShieldBan, UserRoundPlus } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
@@ -183,7 +183,7 @@ export function DisabledUsersManagement({
               )}
               {onOpenInvites && (
                 <Button variant="outline" size="sm" onClick={onOpenInvites} title="Invites" aria-label="Invites">
-                  <Key className="h-4 w-4" />
+                  <UserRoundPlus className="h-4 w-4" />
                 </Button>
               )}
             </div>
