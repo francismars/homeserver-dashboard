@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { Check, ClipboardPaste, Copy, Info, Key, Search, ShieldOff } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, Info, Key, Search, ShieldBan } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
@@ -223,7 +223,7 @@ export function DisabledUsersManagement({
                   title="Disable or enable user"
                   aria-label="Disable or enable user"
                 >
-                  <ShieldOff className="h-4 w-4" />
+                  <ShieldBan className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -273,7 +273,7 @@ export function DisabledUsersManagement({
 
               {filteredDisabledUsers.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
-                  <ShieldOff className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                  <ShieldBan className="mx-auto mb-2 h-12 w-12 opacity-50" />
                   <p>{disabledUsers.length === 0 ? 'No disabled users' : 'No matches'}</p>
                 </div>
               ) : (
@@ -410,10 +410,7 @@ export function DisabledUsersManagement({
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
-                  <>
-                    <ShieldOff className="mr-2 h-4 w-4" />
-                    Disable
-                  </>
+                  'Disable'
                 )}
               </Button>
               <Button
@@ -430,10 +427,7 @@ export function DisabledUsersManagement({
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Enable
-                  </>
+                  'Enable'
                 )}
               </Button>
             </div>

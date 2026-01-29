@@ -12,7 +12,7 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InvitesDialog } from '@/components/organisms/InvitesDialog';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, FileText, Activity, Plug } from 'lucide-react';
+import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -62,7 +62,7 @@ export default function DashboardPage() {
                 Users
               </TabsTrigger>
               <TabsTrigger value="files" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
-                <FileText className="shrink-0" />
+                <Files className="shrink-0" />
                 Files
               </TabsTrigger>
               <TabsTrigger value="logs" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
@@ -142,8 +142,9 @@ export default function DashboardPage() {
                 <span className="text-xs">{info?.version ? `v${info.version}` : 'v0.1.0-dev'}</span>
               </div>
               <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
-                <span>Powered by Pubky</span>
-                <span>© {new Date().getFullYear()} Synonym Software, S.A. DE C.V.</span>
+                <span>
+                  Synonym Software, S.A. DE C.V. ©{new Date().getFullYear()}. All rights reserved.
+                </span>
               </div>
             </div>
 
@@ -157,7 +158,6 @@ export default function DashboardPage() {
               >
                 <Github className="h-3.5 w-3.5" />
                 <span>GitHub</span>
-                <ExternalLink className="h-3 w-3" />
               </Link>
               <Link
                 href="https://docs.pubky.org/"
@@ -167,7 +167,6 @@ export default function DashboardPage() {
               >
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Documentation</span>
-                <ExternalLink className="h-3 w-3" />
               </Link>
               <Link
                 href="https://docs.pubky.org/issues"
@@ -177,7 +176,6 @@ export default function DashboardPage() {
               >
                 <HelpCircle className="h-3.5 w-3.5" />
                 <span>Support</span>
-                <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           </div>
