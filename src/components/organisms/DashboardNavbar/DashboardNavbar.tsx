@@ -1,30 +1,15 @@
 'use client';
 
-import { Settings, Power, RotateCw } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/libs/utils';
 
 interface DashboardNavbarProps {
   className?: string;
   onSettingsClick?: () => void;
-  onRestartServer?: () => void;
-  onShutdownServer?: () => void;
 }
 
-export function DashboardNavbar({
-  className,
-  onSettingsClick,
-  onRestartServer,
-  onShutdownServer,
-}: DashboardNavbarProps) {
+export function DashboardNavbar({ className, onSettingsClick }: DashboardNavbarProps) {
   return (
     <header
       className={cn('w-full bg-background pb-2 pt-4 sm:pb-3 sm:pt-5', className)}
@@ -46,61 +31,15 @@ export function DashboardNavbar({
           <p className="hidden truncate text-sm text-muted-foreground md:max-w-xs lg:inline lg:max-w-sm">
             Manage your homeserver settings and monitor usage
           </p>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/[0.08]"
-                aria-label="Settings"
-              >
-                <Settings className="size-6" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-38">
-              <DropdownMenuLabel>Settings</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onSettingsClick}>
-                <span>Configuration</span>
-              </DropdownMenuItem>
-              {(onRestartServer || onShutdownServer) && (
-                <div className="flex items-center gap-0 p-1">
-                  {onRestartServer && (
-                    <DropdownMenuItem asChild className="flex-1 p-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRestartServer();
-                        }}
-                        aria-label="Restart Homeserver"
-                      >
-                        <RotateCw className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuItem>
-                  )}
-                  {onShutdownServer && (
-                    <DropdownMenuItem asChild className="flex-1 p-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onShutdownServer();
-                        }}
-                        aria-label="Shutdown Homeserver"
-                      >
-                        <Power className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuItem>
-                  )}
-                </div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/[0.08]"
+            aria-label="Homeserver Configuration"
+            onClick={onSettingsClick}
+          >
+            <Settings className="size-6" />
+          </Button>
         </div>
       </nav>
     </header>
