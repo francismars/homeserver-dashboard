@@ -42,19 +42,19 @@ export function DashboardNavbar({
         </div>
 
         {/* Right: tagline + settings button */}
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-4 sm:gap-6">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-8 sm:gap-10">
           <p className="hidden truncate text-sm text-muted-foreground md:max-w-xs lg:inline lg:max-w-sm">
             Manage your homeserver settings and monitor usage
           </p>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-full border border-border bg-secondary/80 text-foreground hover:bg-secondary sm:h-10 sm:w-10"
+                className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/[0.08]"
                 aria-label="Settings"
               >
-                <Settings className="size-4 sm:size-5" />
+                <Settings className="size-6" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-38">
