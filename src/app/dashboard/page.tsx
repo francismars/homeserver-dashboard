@@ -45,11 +45,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background text-foreground">
       <main>
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 sm:gap-3 sm:px-6 sm:py-10">
-          <DashboardNavbar
-            onSettingsClick={handleSettingsClick}
-            onRestartServer={handleRestartServer}
-            onShutdownServer={handleShutdownServer}
-          />
+          <DashboardNavbar onSettingsClick={handleSettingsClick} />
 
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-5">
