@@ -903,7 +903,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
       <Dialog open={showDeleteByPathDialog} onOpenChange={setShowDeleteByPathDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete</DialogTitle>
+            <DialogTitle>Delete by path</DialogTitle>
             <DialogDescription>
               Paste an entry path to delete (destructive). You can paste a full URL or a path like{' '}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">/dav/&lt;pubkey&gt;/pub/file.txt</code>.
@@ -962,10 +962,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Will delete:{' '}
-              <code className="rounded bg-muted px-1 py-0.5">{normalizeAdminDeletePath(deleteByPathInput) || '-'}</code>
-            </p>
           </div>
 
           <DialogFooter>
