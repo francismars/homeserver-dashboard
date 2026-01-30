@@ -10,9 +10,9 @@ import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
-import { InvitesDialog } from '@/components/organisms/InvitesDialog';
+import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug } from 'lucide-react';
+import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug, Gift } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -21,7 +21,6 @@ export default function DashboardPage() {
     useAdminActions();
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [isInvitesDialogOpen, setIsInvitesDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
 
   const handleSettingsClick = useCallback(() => {
@@ -48,7 +47,7 @@ export default function DashboardPage() {
           <DashboardNavbar onSettingsClick={handleSettingsClick} />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-5">
+            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-6">
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -56,6 +55,10 @@ export default function DashboardPage() {
               <TabsTrigger value="users" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Users className="shrink-0" />
                 Users
+              </TabsTrigger>
+              <TabsTrigger value="invites" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
+                <Gift className="shrink-0" />
+                Invites
               </TabsTrigger>
               <TabsTrigger value="files" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Files className="shrink-0" />
@@ -80,9 +83,20 @@ export default function DashboardPage() {
                 onDisableUser={disableUser}
                 onEnableUser={enableUser}
                 isDisablingUser={isDisablingUser}
-                onOpenInvites={() => setIsInvitesDialogOpen(true)}
                 numUsersTotal={info?.num_users}
                 numDisabledUsers={info?.num_disabled_users}
+              />
+            </TabsContent>
+
+            <TabsContent value="invites" className="space-y-4">
+              <InviteManagement
+                invites={generatedInvites}
+                onGenerate={handleGenerateInvite}
+                isGenerating={isGeneratingInvite}
+                signupCodesTotal={info?.num_signup_codes}
+                signupCodesUnused={info?.num_unused_signup_codes}
+                isStatsLoading={infoLoading}
+                homeserverPubkey={info?.public_key ?? info?.pubkey}
               />
             </TabsContent>
 
@@ -106,19 +120,6 @@ export default function DashboardPage() {
 
           {/* Config Dialog */}
           <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} />
-
-          {/* Invites Dialog */}
-          <InvitesDialog
-            open={isInvitesDialogOpen}
-            onOpenChange={setIsInvitesDialogOpen}
-            invites={generatedInvites}
-            onGenerate={handleGenerateInvite}
-            isGenerating={isGeneratingInvite}
-            signupCodesTotal={info?.num_signup_codes}
-            signupCodesUnused={info?.num_unused_signup_codes}
-            isStatsLoading={infoLoading}
-            homeserverPubkey={info?.public_key ?? info?.pubkey}
-          />
 
           {/* Server Control Dialog */}
           <ServerControlDialog
