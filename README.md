@@ -6,21 +6,16 @@ The UI lives under a single route: **`/dashboard`** (the home page redirects the
 
 ## Current UI
 
-The dashboard has 5 tabs:
+The dashboard has 6 tabs:
 
 - **Overview**: Shows homeserver stats from `GET /info` including connection status, public key, addresses, version, and user/storage statistics
-- **Users**:
-  - Generate signup tokens (invites) via `GET /generate_signup_token` with QR code display for easy mobile app signup
-  - Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`
-  - Shows a **mock** "disabled users list" (the count comes from `/info`, but the list entries are mock until there's an API)
-- **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth)
+- **Users**: Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`. Shows a **mock** "disabled users list" (the count comes from `/info`, but the list entries are mock until there's an API)
+- **Invites**: Generate signup tokens via `GET /generate_signup_token` with QR code display for easy mobile app signup; view invite statistics (total generated, used, unused)
+- **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth). Includes admin "Delete from path" for removing entries by path
 - **Logs**: Mock log viewer (no backend logs API wired yet)
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
 
-Also in the navbar "Settings" menu:
-
-- **Configuration**: Mock, read-only TOML viewer (no real config endpoints yet)
-- **Restart / Shutdown**: Mock dialogs (no backend control endpoint yet)
+The navbar **Settings** (gear) button opens **Homeserver Configuration**: read-only TOML viewer (no real config endpoints yet). Restart / Shutdown dialogs exist in code but are not currently exposed in the UI.
 
 ## Prerequisites
 
