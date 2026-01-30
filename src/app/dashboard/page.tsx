@@ -12,7 +12,7 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { ExternalLink, Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug, Gift } from 'lucide-react';
+import { Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug, Gift } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
