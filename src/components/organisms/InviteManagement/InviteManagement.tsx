@@ -150,7 +150,6 @@ export function InviteManagement({
                   </>
                 ) : (
                   <>
-                    <Plus className="mr-2 h-4 w-4" />
                     Create invite
                   </>
                 )}
@@ -219,16 +218,16 @@ export function InviteManagement({
                             </div>
                             <span className="text-xs text-muted-foreground">QR code</span>
                           </div>
-                          <div className="min-w-0 flex-1 space-y-3">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
                               <code className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
                                 {signupUrl}
                               </code>
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
                                 onClick={() => handleCopyUrl(invite, index)}
-                                className="h-8 shrink-0 gap-1.5"
+                                className="h-8 w-8 shrink-0"
                                 title={copiedUrlIndex === index ? 'Copied' : 'Copy URL'}
                               >
                                 {copiedUrlIndex === index ? (
@@ -236,24 +235,8 @@ export function InviteManagement({
                                 ) : (
                                   <Copy className="h-4 w-4" />
                                 )}
-                                <span className="text-xs">
-                                  {copiedUrlIndex === index ? 'Copied' : 'Copy URL'}
-                                </span>
                               </Button>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopy(invite, index)}
-                              className="text-xs"
-                            >
-                              {copiedIndex === index ? (
-                                <Check className="mr-1.5 h-3.5 w-3.5" />
-                              ) : (
-                                <Copy className="mr-1.5 h-3.5 w-3.5" />
-                              )}
-                              {copiedIndex === index ? 'Code copied' : 'Copy code only'}
-                            </Button>
                           </div>
                         </div>
                       </div>
