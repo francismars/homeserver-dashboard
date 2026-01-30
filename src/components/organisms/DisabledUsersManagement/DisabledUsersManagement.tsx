@@ -14,14 +14,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { Check, ClipboardPaste, Copy, Info, Search, ShieldBan, UserRoundPlus } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, Info, Search, ShieldBan } from 'lucide-react';
 import type { User } from '@/services/user/user.types';
 
 export type DisabledUsersManagementProps = {
   onDisableUser: (pubkey: string) => Promise<void>;
   onEnableUser: (pubkey: string) => Promise<void>;
   isDisablingUser?: boolean;
-  onOpenInvites?: () => void;
   numUsersTotal?: number;
   numDisabledUsers?: number;
 };
@@ -46,7 +45,6 @@ export function DisabledUsersManagement({
   onDisableUser,
   onEnableUser,
   isDisablingUser = false,
-  onOpenInvites,
   numUsersTotal,
   numDisabledUsers,
 }: DisabledUsersManagementProps) {
@@ -175,18 +173,11 @@ export function DisabledUsersManagement({
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
               <CardDescription className="text-xs sm:text-sm">Manage invites and user access</CardDescription>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {typeof numUsersTotal === 'number' && (
-                <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-                  Users: {numUsersTotal}
-                </Badge>
-              )}
-              {onOpenInvites && (
-                <Button variant="outline" size="sm" onClick={onOpenInvites} title="Invites" aria-label="Invites">
-                  <UserRoundPlus className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+            {typeof numUsersTotal === 'number' && (
+              <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+                Users: {numUsersTotal}
+              </Badge>
+            )}
           </div>
         </CardHeader>
 
