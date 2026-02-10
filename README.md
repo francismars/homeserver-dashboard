@@ -15,7 +15,7 @@ The dashboard has 6 tabs:
 - **Logs**: Mock log viewer (no backend logs API wired yet)
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
 
-The navbar **Settings** (gear) button opens **Homeserver Configuration**: read-only TOML viewer (no real config endpoints yet). Restart / Shutdown dialogs exist in code but are not currently exposed in the UI.
+The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config** (read-only view of the real `config.toml` with sensitive fields redacted) and **Cloudflare** (configure Cloudflare Tunnel token and domain for public access without port forwarding).
 
 ## Prerequisites
 
@@ -103,10 +103,11 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 
 ### Environment Variables
 
-| Variable          | Description                   | Required | Default | Notes                                    |
-| ----------------- | ----------------------------- | -------- | ------- | ---------------------------------------- |
-| `ADMIN_BASE_URL`  | Homeserver admin API base URL | Yes\*    | -       | Server-only (not exposed to client)      |
-| `ADMIN_TOKEN`     | Admin password/token          | Yes\*    | -       | Server-only (not exposed to client)     |
+| Variable                  | Description                          | Required | Default                              | Notes                               |
+| ------------------------- | ------------------------------------ | -------- | ------------------------------------ | ----------------------------------- |
+| `ADMIN_BASE_URL`          | Homeserver admin API base URL        | Yes\*    | -                                    | Server-only (not exposed to client) |
+| `ADMIN_TOKEN`             | Admin password/token                 | Yes\*    | -                                    | Server-only (not exposed to client) |
+| `HOMESERVER_CONFIG_PATH`  | Path to homeserver `config.toml`     | No       | `/app/homeserver-data/config.toml`   | For non-Docker setups               |
 
 \* Required to use the real homeserver APIs
 
