@@ -17,6 +17,11 @@ export type AdminInfo = AdminInfoResponse; // Alias for backward compatibility
 
 export type DeleteUrlRequest = { path: string };
 export type DisableUserRequest = { pubkey: string };
+export type DisabledUser = { pubkey: string };
+export type DisabledUsersResponse = {
+  items: DisabledUser[];
+  next_cursor: string | null;
+};
 export type GenerateInviteResponse = { token: string };
 export type AdminUsageResponse = {
   usersTotal: number;

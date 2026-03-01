@@ -1,5 +1,6 @@
 import {
   AdminConfig,
+  DisabledUsersResponse,
   AdminInfo,
   AdminServiceDeps,
   DeleteUrlRequest,
@@ -12,7 +13,7 @@ export class AdminService {
   private baseUrl: string;
   private token?: string;
 
-  constructor({ baseUrl, token }: AdminServiceDeps) {
+  constructor({ baseUrl: _baseUrl, token: _token }: AdminServiceDeps) {
     // Use API route instead of direct homeserver URL
     // Token is handled server-side, not sent from client
     this.baseUrl = '/api/admin';
@@ -31,6 +32,7 @@ export class AdminService {
       const res = await fetch(`${this.baseUrl}${path}`, {
         ...init,
         headers,
+        cache: 'no-store',
       });
 
       if (!res.ok) {
@@ -69,9 +71,16 @@ export class AdminService {
     return this.request<AdminInfo>('/info');
   }
 
+  async getDisabledUsers(limit = 20, cursor?: string): Promise<DisabledUsersResponse> {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    if (cursor) params.set('cursor', cursor);
+    return this.request<DisabledUsersResponse>(`/users/disabled?${params.toString()}`);
+  }
+
   async generateInvite(): Promise<GenerateInviteResponse> {
     // Use API route which handles token server-side
-    const res = await fetch(`${this.baseUrl}/generate_signup_token`);
+    const res = await fetch(`${this.baseUrl}/generate_signup_token`, { cache: 'no-store' });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: `Failed to generate invite: ${res.status}` }));
       throw new Error(error.error || `Failed to generate invite: ${res.status}`);

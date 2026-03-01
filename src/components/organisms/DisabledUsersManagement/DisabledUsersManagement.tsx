@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
-import { Check, ClipboardPaste, Copy, Info, Search, ShieldBan } from 'lucide-react';
-import type { User } from '@/services/user/user.types';
+import { Check, ClipboardPaste, Copy, Search, ShieldBan } from 'lucide-react';
+import type { DisabledUser } from '@/services/admin/admin.types';
 
 export type DisabledUsersManagementProps = {
   onDisableUser: (pubkey: string) => Promise<void>;
@@ -23,23 +23,17 @@ export type DisabledUsersManagementProps = {
   isDisablingUser?: boolean;
   numUsersTotal?: number;
   numDisabledUsers?: number;
+  disabledUsers: DisabledUser[];
+  isLoadingDisabledUsers?: boolean;
+  isLoadingMoreDisabledUsers?: boolean;
+  hasMoreDisabledUsers?: boolean;
+  onLoadMoreDisabledUsers?: () => Promise<void> | void;
+  onRefreshDisabledUsers?: () => Promise<void> | void;
+  disabledUsersError?: string | null;
 };
 
 const formatDisplayName = (pubkey: string): string =>
   pubkey.length >= 12 ? `${pubkey.substring(0, 8)}...${pubkey.substring(pubkey.length - 4)}` : pubkey;
-
-const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
-const makeMockPubkey = (index: number): string => {
-  // 52-ish chars to resemble a real pubkey length, but clearly mock.
-  // "mock" prefix + 48 z-base-32 chars
-  let n = index + 1;
-  let s = '';
-  while (s.length < 48) {
-    s += ZBASE32[n % ZBASE32.length];
-    n = Math.floor(n / ZBASE32.length) + index + 7;
-  }
-  return `mock${s}`;
-};
 
 export function DisabledUsersManagement({
   onDisableUser,
@@ -47,6 +41,13 @@ export function DisabledUsersManagement({
   isDisablingUser = false,
   numUsersTotal,
   numDisabledUsers,
+  disabledUsers,
+  isLoadingDisabledUsers = false,
+  isLoadingMoreDisabledUsers = false,
+  hasMoreDisabledUsers = false,
+  onLoadMoreDisabledUsers,
+  onRefreshDisabledUsers,
+  disabledUsersError = null,
 }: DisabledUsersManagementProps) {
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [pubkeyToDisable, setPubkeyToDisable] = useState('');
@@ -54,34 +55,22 @@ export function DisabledUsersManagement({
   const [processingAction, setProcessingAction] = useState<'disable' | 'enable' | null>(null);
   const [copiedPubkey, setCopiedPubkey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Mock disabled users list (until we have an API). We intentionally use mock pubkeys only.
-  const [mockDisabledPubkeys, setMockDisabledPubkeys] = useState<string[]>([]);
-  const mockNextIndexRef = useRef(0);
-
-  const targetDisabledCount = useMemo(() => {
-    if (typeof numDisabledUsers === 'number') return Math.max(0, Math.floor(numDisabledUsers));
-    return 3;
-  }, [numDisabledUsers]);
-
-  // Keep the mock list sized to match the real num_disabled_users.
-  useEffect(() => {
-    mockNextIndexRef.current = targetDisabledCount;
-    setMockDisabledPubkeys(Array.from({ length: targetDisabledCount }, (_, i) => makeMockPubkey(i)));
-  }, [targetDisabledCount]);
-
-  const disabledUsers: User[] = useMemo(() => {
-    return mockDisabledPubkeys.map((pubkey) => ({
-      pubkey,
-      displayName: formatDisplayName(pubkey),
-    }));
-  }, [mockDisabledPubkeys]);
+  const disabledUsersWithDisplayName = useMemo(
+    () =>
+      disabledUsers.map((user) => ({
+        ...user,
+        displayName: formatDisplayName(user.pubkey),
+      })),
+    [disabledUsers],
+  );
 
   const filteredDisabledUsers = useMemo(() => {
-    if (!searchQuery) return disabledUsers;
+    if (!searchQuery) return disabledUsersWithDisplayName;
     const q = searchQuery.toLowerCase();
-    return disabledUsers.filter((u) => u.pubkey.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q));
-  }, [disabledUsers, searchQuery]);
+    return disabledUsersWithDisplayName.filter(
+      (u) => u.pubkey.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q),
+    );
+  }, [disabledUsersWithDisplayName, searchQuery]);
 
   const handlePaste = useCallback(async () => {
     try {
@@ -112,12 +101,15 @@ export function DisabledUsersManagement({
       await onDisableUser(pubkey);
       setPubkeyToDisable('');
       setIsAccessDialogOpen(false);
+      if (onRefreshDisabledUsers) {
+        await onRefreshDisabledUsers();
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to disable user');
     } finally {
       setProcessingAction(null);
     }
-  }, [pubkeyToDisable, onDisableUser]);
+  }, [pubkeyToDisable, onDisableUser, onRefreshDisabledUsers]);
 
   const handleEnableByPubkey = useCallback(async () => {
     const pubkey = pubkeyToDisable.trim();
@@ -132,34 +124,32 @@ export function DisabledUsersManagement({
       await onEnableUser(pubkey);
       setPubkeyToDisable('');
       setIsAccessDialogOpen(false);
+      if (onRefreshDisabledUsers) {
+        await onRefreshDisabledUsers();
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Failed to enable user');
     } finally {
       setProcessingAction(null);
     }
-  }, [pubkeyToDisable, onEnableUser]);
+  }, [pubkeyToDisable, onEnableUser, onRefreshDisabledUsers]);
 
   const handleEnableUser = useCallback(
     async (pubkey: string) => {
       setProcessingAction('enable');
       setLocalError(null);
       try {
-        // This list is mock, so we don't call the backend with mock pubkeys.
-        // Instead, we rotate the mock list while preserving the real count.
-        setMockDisabledPubkeys((prev) => {
-          const next = prev.filter((p) => p !== pubkey);
-          while (next.length < targetDisabledCount) {
-            next.push(makeMockPubkey(mockNextIndexRef.current++));
-          }
-          return next.slice(0, targetDisabledCount);
-        });
+        await onEnableUser(pubkey);
+        if (onRefreshDisabledUsers) {
+          await onRefreshDisabledUsers();
+        }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to enable user');
       } finally {
         setProcessingAction(null);
       }
     },
-    [targetDisabledCount],
+    [onEnableUser, onRefreshDisabledUsers],
   );
 
   const isProcessing = processingAction !== null;
@@ -191,17 +181,13 @@ export function DisabledUsersManagement({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="text-sm font-medium">Disabled Users</div>
-                  <Badge variant="outline" className="border-dashed text-xs font-normal">
-                    <Info className="mr-1 h-3 w-3" />
-                    Soon
-                  </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">List of disabled users</div>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="secondary" className="shrink-0 text-xs">
-                  Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsers.length}
+                  Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsersWithDisplayName.length}
                 </Badge>
                 <Button
                   variant="outline"
@@ -220,7 +206,7 @@ export function DisabledUsersManagement({
             </div>
 
             <div className="space-y-3">
-              {disabledUsers.length > 0 && (
+              {disabledUsersWithDisplayName.length > 0 && (
                 <div className="relative">
                   <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -262,12 +248,23 @@ export function DisabledUsersManagement({
                 </div>
               )}
 
-              {filteredDisabledUsers.length === 0 ? (
+              {disabledUsersError && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{disabledUsersError}</AlertDescription>
+                </Alert>
+              )}
+
+              {isLoadingDisabledUsers ? (
+                <div className="py-8 text-center text-muted-foreground">Loading disabled users...</div>
+              ) : null}
+
+              {!isLoadingDisabledUsers && filteredDisabledUsers.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   <ShieldBan className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                  <p>{disabledUsers.length === 0 ? 'No disabled users' : 'No matches'}</p>
+                  <p>{disabledUsersWithDisplayName.length === 0 ? 'No disabled users' : 'No matches'}</p>
                 </div>
-              ) : (
+              ) : !isLoadingDisabledUsers ? (
                 <div className="space-y-2">
                   {filteredDisabledUsers.map((user) => (
                     <div
@@ -306,6 +303,20 @@ export function DisabledUsersManagement({
                       </Button>
                     </div>
                   ))}
+                </div>
+              ) : null}
+
+              {hasMoreDisabledUsers && onLoadMoreDisabledUsers && (
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void onLoadMoreDisabledUsers()}
+                    disabled={isLoadingMoreDisabledUsers}
+                    className="w-full sm:w-auto"
+                  >
+                    {isLoadingMoreDisabledUsers ? 'Loading...' : 'Load more'}
+                  </Button>
                 </div>
               )}
             </div>

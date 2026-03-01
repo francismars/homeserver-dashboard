@@ -51,6 +51,13 @@ const ADMIN_ENDPOINTS: ApiEndpoint[] = [
     requiresAuth: true,
   },
   {
+    method: 'GET',
+    path: '/users/disabled?limit=20',
+    description: 'List disabled users with cursor pagination',
+    server: 'admin',
+    requiresAuth: true,
+  },
+  {
     method: 'DELETE',
     path: '/webdav/{pubkey}/pub/example.txt',
     description: 'Delete a file or entry by WebDAV path',
@@ -179,7 +186,7 @@ const METRICS_ENDPOINTS: ApiEndpoint[] = [
   },
 ];
 
-export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, adminToken }: ApiExplorerProps) {
+export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, adminToken: _adminToken }: ApiExplorerProps) {
   const [selectedServer, setSelectedServer] = useState<'admin' | 'client' | 'metrics'>('admin');
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
   const [customMethod, setCustomMethod] = useState<
