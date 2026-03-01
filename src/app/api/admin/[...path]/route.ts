@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -67,6 +69,7 @@ async function proxyRequest(
 
     const response = await fetch(url.toString(), {
       method,
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         'X-Admin-Password': token,
@@ -88,6 +91,9 @@ async function proxyRequest(
       status: response.status,
       headers: {
         'Content-Type': contentType,
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
   } catch (error) {

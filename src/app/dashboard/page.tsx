@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAdminInfo, useAdminActions } from '@/hooks/admin';
+import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
@@ -17,8 +17,25 @@ import Link from 'next/link';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
-  const { disableUser, enableUser, generateInvite, isGeneratingInvite, isDisablingUser, generatedInvites } =
-    useAdminActions();
+  const {
+    disableUser,
+    enableUser,
+    generateInvite,
+    isGeneratingInvite,
+    isDisablingUser,
+    isEnablingUser,
+    generatedInvites,
+  } = useAdminActions();
+  const {
+    items: disabledUsers,
+    nextCursor,
+    isLoading: isLoadingDisabledUsers,
+    isLoadingMore: isLoadingMoreDisabledUsers,
+    error: disabledUsersError,
+    refetch: refetchDisabledUsers,
+    loadMore: loadMoreDisabledUsers,
+    removeDisabledUserLocally,
+  } = useDisabledUsers();
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
@@ -27,18 +44,30 @@ export default function DashboardPage() {
     setIsConfigDialogOpen(true);
   }, []);
 
-  const handleRestartServer = useCallback(() => {
-    setServerControlAction('restart');
-  }, []);
-
-  const handleShutdownServer = useCallback(() => {
-    setServerControlAction('shutdown');
-  }, []);
-
   const handleGenerateInvite = useCallback(async () => {
     await generateInvite();
     await refetchInfo();
   }, [generateInvite, refetchInfo]);
+
+  const handleDisableUser = useCallback(
+    async (pubkey: string) => {
+      await disableUser(pubkey);
+      await Promise.all([refetchInfo(), refetchDisabledUsers()]);
+    },
+    [disableUser, refetchDisabledUsers, refetchInfo],
+  );
+
+  const handleEnableUser = useCallback(
+    async (pubkey: string) => {
+      removeDisabledUserLocally(pubkey);
+      try {
+        await enableUser(pubkey);
+      } finally {
+        await Promise.all([refetchInfo(), refetchDisabledUsers()]);
+      }
+    },
+    [enableUser, refetchDisabledUsers, refetchInfo, removeDisabledUserLocally],
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -80,11 +109,18 @@ export default function DashboardPage() {
 
             <TabsContent value="users" className="space-y-4">
               <DisabledUsersManagement
-                onDisableUser={disableUser}
-                onEnableUser={enableUser}
-                isDisablingUser={isDisablingUser}
+                onDisableUser={handleDisableUser}
+                onEnableUser={handleEnableUser}
+                isDisablingUser={isDisablingUser || isEnablingUser}
                 numUsersTotal={info?.num_users}
                 numDisabledUsers={info?.num_disabled_users}
+                disabledUsers={disabledUsers}
+                isLoadingDisabledUsers={isLoadingDisabledUsers}
+                isLoadingMoreDisabledUsers={isLoadingMoreDisabledUsers}
+                hasMoreDisabledUsers={Boolean(nextCursor)}
+                onLoadMoreDisabledUsers={loadMoreDisabledUsers}
+                onRefreshDisabledUsers={refetchDisabledUsers}
+                disabledUsersError={disabledUsersError?.message ?? null}
               />
             </TabsContent>
 
