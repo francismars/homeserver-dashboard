@@ -6,13 +6,15 @@
     "dev": "next dev --webpack -p 8080",
     "build": "next build --webpack",
     "start": "next start -p 8080",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .prettierignore",
     "knip": "knip",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -35,11 +37,13 @@
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.0.10",
     "@tailwindcss/postcss": "4.1.17",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "24.10.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
+    "@vitest/coverage-v8": "^4.0.15",
     "baseline-browser-mapping": "^2.9.19",
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.7",

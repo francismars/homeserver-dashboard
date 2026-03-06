@@ -137,7 +137,7 @@ export default function DashboardPage() {
             </TabsContent>
 
             <TabsContent value="files" className="space-y-4">
-              <FileBrowser initialPath="/" diskUsedMB={info?.total_disk_used_mb} />
+              <FileBrowser initialPath="/" diskUsedMB={info?.total_disk_used_mb} homeserverPubkey={info?.public_key ?? info?.pubkey} />
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4">

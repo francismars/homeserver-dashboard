@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RouteError, errorResponse } from '@/lib/server/errors';
+import { isAllowedPublicHostname } from '@/lib/server/hostname';
+import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const CHECK_TIMEOUT_MS = 8000;
-
-/**
- * Validates that the domain is a public hostname (no localhost, no IP) to avoid SSRF.
- */
-function isAllowedHostname(domain: string): boolean {
-  if (!domain || domain.length > 253) return false;
-  if (domain.startsWith('localhost') || domain.endsWith('.localhost')) return false;
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(domain)) return false; // IPv4
-  if (domain.includes(':')) return false; // IPv6 or port
-  if (!domain.includes('.')) return false; // need at least one dot for a public hostname
-  return true;
-}
+const ROUTE_NAME = '/api/public-health';
 
 /**
  * GET /api/public-health?domain=pubky.example.com
@@ -20,13 +12,36 @@ function isAllowedHostname(domain: string): boolean {
  * Used by the dashboard to show "Public URL reachable: yes/no".
  */
 export async function GET(request: NextRequest) {
+  const requestId = getRequestId(request);
+  const startedAt = Date.now();
   const domain = request.nextUrl.searchParams.get('domain');
   if (!domain) {
-    return NextResponse.json({ error: 'Missing domain' }, { status: 400 });
+    const error = new RouteError(400, 'bad_request', 'Missing domain');
+    logRouteError({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'GET',
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: error.message,
+    });
+    return errorResponse(error, requestId);
   }
   const normalized = domain.trim().toLowerCase();
-  if (!isAllowedHostname(normalized)) {
-    return NextResponse.json({ error: 'Domain not allowed' }, { status: 400 });
+  if (!isAllowedPublicHostname(normalized)) {
+    const error = new RouteError(400, 'bad_request', 'Domain not allowed');
+    logRouteError({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'GET',
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: error.message,
+      meta: { domainLength: normalized.length },
+    });
+    return errorResponse(error, requestId);
   }
 
   const url = `https://${normalized}`;
@@ -41,16 +56,37 @@ export async function GET(request: NextRequest) {
       headers: { 'User-Agent': 'Pubky-Homeserver-Dashboard/1' },
     });
     clearTimeout(timeout);
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: res.ok,
       status: res.status,
+      requestId,
     });
+    logRouteInfo({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'GET',
+      statusCode: 200,
+      durationMs: Date.now() - startedAt,
+      message: 'Public health probe completed',
+      meta: { ok: res.ok, upstreamStatus: res.status },
+    });
+    return response;
   } catch (e) {
     clearTimeout(timeout);
-    const message = e instanceof Error ? e.message : 'Request failed';
-    return NextResponse.json({
-      ok: false,
-      error: message,
+    const error =
+      e instanceof Error && e.name === 'AbortError'
+        ? new RouteError(504, 'timeout', 'Public URL probe timed out')
+        : new RouteError(502, 'upstream_error', 'Public URL probe failed');
+    logRouteError({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'GET',
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: e instanceof Error ? e.message : String(e),
+      meta: { domain: normalized },
     });
+    return errorResponse(error, requestId, 'Public URL probe failed');
   }
 }
