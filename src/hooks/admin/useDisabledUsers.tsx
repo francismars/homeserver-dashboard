@@ -27,6 +27,14 @@ export function useDisabledUsers() {
       setNextCursor(response.next_cursor);
     } catch (err) {
       if (!isMountedRef.current || fetchId !== fetchIdRef.current) return;
+      const status = typeof err === 'object' && err !== null && 'status' in err ? (err as { status?: number }).status : undefined;
+      if (status === 404) {
+        // Older homeserver builds may not expose disabled-users listing yet.
+        setItems([]);
+        setNextCursor(null);
+        setError(null);
+        return;
+      }
       setError(err instanceof Error ? err : new Error('Failed to load disabled users'));
     } finally {
       if (!isMountedRef.current || fetchId !== fetchIdRef.current) return;

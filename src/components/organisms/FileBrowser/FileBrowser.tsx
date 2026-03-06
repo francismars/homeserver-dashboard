@@ -41,7 +41,7 @@ type SortField = 'name' | 'size' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 type SortOption = { field: SortField; direction: SortDirection };
 
-export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps) {
+export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
   const [currentPath, setCurrentPath] = useState(initialPath);
@@ -83,9 +83,20 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
       const directory = await listDirectory(path);
       if (directory) {
         setFiles(directory.files);
+        return;
+      }
+
+      // Some deployments return 500 for root /dav/ listing; fall back to homeserver pub directory.
+      if (path === '/' && homeserverPubkey) {
+        const pubPath = `/${homeserverPubkey}/pub/`;
+        const pubDirectory = await listDirectory(pubPath);
+        if (pubDirectory) {
+          setCurrentPath(pubPath);
+          setFiles(pubDirectory.files);
+        }
       }
     },
-    [listDirectory],
+    [homeserverPubkey, listDirectory],
   );
 
   useEffect(() => {
@@ -384,6 +395,8 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
             <div className="relative sm:flex-1">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                id="file-browser-search"
+                aria-label="Search files"
                 placeholder="Search files"
                 className="pr-16 pl-9"
                 value={searchQuery}
@@ -397,6 +410,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                     className="h-6 w-6"
                     onClick={() => setSearchQuery('')}
                     title="Clear"
+                    aria-label="Clear search"
                   >
                     <span className="sr-only">Clear</span>✕
                   </Button>
@@ -414,6 +428,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       }
                     }}
                     title="Paste from clipboard"
+                    aria-label="Paste from clipboard into search"
                   >
                     <ClipboardPaste className="h-3.5 w-3.5" />
                   </Button>
@@ -480,10 +495,14 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                   <thead>
                     <tr className="border-b">
                       <th
-                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                        onClick={() => handleSort('type')}
+                        className="p-2 text-left text-sm font-semibold select-none"
                       >
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => handleSort('type')}
+                          aria-label="Sort files by name and type"
+                        >
                           <span>Name</span>
                           {sortOption.field === 'type' &&
                             (sortOption.direction === 'asc' ? (
@@ -491,13 +510,17 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                             ) : (
                               <ArrowDown className="h-3 w-3" />
                             ))}
-                        </div>
+                        </button>
                       </th>
                       <th
-                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                        onClick={() => handleSort('size')}
+                        className="p-2 text-left text-sm font-semibold select-none"
                       >
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => handleSort('size')}
+                          aria-label="Sort files by size"
+                        >
                           <span>Size</span>
                           {sortOption.field === 'size' &&
                             (sortOption.direction === 'asc' ? (
@@ -505,13 +528,17 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                             ) : (
                               <ArrowDown className="h-3 w-3" />
                             ))}
-                        </div>
+                        </button>
                       </th>
                       <th
-                        className="cursor-pointer p-2 text-left text-sm font-semibold select-none hover:bg-muted/50"
-                        onClick={() => handleSort('date')}
+                        className="p-2 text-left text-sm font-semibold select-none"
                       >
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => handleSort('date')}
+                          aria-label="Sort files by modified date"
+                        >
                           <span>Modified</span>
                           {sortOption.field === 'date' &&
                             (sortOption.direction === 'asc' ? (
@@ -519,27 +546,28 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                             ) : (
                               <ArrowDown className="h-3 w-3" />
                             ))}
-                        </div>
+                        </button>
                       </th>
                       <th className="p-2 text-right text-sm font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAndSortedFiles.map((file) => (
-                      <tr
-                        key={file.path}
-                        className="cursor-pointer border-b hover:bg-muted/50"
-                        onClick={() => handleFileClick(file)}
-                      >
+                      <tr key={file.path} className="border-b hover:bg-muted/50">
                         <td className="p-2">
-                          <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            onClick={() => handleFileClick(file)}
+                            aria-label={`${file.isCollection ? 'Open folder' : 'Open file'} ${file.displayName}`}
+                          >
                             {file.isCollection ? (
                               <Folder className="h-4 w-4 text-brand" />
                             ) : (
                               <File className="h-4 w-4 text-muted-foreground" />
                             )}
                             <span className="truncate font-medium">{file.displayName}</span>
-                          </div>
+                          </button>
                         </td>
                         <td className="p-2 text-sm text-muted-foreground">
                           {file.isCollection ? '-' : formatFileSize(file.contentLength)}
@@ -558,6 +586,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                               }}
                               className="h-7 w-7 p-0"
                               title="Rename"
+                              aria-label={`Rename ${file.displayName}`}
                             >
                               <Pencil className="h-3 w-3" />
                             </Button>
@@ -571,6 +600,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                               }}
                               className="h-7 w-7 p-0"
                               title="Delete"
+                              aria-label={`Delete ${file.displayName}`}
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -587,8 +617,17 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                 {filteredAndSortedFiles.map((file) => (
                   <div
                     key={file.path}
-                    className="cursor-pointer rounded-md border bg-muted/50 p-3 hover:bg-muted"
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer rounded-md border bg-muted/50 p-3 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => handleFileClick(file)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        void handleFileClick(file);
+                      }
+                    }}
+                    aria-label={`${file.isCollection ? 'Open folder' : 'Open file'} ${file.displayName}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -618,6 +657,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                           }}
                           className="h-7 w-7 p-0"
                           title="Rename"
+                          aria-label={`Rename ${file.displayName}`}
                         >
                           <Pencil className="h-3 w-3" />
                         </Button>
@@ -631,6 +671,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                           }}
                           className="h-7 w-7 p-0"
                           title="Delete"
+                          aria-label={`Delete ${file.displayName}`}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -661,7 +702,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               />
             ) : (
               <div className="max-h-[50vh] overflow-auto rounded-md border bg-muted/50 p-3 sm:max-h-[60vh] sm:p-4">
-                <pre className="font-mono text-xs break-words whitespace-pre-wrap sm:text-sm">{fileContent}</pre>
+                <pre className="wrap-break-word font-mono text-xs whitespace-pre-wrap sm:text-sm">{fileContent}</pre>
               </div>
             )}
           </div>
@@ -692,9 +733,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>File Name</Label>
+              <Label htmlFor="new-file-name">File Name</Label>
               <div className="relative">
                 <Input
+                  id="new-file-name"
                   value={newFileName}
                   onChange={(e) => setNewFileName(e.target.value)}
                   placeholder="example.txt"
@@ -708,6 +750,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={() => setNewFileName('')}
                       title="Clear"
+                      aria-label="Clear file name"
                     >
                       <span className="sr-only">Clear</span>✕
                     </Button>
@@ -725,6 +768,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                         }
                       }}
                       title="Paste from clipboard"
+                      aria-label="Paste file name from clipboard"
                     >
                       <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
@@ -733,8 +777,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Content</Label>
+              <Label htmlFor="new-file-content">Content</Label>
               <Textarea
+                id="new-file-content"
                 value={newFileContent}
                 onChange={(e) => setNewFileContent(e.target.value)}
                 placeholder="File content..."
@@ -762,9 +807,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Directory Name</Label>
+              <Label htmlFor="new-directory-name">Directory Name</Label>
               <div className="relative">
                 <Input
+                  id="new-directory-name"
                   value={newDirName}
                   onChange={(e) => setNewDirName(e.target.value)}
                   placeholder="new-folder"
@@ -778,6 +824,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={() => setNewDirName('')}
                       title="Clear"
+                      aria-label="Clear directory name"
                     >
                       <span className="sr-only">Clear</span>✕
                     </Button>
@@ -795,6 +842,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                         }
                       }}
                       title="Paste from clipboard"
+                      aria-label="Paste directory name from clipboard"
                     >
                       <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
@@ -845,9 +893,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
               </Alert>
             )}
             <div className="space-y-2">
-              <Label>New Name</Label>
+              <Label htmlFor="rename-value">New Name</Label>
               <div className="relative">
                 <Input
+                  id="rename-value"
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   placeholder={fileToRename?.displayName}
@@ -866,6 +915,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={() => setRenameValue('')}
                       title="Clear"
+                      aria-label="Clear new name"
                     >
                       <span className="sr-only">Clear</span>✕
                     </Button>
@@ -883,6 +933,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                         }
                       }}
                       title="Paste from clipboard"
+                      aria-label="Paste new name from clipboard"
                     >
                       <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
@@ -918,9 +969,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
           )}
 
           <div className="space-y-2">
-            <Label>Path</Label>
+            <Label htmlFor="delete-by-path">Path</Label>
             <div className="relative">
               <Input
+                id="delete-by-path"
                 value={deleteByPathInput}
                 onChange={(e) => setDeleteByPathInput(e.target.value)}
                 placeholder="/dav/<pubkey>/pub/file.txt"
@@ -939,6 +991,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                     className="h-6 w-6 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                     onClick={() => setDeleteByPathInput('')}
                     title="Clear"
+                    aria-label="Clear path input"
                   >
                     <span className="sr-only">Clear</span>✕
                   </Button>
@@ -956,6 +1009,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB }: FileBrowserProps)
                       }
                     }}
                     title="Paste from clipboard"
+                    aria-label="Paste delete path from clipboard"
                   >
                     <ClipboardPaste className="h-3.5 w-3.5" />
                   </Button>

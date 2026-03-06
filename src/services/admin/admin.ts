@@ -20,6 +20,12 @@ export class AdminService {
     this.token = ''; // Not needed, handled by API route
   }
 
+  private createHttpError(message: string, status: number): Error & { status: number } {
+    const error = new Error(message) as Error & { status: number };
+    error.status = status;
+    return error;
+  }
+
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     // Always use API route - no need to check baseUrl
     try {
@@ -54,7 +60,7 @@ export class AdminService {
           }
         }
 
-        throw new Error(message);
+        throw this.createHttpError(message, res.status);
       }
 
       if (res.status === 204) return undefined as T;

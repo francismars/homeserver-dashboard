@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
+import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 export const dynamic = 'force-dynamic';
+const UPSTREAM_TIMEOUT_MS = 8000;
+const MAX_RETRIES = 2;
+
+function getForwardHeaders(request: NextRequest): Record<string, string> {
+  const allowlist = new Set(['accept', 'content-type', 'if-none-match', 'if-match', 'user-agent']);
+  const result: Record<string, string> = {};
+
+  for (const [rawKey, value] of request.headers.entries()) {
+    const key = rawKey.toLowerCase();
+    if (allowlist.has(key)) {
+      result[rawKey] = value;
+    }
+  }
+
+  return result;
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean): Promise<Response> {
+  let lastError: unknown;
+  const attempts = retryable ? MAX_RETRIES + 1 : 1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (!retryable || !isAbortError(error) || attempt === attempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
 
 export async function GET(
   request: NextRequest,
@@ -39,19 +75,24 @@ async function proxyRequest(
   pathSegments: string[],
   method: string
 ) {
-  // Read from server-only environment variables
+  const requestId = getRequestId(request);
+  const startedAt = Date.now();
+  const routeName = '/api/admin/[...path]';
   const baseUrl = process.env.ADMIN_BASE_URL;
   const token = process.env.ADMIN_TOKEN;
 
   if (!baseUrl || !token) {
-    console.error('Missing configuration:', { baseUrl, hasToken: !!token, envKeys: Object.keys(process.env).filter(k => k.includes('ADMIN')) });
-    return NextResponse.json(
-      { 
-        error: 'Admin API not configured. Set ADMIN_BASE_URL and ADMIN_TOKEN.',
-        details: { baseUrl: baseUrl || 'missing', hasToken: !!token }
-      },
-      { status: 500 }
-    );
+    const error = new RouteError(500, 'config_error', 'Homeserver admin API is not configured');
+    logRouteError({
+      requestId,
+      route: routeName,
+      method,
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: error.message,
+    });
+    return errorResponse(error, requestId);
   }
 
   const path = '/' + pathSegments.join('/');
@@ -63,30 +104,35 @@ async function proxyRequest(
   });
 
   try {
-    const body = method !== 'GET' && method !== 'HEAD' 
-      ? await request.text() 
-      : undefined;
-
-    const response = await fetch(url.toString(), {
-      method,
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Admin-Password': token,
-        // Forward other headers if needed
-        ...Object.fromEntries(
-          Object.entries(Object.fromEntries(request.headers.entries()))
-            .filter(([key]) => 
-              !['host', 'content-length'].includes(key.toLowerCase())
-            )
-        ),
+    const body = method !== 'GET' && method !== 'HEAD' ? await request.text() : undefined;
+    const response = await fetchWithRetry(
+      url.toString(),
+      {
+        method,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        headers: {
+          'X-Admin-Password': token,
+          ...getForwardHeaders(request),
+        },
+        body,
       },
-      body,
-    });
+      method === 'GET' || method === 'HEAD',
+    );
 
     const contentType = response.headers.get('Content-Type') || 'application/json';
     const data = await response.text();
-    
+    const durationMs = Date.now() - startedAt;
+    logRouteInfo({
+      requestId,
+      route: routeName,
+      method,
+      statusCode: response.status,
+      durationMs,
+      message: 'Admin proxy request completed',
+      meta: { path },
+    });
+
     return new NextResponse(data, {
       status: response.status,
       headers: {
@@ -94,28 +140,23 @@ async function proxyRequest(
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         Pragma: 'no-cache',
         Expires: '0',
+        'X-Request-Id': requestId,
       },
     });
   } catch (error) {
-    console.error('Proxy error:', {
-      error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-      errorStack: error instanceof Error ? error.stack : undefined,
-      baseUrl,
-      hasToken: !!token,
-      url: url.toString(),
-      method
+    const mapped = isAbortError(error)
+      ? new RouteError(504, 'timeout', 'Homeserver request timed out')
+      : new RouteError(502, 'upstream_error', 'Failed to connect to homeserver');
+    logRouteError({
+      requestId,
+      route: routeName,
+      method,
+      statusCode: mapped.status,
+      durationMs: Date.now() - startedAt,
+      errorType: mapped.type,
+      message: error instanceof Error ? error.message : String(error),
+      meta: { path, targetHost: new URL(baseUrl).host },
     });
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to connect to homeserver',
-        details: errorMessage,
-        baseUrl,
-        hasToken: !!token,
-        attemptedUrl: url.toString()
-      },
-      { status: 500 }
-    );
+    return errorResponse(mapped, requestId);
   }
 }

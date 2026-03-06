@@ -180,6 +180,7 @@ export function InviteManagement({
                           onClick={() => handleCopy(invite, index)}
                           className="h-8 w-8 shrink-0"
                           title={copiedIndex === index ? 'Copied' : 'Copy code'}
+                          aria-label={copiedIndex === index ? 'Copied invite code' : `Copy invite code ${index + 1}`}
                         >
                           {copiedIndex === index ? (
                             <Check className="h-4 w-4" />
@@ -194,6 +195,7 @@ export function InviteManagement({
                             onClick={() => setExpandedInviteIndex(isExpanded ? null : index)}
                             className="h-8 w-8"
                             title={isExpanded ? 'Hide QR Code' : 'Show QR Code'}
+                            aria-label={isExpanded ? 'Hide invite QR code' : 'Show invite QR code'}
                           >
                             {isExpanded ? (
                               <X className="h-4 w-4" />
@@ -229,6 +231,7 @@ export function InviteManagement({
                                 onClick={() => handleCopyUrl(invite, index)}
                                 className="h-8 w-8 shrink-0"
                                 title={copiedUrlIndex === index ? 'Copied' : 'Copy URL'}
+                                aria-label={copiedUrlIndex === index ? 'Copied invite URL' : `Copy invite URL ${index + 1}`}
                               >
                                 {copiedUrlIndex === index ? (
                                   <Check className="h-4 w-4" />

@@ -11,7 +11,7 @@ export function useWebDav() {
   const getService = useCallback((): WebDavService => {
     // WebDAV service now uses API routes, so credentials are handled server-side
     return new WebDavService({
-      baseUrl: '/api/webdav/dav', // API route handles /dav prefix
+      baseUrl: '/api/webdav', // API route handles /dav prefix
       username: 'admin', // Not used anymore, but kept for compatibility
       password: '', // Not used anymore, but kept for compatibility
     });

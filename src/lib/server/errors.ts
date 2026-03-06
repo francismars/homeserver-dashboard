@@ -1,0 +1,71 @@
+import { NextResponse } from 'next/server';
+
+export type ErrorType =
+  | 'bad_request'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'timeout'
+  | 'upstream_error'
+  | 'config_error'
+  | 'internal_error';
+
+export class RouteError extends Error {
+  status: number;
+  type: ErrorType;
+  publicMessage: string;
+
+  constructor(status: number, type: ErrorType, publicMessage: string, message?: string) {
+    super(message || publicMessage);
+    this.status = status;
+    this.type = type;
+    this.publicMessage = publicMessage;
+  }
+}
+
+export function isAbortError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return error.name === 'AbortError' || error.name === 'TimeoutError';
+  }
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    const name = String((error as { name?: unknown }).name);
+    return name === 'AbortError' || name === 'TimeoutError';
+  }
+  return false;
+}
+
+export function toRouteError(error: unknown, fallbackMessage: string = 'Request failed'): RouteError {
+  if (error instanceof RouteError) return error;
+  if (isAbortError(error)) return new RouteError(504, 'timeout', 'Request timed out', fallbackMessage);
+  return new RouteError(500, 'internal_error', 'An unexpected error occurred', fallbackMessage);
+}
+
+export function errorResponse(error: unknown, requestId: string, fallbackMessage?: string): NextResponse {
+  const routeError = toRouteError(error, fallbackMessage);
+  return NextResponse.json(
+    {
+      error: routeError.publicMessage,
+      type: routeError.type,
+      requestId,
+    },
+    { status: routeError.status },
+  );
+}
+
+export async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const raceResult = await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        controller.signal.addEventListener('abort', () => {
+          reject(new RouteError(504, 'timeout', 'Request timed out'));
+        });
+      }),
+    ]);
+    return raceResult;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
