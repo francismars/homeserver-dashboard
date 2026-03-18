@@ -7,9 +7,10 @@ import { cn } from '@/libs/utils';
 interface DashboardNavbarProps {
   className?: string;
   onSettingsClick?: () => void;
+  showSettingsButton?: boolean;
 }
 
-export function DashboardNavbar({ className, onSettingsClick }: DashboardNavbarProps) {
+export function DashboardNavbar({ className, onSettingsClick, showSettingsButton = true }: DashboardNavbarProps) {
   return (
     <header
       className={cn('w-full bg-background pb-2 pt-4 sm:pb-3 sm:pt-5', className)}
@@ -31,15 +32,17 @@ export function DashboardNavbar({ className, onSettingsClick }: DashboardNavbarP
           <p className="hidden truncate text-sm text-muted-foreground md:max-w-xs lg:inline lg:max-w-sm">
             Manage your homeserver settings and monitor usage
           </p>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/[0.08]"
-            aria-label="Homeserver Configuration"
-            onClick={onSettingsClick}
-          >
-            <Settings className="size-6" />
-          </Button>
+          {showSettingsButton && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/8"
+              aria-label="Homeserver Configuration"
+              onClick={onSettingsClick}
+            >
+              <Settings className="size-6" />
+            </Button>
+          )}
         </div>
       </nav>
     </header>

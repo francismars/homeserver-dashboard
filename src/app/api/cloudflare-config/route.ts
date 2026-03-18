@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
+import { constants as fsConstants, promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
@@ -10,12 +10,22 @@ const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config'
 const TOKEN_FILE = path.join(CONFIG_DIR, 'token');
 const DOMAIN_FILE = path.join(CONFIG_DIR, 'domain');
 
+async function isCloudflareConfigSupported(): Promise<boolean> {
+  try {
+    await fs.access(CONFIG_DIR, fsConstants.R_OK | fsConstants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * GET /api/cloudflare-config
  * Returns current Cloudflare domain (if set). Token is never returned.
  */
 export async function GET() {
   const startedAt = Date.now();
+  const supported = await isCloudflareConfigSupported();
   try {
     const domain = await fs.readFile(DOMAIN_FILE, 'utf-8').then((s) => s.trim()).catch(() => null);
     const hasToken = await fs
@@ -25,6 +35,7 @@ export async function GET() {
     const response = NextResponse.json({
       domain: domain || null,
       configured: !!(domain && hasToken),
+      supported,
     });
     logRouteInfo({
       requestId: crypto.randomUUID(),
@@ -33,7 +44,7 @@ export async function GET() {
       statusCode: 200,
       durationMs: Date.now() - startedAt,
       message: 'Cloudflare config read',
-      meta: { configured: !!(domain && hasToken) },
+      meta: { configured: !!(domain && hasToken), supported },
     });
     return response;
   } catch {
@@ -46,7 +57,7 @@ export async function GET() {
       errorType: 'internal_error',
       message: 'Cloudflare config read fallback',
     });
-    return NextResponse.json({ domain: null, configured: false });
+    return NextResponse.json({ domain: null, configured: false, supported: false });
   }
 }
 

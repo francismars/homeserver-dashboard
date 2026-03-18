@@ -1,18 +1,17 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
-import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { Github, BookOpen, HelpCircle, Home, Users, Files, Activity, Plug, Gift } from 'lucide-react';
+import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -39,6 +38,7 @@ export default function DashboardPage() {
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
+  const [canOpenSettings, setCanOpenSettings] = useState(true);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
@@ -69,14 +69,49 @@ export default function DashboardPage() {
     [enableUser, refetchDisabledUsers, refetchInfo, removeDisabledUserLocally],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const detectSettingsAvailability = async () => {
+      try {
+        const [configRes, cloudflareRes] = await Promise.all([
+          fetch('/api/server-config'),
+          fetch('/api/cloudflare-config'),
+        ]);
+
+        let isCloudflareSupported = false;
+        if (cloudflareRes.ok) {
+          const cloudflareData = (await cloudflareRes.json()) as { supported?: boolean };
+          isCloudflareSupported = Boolean(cloudflareData.supported);
+        }
+
+        const isConfigVisible = configRes.ok;
+        if (!cancelled) {
+          setCanOpenSettings(isConfigVisible || isCloudflareSupported);
+        }
+      } catch {
+        // Keep button visible when detection fails to avoid blocking access.
+        if (!cancelled) setCanOpenSettings(true);
+      }
+    };
+
+    void detectSettingsAvailability();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 py-6 sm:gap-3 sm:px-6 sm:py-10">
-          <DashboardNavbar onSettingsClick={handleSettingsClick} />
+          <DashboardNavbar
+            onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
+            showSettingsButton={canOpenSettings}
+          />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-6">
+            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-5">
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -92,10 +127,6 @@ export default function DashboardPage() {
               <TabsTrigger value="files" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Files className="shrink-0" />
                 Files
-              </TabsTrigger>
-              <TabsTrigger value="logs" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
-                <Activity className="shrink-0" />
-                Logs
               </TabsTrigger>
               <TabsTrigger value="api" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Plug className="shrink-0" />
@@ -140,10 +171,6 @@ export default function DashboardPage() {
               <FileBrowser initialPath="/" diskUsedMB={info?.total_disk_used_mb} homeserverPubkey={info?.public_key ?? info?.pubkey} />
             </TabsContent>
 
-            <TabsContent value="logs" className="space-y-4">
-              <DashboardLogs isLoading={infoLoading} error={infoError} />
-            </TabsContent>
-
             <TabsContent value="api" className="space-y-4">
               <ApiExplorer
                 adminBaseUrl="/api/admin"
@@ -155,7 +182,7 @@ export default function DashboardPage() {
           </Tabs>
 
           {/* Config Dialog */}
-          <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} />
+          {canOpenSettings && <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} />}
 
           {/* Server Control Dialog */}
           <ServerControlDialog
