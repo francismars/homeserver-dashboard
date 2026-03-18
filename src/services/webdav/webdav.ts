@@ -7,7 +7,7 @@ import type { WebDavFile, WebDavDirectory, WebDavServiceDeps, WebDavError } from
 export class WebDavService {
   private baseUrl: string;
 
-  constructor({ baseUrl, username, password }: WebDavServiceDeps) {
+  constructor({ baseUrl, username: _username, password: _password }: WebDavServiceDeps) {
     // Use API route instead of direct homeserver URL
     // Remove /dav from baseUrl if present, as the API route will add it
     let apiBaseUrl = '/api/webdav';

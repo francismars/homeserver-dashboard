@@ -210,6 +210,8 @@ export function DisabledUsersManagement({
                 <div className="relative">
                   <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
+                    id="disabled-users-search"
+                    aria-label="Search disabled users"
                     placeholder="Search disabled users"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -223,6 +225,7 @@ export function DisabledUsersManagement({
                         className="h-6 w-6"
                         onClick={() => setSearchQuery('')}
                         title="Clear"
+                        aria-label="Clear disabled users search"
                       >
                         <span className="sr-only">Clear</span>✕
                       </Button>
@@ -240,6 +243,7 @@ export function DisabledUsersManagement({
                           }
                         }}
                         title="Paste from clipboard"
+                        aria-label="Paste into disabled users search"
                       >
                         <ClipboardPaste className="h-3.5 w-3.5" />
                       </Button>
@@ -280,6 +284,7 @@ export function DisabledUsersManagement({
                             className="h-5 w-5 shrink-0 p-0"
                             onClick={() => handleCopyPubkey(user.pubkey)}
                             title="Copy full pubkey"
+                            aria-label={`Copy full pubkey for ${user.displayName}`}
                           >
                             {copiedPubkey === user.pubkey ? (
                               <Check className="h-3 w-3 text-green-600" />
@@ -354,11 +359,16 @@ export function DisabledUsersManagement({
           <div className="space-y-3 sm:space-y-4">
             {/* Pubkey field */}
             <div className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <label
+                htmlFor="user-pubkey-input"
+                className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+              >
                 User pubky
-              </div>
+              </label>
               <div className="flex items-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2.5">
                 <Input
+                  id="user-pubkey-input"
+                  aria-label="User pubkey input"
                   placeholder="Enter pubky"
                   value={pubkeyToDisable}
                   onChange={(e) => {
@@ -378,6 +388,7 @@ export function DisabledUsersManagement({
                         setLocalError(null);
                       }}
                       title="Clear"
+                      aria-label="Clear user pubkey"
                     >
                       <span className="sr-only">Clear</span>✕
                     </Button>
@@ -387,9 +398,10 @@ export function DisabledUsersManagement({
                       size="icon"
                       className="h-7 w-7 rounded-full bg-transparent text-muted-foreground hover:bg-muted/30"
                       onClick={handlePaste}
-                    title="Paste from clipboard"
-                  >
-                    <ClipboardPaste className="h-3.5 w-3.5" />
+                      title="Paste from clipboard"
+                      aria-label="Paste user pubkey from clipboard"
+                    >
+                      <ClipboardPaste className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>

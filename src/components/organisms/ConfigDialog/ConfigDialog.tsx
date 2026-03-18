@@ -17,7 +17,7 @@ import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/libs/utils';
 
 type Tab = 'config' | 'cloudflare';
-type CloudflareConfig = { domain: string | null; configured: boolean };
+type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'fail';
 
 interface ConfigDialogProps {
@@ -26,7 +26,8 @@ interface ConfigDialogProps {
 }
 
 export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('config');
+  const [activeTab, setActiveTab] = useState<Tab>('cloudflare');
+  const [isConfigTabVisible, setIsConfigTabVisible] = useState(false);
 
   // Config file state
   const [configValue, setConfigValue] = useState('');
@@ -35,6 +36,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
   const [isReloading, setIsReloading] = useState(false);
 
   // Cloudflare state
+  const [isCloudflareTabVisible, setIsCloudflareTabVisible] = useState(false);
   const [cfConfig, setCfConfig] = useState<CloudflareConfig | null>(null);
   const [cfLoading, setCfLoading] = useState(true);
   const [cfSaving, setCfSaving] = useState(false);
@@ -50,9 +52,14 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
       const res = await fetch('/api/server-config');
       const data = await res.json();
       if (!res.ok) {
+        // Hide config tab if the file is missing/unavailable in this environment.
+        if (res.status === 404) {
+          setIsConfigTabVisible(false);
+        }
         setConfigError(data.error || `HTTP ${res.status}`);
         setConfigValue('');
       } else {
+        setIsConfigTabVisible(true);
         setConfigValue(data.config || '');
       }
     } catch {
@@ -78,6 +85,17 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
     return () => { cancelled = true; };
   }, [open]);
 
+  // Ensure we never stay on hidden tabs
+  useEffect(() => {
+    if (activeTab === 'config' && !isConfigTabVisible) {
+      if (isCloudflareTabVisible) setActiveTab('cloudflare');
+      return;
+    }
+    if (activeTab === 'cloudflare' && !isCloudflareTabVisible) {
+      if (isConfigTabVisible) setActiveTab('config');
+    }
+  }, [activeTab, isConfigTabVisible, isCloudflareTabVisible]);
+
   // Fetch Cloudflare config when dialog opens
   useEffect(() => {
     if (!open) return;
@@ -88,11 +106,15 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
       .then((data: CloudflareConfig) => {
         if (!cancelled) {
           setCfConfig(data);
+          setIsCloudflareTabVisible(Boolean(data.supported));
           if (data.domain) setCfDomain(data.domain);
         }
       })
       .catch(() => {
-        if (!cancelled) setCfConfig({ domain: null, configured: false });
+        if (!cancelled) {
+          setCfConfig({ domain: null, configured: false, supported: false });
+          setIsCloudflareTabVisible(false);
+        }
       })
       .finally(() => {
         if (!cancelled) setCfLoading(false);
@@ -149,8 +171,8 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'config', label: 'Config' },
-    { id: 'cloudflare', label: 'Cloudflare' },
+    ...(isConfigTabVisible ? [{ id: 'config' as Tab, label: 'Config' }] : []),
+    ...(isCloudflareTabVisible ? [{ id: 'cloudflare' as Tab, label: 'Cloudflare' }] : []),
   ];
 
   return (
@@ -166,30 +188,37 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Minimal vertical tabs */}
-          <nav className="flex w-32 shrink-0 flex-col border-r border-border/50 py-4 pl-4 pr-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'relative py-2 text-left text-sm transition-colors',
-                  activeTab === tab.id
-                    ? 'font-medium text-brand'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {activeTab === tab.id && (
-                  <span className="absolute -left-4 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand" />
-                )}
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+          {tabs.length > 0 && (
+            <nav className="flex w-32 shrink-0 flex-col border-r border-border/50 py-4 pl-4 pr-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'relative py-2 text-left text-sm transition-colors',
+                    activeTab === tab.id
+                      ? 'font-medium text-brand'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {activeTab === tab.id && (
+                    <span className="absolute -left-4 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand" />
+                  )}
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          )}
 
           {/* Tab content */}
           <div className="flex flex-1 flex-col overflow-hidden p-6">
-            {activeTab === 'config' && (
+            {tabs.length === 0 && (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                Settings are not available in this environment.
+              </div>
+            )}
+
+            {activeTab === 'config' && isConfigTabVisible && (
               <div className="flex flex-1 flex-col gap-3 overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -230,7 +259,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
               </div>
             )}
 
-            {activeTab === 'cloudflare' && (
+            {activeTab === 'cloudflare' && isCloudflareTabVisible && (
               <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
                 {cfLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
