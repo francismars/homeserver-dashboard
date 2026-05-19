@@ -10,6 +10,18 @@ const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config'
 const TOKEN_FILE = path.join(CONFIG_DIR, 'token');
 const DOMAIN_FILE = path.join(CONFIG_DIR, 'domain');
 
+// Cloudflare tunnel tokens are opaque strings but they're not arbitrary: they're long
+// (>=64 chars in current formats), URL-safe, and never contain whitespace. Reject
+// anything obviously malformed to catch paste errors and prevent storing junk.
+const TOKEN_PATTERN = /^[A-Za-z0-9_.+/=-]+$/;
+const MIN_TOKEN_LENGTH = 32;
+const MAX_TOKEN_LENGTH = 2048;
+
+function isPlausibleCloudflareToken(token: string): boolean {
+  if (token.length < MIN_TOKEN_LENGTH || token.length > MAX_TOKEN_LENGTH) return false;
+  return TOKEN_PATTERN.test(token);
+}
+
 async function isCloudflareConfigSupported(): Promise<boolean> {
   try {
     await fs.access(CONFIG_DIR, fsConstants.R_OK | fsConstants.W_OK);
@@ -103,6 +115,21 @@ export async function POST(request: NextRequest) {
       errorType: error.type,
       message: error.message,
       meta: { domainLength: domain.length },
+    });
+    return errorResponse(error, requestId);
+  }
+
+  if (token && !isPlausibleCloudflareToken(token)) {
+    const error = new RouteError(400, 'bad_request', 'Invalid token');
+    logRouteError({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'POST',
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: error.message,
+      meta: { tokenLength: token.length },
     });
     return errorResponse(error, requestId);
   }

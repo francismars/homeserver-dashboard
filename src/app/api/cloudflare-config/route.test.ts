@@ -4,6 +4,9 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 
+const VALID_TOKEN = 'eyJhbGciOi-test.token_with.various-chars.123456789ABCdef=';
+const ANOTHER_VALID_TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 describe('cloudflare-config route', () => {
   const originalEnv = { ...process.env };
   let tmpDir: string;
@@ -41,7 +44,7 @@ describe('cloudflare-config route', () => {
 
   it('GET reports configured when both domain and token are present', async () => {
     await fs.writeFile(path.join(tmpDir, 'domain'), 'pubky.example.com');
-    await fs.writeFile(path.join(tmpDir, 'token'), 'sample-cf-token');
+    await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
     const { GET } = await loadRoute();
     const response = await GET();
     const payload = await response.json();
@@ -97,38 +100,55 @@ describe('cloudflare-config route', () => {
     const { POST } = await loadRoute();
     const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
       method: 'POST',
-      body: JSON.stringify({ domain: 'pubky.example.com', token: 't0k3n' }),
+      body: JSON.stringify({ domain: 'pubky.example.com', token: VALID_TOKEN }),
       headers: { 'content-type': 'application/json' },
     });
     const response = await POST(request);
     expect(response.status).toBe(200);
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('t0k3n');
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
   });
 
   it('POST only writes fields that are present in the body', async () => {
     await fs.writeFile(path.join(tmpDir, 'domain'), 'pre-existing.example.com');
-    await fs.writeFile(path.join(tmpDir, 'token'), 'pre-existing-token');
+    await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
     const { POST } = await loadRoute();
     const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
       method: 'POST',
-      body: JSON.stringify({ token: 'fresh-token' }),
+      body: JSON.stringify({ token: ANOTHER_VALID_TOKEN }),
       headers: { 'content-type': 'application/json' },
     });
     await POST(request);
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pre-existing.example.com');
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('fresh-token');
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(ANOTHER_VALID_TOKEN);
   });
 
   it('POST trims whitespace before storing', async () => {
     const { POST } = await loadRoute();
     const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
       method: 'POST',
-      body: JSON.stringify({ domain: '   pubky.example.com   ', token: '   t0k3n   ' }),
+      body: JSON.stringify({ domain: '   pubky.example.com   ', token: '   ' + VALID_TOKEN + '   ' }),
       headers: { 'content-type': 'application/json' },
     });
     await POST(request);
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('t0k3n');
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
+  });
+
+  it.each([
+    ['too short', 'short'],
+    ['contains whitespace', 'a'.repeat(20) + ' ' + 'a'.repeat(20)],
+    ['contains illegal chars', 'a'.repeat(20) + '!@#$' + 'a'.repeat(20)],
+  ])('POST rejects an implausible token (%s)', async (_label, badToken) => {
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ token: badToken }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    const payload = await response.json();
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('Invalid token');
   });
 });

@@ -24,6 +24,17 @@ function isRetryableMethod(method: string): boolean {
   return method === 'GET' || method === 'HEAD' || method === 'PROPFIND';
 }
 
+function ensureSafePathSegments(segments: string[]): void {
+  for (const segment of segments) {
+    if (segment === '.' || segment === '..') {
+      throw new RouteError(400, 'bad_request', 'Invalid path segment');
+    }
+    if (segment.includes('\0') || segment.includes('/') || segment.includes('\\')) {
+      throw new RouteError(400, 'bad_request', 'Invalid path segment');
+    }
+  }
+}
+
 function buildDavPath(pathSegments: string, actualMethod: string): string {
   const isDirectoryRequest = actualMethod === 'PROPFIND' || actualMethod === 'MKCOL';
   const needsTrailingSlash = isDirectoryRequest && pathSegments;
@@ -79,11 +90,12 @@ export async function proxyWebDavRequest(
     return errorResponse(error, requestId);
   }
 
-  const pathSegments = path.join('/');
   let actualMethod = method.toUpperCase();
   let webdavPath = '/dav/';
 
   try {
+    ensureSafePathSegments(path);
+    const pathSegments = path.join('/');
     actualMethod = getActualMethod(request, method);
     const allowedBodyMethods = new Set(['POST', 'PUT']);
     let body: string | undefined;
