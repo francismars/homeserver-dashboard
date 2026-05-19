@@ -10,6 +10,10 @@ export default defineConfig({
       provider: 'v8',
       include: [
         'src/app/api/admin/[...path]/route.ts',
+        'src/app/api/admin/generate_signup_token/route.ts',
+        'src/app/api/cloudflare-config/route.ts',
+        'src/app/api/public-health/route.ts',
+        'src/app/api/server-config/route.ts',
         'src/app/api/webdav/utils.ts',
         'src/hooks/admin/useAdminInfo.tsx',
         'src/hooks/admin/useDisabledUsers.tsx',
