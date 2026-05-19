@@ -34,15 +34,15 @@ export class WebDavService {
     }
 
     const url = `${this.baseUrl}${normalizedPath}`;
-    
+
     // For WebDAV methods that aren't standard HTTP methods, use POST with override header
     const method = init?.method || 'GET';
     const isWebDavMethod = ['PROPFIND', 'MKCOL', 'MOVE', 'COPY'].includes(method);
-    
+
     const headers: Record<string, string> = {
-      ...(Object.fromEntries(new Headers(init?.headers).entries())),
+      ...Object.fromEntries(new Headers(init?.headers).entries()),
     };
-    
+
     // Add method override header for WebDAV methods
     if (isWebDavMethod) {
       headers['X-HTTP-Method-Override'] = method;
@@ -167,7 +167,7 @@ export class WebDavService {
     }
     // Use relative path for destination header
     const destUrl = `${this.baseUrl}${normalizedDest}`;
-    
+
     await this.request(sourcePath, {
       method: 'MOVE',
       headers: {
@@ -192,7 +192,7 @@ export class WebDavService {
     }
     // Use relative path for destination header
     const destUrl = `${this.baseUrl}${normalizedDest}`;
-    
+
     await this.request(sourcePath, {
       method: 'COPY',
       headers: {

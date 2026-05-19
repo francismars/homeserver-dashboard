@@ -27,7 +27,10 @@ export async function GET() {
   const startedAt = Date.now();
   const supported = await isCloudflareConfigSupported();
   try {
-    const domain = await fs.readFile(DOMAIN_FILE, 'utf-8').then((s) => s.trim()).catch(() => null);
+    const domain = await fs
+      .readFile(DOMAIN_FILE, 'utf-8')
+      .then((s) => s.trim())
+      .catch(() => null);
     const hasToken = await fs
       .readFile(TOKEN_FILE, 'utf-8')
       .then((s) => s.trim().length > 0)

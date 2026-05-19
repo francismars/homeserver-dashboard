@@ -38,43 +38,27 @@ async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean
   throw lastError;
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   return proxyRequest(request, path, 'GET');
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   return proxyRequest(request, path, 'POST');
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   return proxyRequest(request, path, 'PUT');
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   return proxyRequest(request, path, 'DELETE');
 }
 
-async function proxyRequest(
-  request: NextRequest,
-  pathSegments: string[],
-  method: string
-) {
+async function proxyRequest(request: NextRequest, pathSegments: string[], method: string) {
   const requestId = getRequestId(request);
   const startedAt = Date.now();
   const routeName = '/api/admin/[...path]';
@@ -97,7 +81,7 @@ async function proxyRequest(
 
   const path = '/' + pathSegments.join('/');
   const url = new URL(path, baseUrl);
-  
+
   // Forward query parameters
   request.nextUrl.searchParams.forEach((value, key) => {
     url.searchParams.append(key, value);

@@ -1,13 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,9 +84,7 @@ export function InvitesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-[calc(100vw-2rem)] flex-col sm:max-w-[min(48rem,calc(100vw-4rem))]">
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">
-            Invite Management
-          </DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">Invite Management</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
             Generate signup tokens and view invite statistics
           </DialogDescription>
@@ -145,11 +137,7 @@ export function InvitesDialog({
                               className="h-8 w-8"
                               title={copiedIndex === index ? 'Copied!' : 'Copy Code'}
                             >
-                              {copiedIndex === index ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
+                              {copiedIndex === index ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                             </Button>
                             {signupUrl && (
                               <Button
@@ -159,11 +147,7 @@ export function InvitesDialog({
                                 className="h-8 w-8"
                                 title={isExpanded ? 'Hide QR Code' : 'Show QR Code'}
                               >
-                                {isExpanded ? (
-                                  <X className="h-4 w-4" />
-                                ) : (
-                                  <QrCode className="h-4 w-4" />
-                                )}
+                                {isExpanded ? <X className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
                               </Button>
                             )}
                           </div>
@@ -185,7 +169,7 @@ export function InvitesDialog({
                               {/* URL and Actions */}
                               <div className="flex-1 space-y-2">
                                 <div className="rounded-md bg-background p-2">
-                                  <code className="block break-all text-xs text-muted-foreground">{signupUrl}</code>
+                                  <code className="block text-xs break-all text-muted-foreground">{signupUrl}</code>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <Button
@@ -194,15 +178,7 @@ export function InvitesDialog({
                                     onClick={() => handleCopyUrl(invite, index)}
                                     className="text-xs"
                                   >
-                                    {copiedUrlIndex === index ? (
-                                      <>
-                                        URL Copied
-                                      </>
-                                    ) : (
-                                      <>
-                                        Copy URL
-                                      </>
-                                    )}
+                                    {copiedUrlIndex === index ? <>URL Copied</> : <>Copy URL</>}
                                   </Button>
                                   <Button
                                     variant="outline"
@@ -214,8 +190,8 @@ export function InvitesDialog({
                                   </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                  Share this QR code or URL with new users. They can scan it with the Pubky Ring app
-                                  to sign up.
+                                  Share this QR code or URL with new users. They can scan it with the Pubky Ring app to
+                                  sign up.
                                 </p>
                               </div>
                             </div>
@@ -286,7 +262,6 @@ export function InvitesDialog({
             </CardContent>
           </Card>
         </div>
-
       </DialogContent>
     </Dialog>
   );

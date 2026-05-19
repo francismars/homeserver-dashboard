@@ -55,7 +55,7 @@ async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean
 export async function proxyWebDavRequest(
   request: NextRequest,
   paramsPromise: Promise<{ path: string[] }>,
-  method: string
+  method: string,
 ) {
   const requestId = getRequestId(request);
   const startedAt = Date.now();

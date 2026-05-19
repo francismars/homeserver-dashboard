@@ -111,7 +111,7 @@ export default function DashboardPage() {
           />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="flex w-full flex-nowrap overflow-x-auto scrollbar-none md:grid md:grid-cols-5">
+            <TabsList className="scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid md:grid-cols-5">
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -168,7 +168,11 @@ export default function DashboardPage() {
             </TabsContent>
 
             <TabsContent value="files" className="space-y-4">
-              <FileBrowser initialPath="/" diskUsedMB={info?.total_disk_used_mb} homeserverPubkey={info?.public_key ?? info?.pubkey} />
+              <FileBrowser
+                initialPath="/"
+                diskUsedMB={info?.total_disk_used_mb}
+                homeserverPubkey={info?.public_key ?? info?.pubkey}
+              />
             </TabsContent>
 
             <TabsContent value="api" className="space-y-4">
@@ -202,9 +206,7 @@ export default function DashboardPage() {
                 <span className="text-xs">{info?.version ? `v${info.version}` : 'v0.1.0-dev'}</span>
               </div>
               <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
-                <span>
-                  Synonym Software, S.A. DE C.V. ©{new Date().getFullYear()}. All rights reserved.
-                </span>
+                <span>Synonym Software, S.A. DE C.V. ©{new Date().getFullYear()}. All rights reserved.</span>
               </div>
             </div>
 
