@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `public-health` route: use the shared `isAbortError` helper so jsdom `DOMException` instances are correctly mapped to a 504 timeout rather than falling through to a 502.
+
+### Security
+
+- WebDAV proxy now rejects path segments equal to `.`, `..`, or containing `\0`, `/`, or `\\` — defense-in-depth against path traversal on the homeserver `/dav/` endpoint.
+- `cloudflare-config` POST now validates the tunnel token (length 32–2048 chars, URL-safe character class) before persisting; prevents storing junk on paste errors.
+
+### Removed
+
+- `src/components/organisms/DashboardLogs/` — the mock Logs tab. The Logs tab was already absent from the dashboard page; the component was orphaned and held `generateMockLogs()` placeholder data. A real Logs tab will be reintroduced once the homeserver exposes a logs admin endpoint.
+- `src/services/user/` and `src/hooks/user/` — scaffold for an earlier user-listing approach that was never wired into the UI.
+- `src/components/ui/{dropdown-menu,scroll-area}.tsx` — unused Shadcn primitives.
+- `@radix-ui/react-dropdown-menu` and `@radix-ui/react-scroll-area` from dependencies — only consumed by the deleted UI primitives above.
 - `dashboard-ci.yml`: removed the stale `working-directory: homeserver-dashboard` block and corrected `cache-dependency-path` — the repo root is the dashboard, CI never ran correctly before.
 - `entrypoint.sh`: tightened Cloudflare config directory permissions from `0777`/`0666` to `0700`/`0600` so the tunnel token is not world-readable on a bind mount.
 - Dockerfile port: unified on `8080` to match `package.json` dev/start scripts (was `3000`).

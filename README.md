@@ -6,21 +6,22 @@ The UI lives under a single route: **`/dashboard`** (the home page redirects the
 
 ## Current UI
 
-The dashboard has 6 tabs:
+The dashboard has 5 tabs:
 
 - **Overview**: Shows homeserver stats from `GET /info` including connection status, public key, addresses, version, and user/storage statistics
 - **Users**: Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`. The disabled-users list is fetched live from the `/users/disabled` admin endpoint.
 - **Invites**: Generate signup tokens via `GET /generate_signup_token` with QR code display for easy mobile app signup; view invite statistics (total generated, used, unused)
 - **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth). Includes admin "Delete from path" for removing entries by path
-- **Logs**: Mock log viewer (no backend logs API wired yet)
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
+
+> A real-time **Logs** tab will be added once the homeserver exposes a logs admin endpoint; see `docs/AUDIT-2026-05-19.md` for the v1.0 punch list.
 
 The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config** (read-only view of the real `config.toml` with sensitive fields redacted) and **Cloudflare** (configure Cloudflare Tunnel token and domain for public access without port forwarding).
 
 ## Prerequisites
 
 - Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
-- A running Pubky homeserver (required for real data; some UI sections are still mock placeholders)
+- A running Pubky homeserver — every UI section above is wired to live admin endpoints
 
 ## Quick Start
 
