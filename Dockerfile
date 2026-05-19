@@ -41,10 +41,13 @@ RUN sed -i 's/\r$//' /tmp/entrypoint.sh && \
     mv /tmp/entrypoint.sh /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 8080
 
-ENV PORT=3000
+ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget --quiet --tries=1 --spider "http://localhost:${PORT}/api/public-health" || exit 1
 
 # Run as root initially to fix permissions, then drop to nextjs
 CMD ["/usr/local/bin/entrypoint.sh"]
