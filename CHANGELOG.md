@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-First commits under Pubky maintenance, following the takeover from the original contractor. See `docs/AUDIT-2026-05-19.md` for the inherited-state snapshot and `docs/pubky-core-endpoints.md` for the missing-endpoint work that gates v1.0.0.
+Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup, and a paste-ready spec for the four pubky-core admin endpoints still needed to ship mock-free (see `docs/pubky-core-endpoints.md`).
 
 ### Added
 
