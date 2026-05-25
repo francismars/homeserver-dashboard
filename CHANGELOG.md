@@ -7,12 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup, and a paste-ready spec for the four pubky-core admin endpoints still needed to ship mock-free (see `docs/pubky-core-endpoints.md`).
+Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup, and dashboard-direct logs + config editing via the shared data-dir bind mount.
 
 ### Added
 
+- `GET /api/capabilities` — runtime feature flags derived from filesystem accessibility (`{ logs, configWrite }`). Drives whether the UI renders the Logs tab and Config edit affordance, so the dashboard ships once and lights up new features automatically when the corresponding files become readable/writable.
+- `GET /api/logs` — JSON-line tail of `HOMESERVER_LOG_PATH`. Reverse-seek tail of the last 4 MB, parses each line as JSON (falls back to `{ raw }` for legacy/plain-text), `?level` filter, `?lines` clamped to [1, 5000], rotation-race tolerance with `partial: true` flag.
+- `POST /api/server-config` — atomic write (tmp + rename) with optimistic-concurrency `checksum` (409 with `current_checksum` on mismatch), TOML structural validation (required `[general]`, `[drive]`, `[admin]`, `[storage]`), and **redaction roundtrip protection**: the `"********"` placeholder for sensitive keys (`admin_password`, `database_url`) is never written to disk — the real value is preserved when the placeholder comes back from the redacted GET view.
+- `GET /api/server-config` extended to return `{ config, checksum, mtime, writable }` so the UI can drive optimistic concurrency, the conflict-recovery flow, and a "last modified on disk" footer.
+- `DashboardLogs` organism re-introduced (real implementation, no mock data) — monospaced viewport, color-coded level badges, level filter, pause / refresh / download-as-`.jsonl` controls, polls every 5s while the tab is mounted.
+- `ConfigDialog` upgraded for write mode — Edit/Cancel/Save buttons (gated on `configWrite`), conflict banner with one-click force-save, success banner pointing the user at Umbrel restart, "last modified on disk" footer.
+- `useCapabilities` hook (`src/hooks/admin/useCapabilities.tsx`) — fetches `/api/capabilities` every 30s, tolerates blips by keeping the previous snapshot.
 - `GET /api/health` — dedicated liveness endpoint used by the Dockerfile HEALTHCHECK and any orchestrator probes. Always returns `200 { ok: true }`; does not consult downstream services.
-- Vitest coverage for `cloudflare-config`, `server-config`, `public-health`, `admin/generate_signup_token`, and `health` route handlers (test count: 12 → 53; file coverage: 5 → 10).
+- Vitest coverage for `cloudflare-config`, `server-config` (incl. POST + redaction roundtrip), `public-health`, `admin/generate_signup_token`, `capabilities`, `logs`, and `health` route handlers (test count: 12 → 83; file coverage: 5 → 12).
+- `smol-toml` promoted from transitive to explicit dependency (used by `/api/server-config` POST for TOML structural validation).
 - `LICENSE` (MIT, matching pubky-core).
 - `CHANGELOG.md` following Keep a Changelog.
 - `CONTRIBUTORS.md` crediting the original contractor.
