@@ -51,21 +51,3 @@ export function errorResponse(error: unknown, requestId: string, fallbackMessage
     { status: routeError.status },
   );
 }
-
-export async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const raceResult = await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        controller.signal.addEventListener('abort', () => {
-          reject(new RouteError(504, 'timeout', 'Request timed out'));
-        });
-      }),
-    ]);
-    return raceResult;
-  } finally {
-    clearTimeout(timeout);
-  }
-}

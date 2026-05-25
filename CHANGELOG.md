@@ -34,7 +34,10 @@ Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code
 - `src/components/organisms/DashboardLogs/` — the orphaned mock Logs tab. The dashboard page no longer has a Logs tab; the component held `generateMockLogs()` placeholder data with no consumer. A real Logs tab will be reintroduced once the homeserver exposes a logs admin endpoint.
 - `src/services/user/` and `src/hooks/user/` — scaffold for an earlier user-listing approach that was never wired into the UI (and held seven `console.log` debugging statements).
 - `src/components/ui/{dropdown-menu,scroll-area}.tsx` — unused Shadcn primitives.
+- `src/components/molecules/Logo/` and `src/components/organisms/InvitesDialog/` — both flagged by `knip` as having zero consumers and held mock placeholder data. New components will be authored against real endpoints in follow-up PRs.
+- `withTimeout` (in `src/lib/server/errors.ts`) and `logRouteWarn` (in `src/lib/server/logger.ts`) — unused exports.
 - `@radix-ui/react-dropdown-menu` and `@radix-ui/react-scroll-area` from dependencies — only consumed by the deleted UI primitives above.
+- `baseline-browser-mapping` from devDependencies — transitive only, no direct consumer.
 
 ### Fixed
 
