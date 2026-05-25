@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
+import { useCapabilities } from '@/hooks/admin/useCapabilities';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
@@ -11,7 +12,8 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift } from 'lucide-react';
+import { DashboardLogs } from '@/components/organisms/DashboardLogs';
+import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -36,6 +38,7 @@ export default function DashboardPage() {
     removeDisabledUserLocally,
   } = useDisabledUsers();
 
+  const { logs: logsEnabled, configWrite: configWritable } = useCapabilities();
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
@@ -111,7 +114,11 @@ export default function DashboardPage() {
           />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid md:grid-cols-5">
+            <TabsList
+              className={`scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid ${
+                logsEnabled ? 'md:grid-cols-6' : 'md:grid-cols-5'
+              }`}
+            >
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -128,6 +135,16 @@ export default function DashboardPage() {
                 <Files className="shrink-0" />
                 Files
               </TabsTrigger>
+              {logsEnabled && (
+                <TabsTrigger
+                  value="logs"
+                  className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
+                  data-testid="tab-logs"
+                >
+                  <ScrollText className="shrink-0" />
+                  Logs
+                </TabsTrigger>
+              )}
               <TabsTrigger value="api" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Plug className="shrink-0" />
                 API
@@ -175,6 +192,12 @@ export default function DashboardPage() {
               />
             </TabsContent>
 
+            {logsEnabled && (
+              <TabsContent value="logs" className="space-y-4">
+                <DashboardLogs />
+              </TabsContent>
+            )}
+
             <TabsContent value="api" className="space-y-4">
               <ApiExplorer
                 adminBaseUrl="/api/admin"
@@ -186,7 +209,9 @@ export default function DashboardPage() {
           </Tabs>
 
           {/* Config Dialog */}
-          {canOpenSettings && <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} />}
+          {canOpenSettings && (
+            <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} writable={configWritable} />
+          )}
 
           {/* Server Control Dialog */}
           <ServerControlDialog
