@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RouteError, errorResponse } from '@/lib/server/errors';
+import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
@@ -73,10 +73,9 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (e) {
     clearTimeout(timeout);
-    const error =
-      e instanceof Error && e.name === 'AbortError'
-        ? new RouteError(504, 'timeout', 'Public URL probe timed out')
-        : new RouteError(502, 'upstream_error', 'Public URL probe failed');
+    const error = isAbortError(e)
+      ? new RouteError(504, 'timeout', 'Public URL probe timed out')
+      : new RouteError(502, 'upstream_error', 'Public URL probe failed');
     logRouteError({
       requestId,
       route: ROUTE_NAME,

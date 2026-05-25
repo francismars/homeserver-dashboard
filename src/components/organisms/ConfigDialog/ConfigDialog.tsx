@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -82,7 +76,9 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
     fetchConfig().finally(() => {
       if (!cancelled) setConfigLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   // Ensure we never stay on hidden tabs
@@ -143,7 +139,9 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
         type: 'success',
         text: data.message || 'Saved. Restart the app from Umbrel for the tunnel to connect.',
       });
-      setCfConfig((c) => (c ? { ...c, domain: cfDomain.trim() || null, configured: !!(cfDomain.trim() && cfToken) } : c));
+      setCfConfig((c) =>
+        c ? { ...c, domain: cfDomain.trim() || null, configured: !!(cfDomain.trim() && cfToken) } : c,
+      );
       setHealthStatus('idle'); // Reset health check after save
     } catch {
       setCfMessage({ type: 'error', text: 'Request failed' });
@@ -179,9 +177,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[85vh] max-h-[90vh] max-w-[calc(100vw-2rem)] flex-col p-0 sm:h-[90vh] sm:max-w-[min(64rem,calc(100vw-4rem))]">
         <DialogHeader className="border-b border-border/50 px-6 py-4">
-          <DialogTitle className="text-base font-semibold sm:text-lg">
-            Settings
-          </DialogTitle>
+          <DialogTitle className="text-base font-semibold sm:text-lg">Settings</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground sm:text-sm">
             Server configuration and public access
           </DialogDescription>
@@ -189,20 +185,18 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
 
         <div className="flex flex-1 overflow-hidden">
           {tabs.length > 0 && (
-            <nav className="flex w-32 shrink-0 flex-col border-r border-border/50 py-4 pl-4 pr-2">
+            <nav className="flex w-32 shrink-0 flex-col border-r border-border/50 py-4 pr-2 pl-4">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
                     'relative py-2 text-left text-sm transition-colors',
-                    activeTab === tab.id
-                      ? 'font-medium text-brand'
-                      : 'text-muted-foreground hover:text-foreground'
+                    activeTab === tab.id ? 'font-medium text-brand' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {activeTab === tab.id && (
-                    <span className="absolute -left-4 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand" />
+                    <span className="absolute top-1/2 -left-4 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand" />
                   )}
                   {tab.label}
                 </button>
@@ -227,7 +221,13 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                       Read-only
                     </Badge>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleReload} disabled={isReloading || configLoading}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={handleReload}
+                    disabled={isReloading || configLoading}
+                  >
                     <RefreshCw className={cn('h-3.5 w-3.5', (isReloading || configLoading) && 'animate-spin')} />
                   </Button>
                 </div>
@@ -246,15 +246,14 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                   <Textarea
                     value={configValue}
                     readOnly
-                    className={cn(
-                      'flex-1 resize-none font-mono text-xs sm:text-sm'
-                    )}
+                    className={cn('flex-1 resize-none font-mono text-xs sm:text-sm')}
                     placeholder="Configuration file content..."
                   />
                 )}
 
                 <p className="text-xs text-muted-foreground/70">
-                  Sensitive fields (passwords, database URL) are redacted. Restart the app from Umbrel to apply config changes.
+                  Sensitive fields (passwords, database URL) are redacted. Restart the app from Umbrel to apply config
+                  changes.
                 </p>
               </div>
             )}
@@ -273,7 +272,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Status</span>
                         {cfConfig?.configured ? (
-                          <span className="text-sm text-brand font-medium">Configured</span>
+                          <span className="text-sm font-medium text-brand">Configured</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">Off</span>
                         )}
@@ -281,13 +280,9 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
 
                       {cfConfig?.configured && cfConfig.domain && (
                         <div className="flex items-center justify-between gap-3">
-                          <code className="text-xs text-muted-foreground font-mono truncate">
-                            {cfConfig.domain}
-                          </code>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {healthStatus === 'ok' && (
-                              <span className="text-xs text-brand">Reachable</span>
-                            )}
+                          <code className="truncate font-mono text-xs text-muted-foreground">{cfConfig.domain}</code>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {healthStatus === 'ok' && <span className="text-xs text-brand">Reachable</span>}
                             {healthStatus === 'fail' && (
                               <span className="text-xs text-destructive">
                                 Not reachable{healthError ? ` (${healthError})` : ''}
@@ -300,11 +295,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                               disabled={healthStatus === 'checking'}
                               onClick={() => checkHealth(cfConfig.domain!)}
                             >
-                              {healthStatus === 'checking' ? (
-                                <RefreshCw className="h-3 w-3 animate-spin" />
-                              ) : (
-                                'Check'
-                              )}
+                              {healthStatus === 'checking' ? <RefreshCw className="h-3 w-3 animate-spin" /> : 'Check'}
                             </Button>
                           </div>
                         </div>
@@ -318,7 +309,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                       <div
                         className={cn(
                           'flex items-center gap-2 text-sm',
-                          cfMessage.type === 'error' ? 'text-destructive' : 'text-brand'
+                          cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
                         )}
                       >
                         {cfMessage.type === 'error' ? (
@@ -366,8 +357,8 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                     </form>
 
                     <p className="text-xs text-muted-foreground/70">
-                      Point the tunnel hostname to <code className="text-muted-foreground">http://homeserver:6286</code>.
-                      Restart the app after saving.
+                      Point the tunnel hostname to <code className="text-muted-foreground">http://homeserver:6286</code>
+                      . Restart the app after saving.
                     </p>
                   </>
                 )}

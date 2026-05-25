@@ -12,9 +12,7 @@ interface DashboardNavbarProps {
 
 export function DashboardNavbar({ className, onSettingsClick, showSettingsButton = true }: DashboardNavbarProps) {
   return (
-    <header
-      className={cn('w-full bg-background pb-2 pt-4 sm:pb-3 sm:pt-5', className)}
-    >
+    <header className={cn('w-full bg-background pt-4 pb-2 sm:pt-5 sm:pb-3', className)}>
       <nav className="flex w-full min-w-0 items-center justify-between gap-4 sm:gap-6">
         {/* Left: Pubky Homeserver logo */}
         <div className="flex min-w-0 shrink-0 items-center">
@@ -36,7 +34,7 @@ export function DashboardNavbar({ className, onSettingsClick, showSettingsButton
             <Button
               variant="outline"
               size="icon"
-              className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 backdrop-blur-xl text-foreground hover:bg-white/8"
+              className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 text-foreground backdrop-blur-xl hover:bg-white/8"
               aria-label="Homeserver Configuration"
               onClick={onSettingsClick}
             >

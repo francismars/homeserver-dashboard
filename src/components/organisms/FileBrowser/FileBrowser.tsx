@@ -494,12 +494,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th
-                        className="p-2 text-left text-sm font-semibold select-none"
-                      >
+                      <th className="p-2 text-left text-sm font-semibold select-none">
                         <button
                           type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           onClick={() => handleSort('type')}
                           aria-label="Sort files by name and type"
                         >
@@ -512,12 +510,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                             ))}
                         </button>
                       </th>
-                      <th
-                        className="p-2 text-left text-sm font-semibold select-none"
-                      >
+                      <th className="p-2 text-left text-sm font-semibold select-none">
                         <button
                           type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           onClick={() => handleSort('size')}
                           aria-label="Sort files by size"
                         >
@@ -530,12 +526,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                             ))}
                         </button>
                       </th>
-                      <th
-                        className="p-2 text-left text-sm font-semibold select-none"
-                      >
+                      <th className="p-2 text-left text-sm font-semibold select-none">
                         <button
                           type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                           onClick={() => handleSort('date')}
                           aria-label="Sort files by modified date"
                         >
@@ -557,7 +551,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                         <td className="p-2">
                           <button
                             type="button"
-                            className="flex w-full items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="flex w-full items-center gap-2 rounded text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             onClick={() => handleFileClick(file)}
                             aria-label={`${file.isCollection ? 'Open folder' : 'Open file'} ${file.displayName}`}
                           >
@@ -619,7 +613,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                     key={file.path}
                     role="button"
                     tabIndex={0}
-                    className="cursor-pointer rounded-md border bg-muted/50 p-3 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="cursor-pointer rounded-md border bg-muted/50 p-3 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     onClick={() => handleFileClick(file)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -702,7 +696,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
               />
             ) : (
               <div className="max-h-[50vh] overflow-auto rounded-md border bg-muted/50 p-3 sm:max-h-[60vh] sm:p-4">
-                <pre className="wrap-break-word font-mono text-xs whitespace-pre-wrap sm:text-sm">{fileContent}</pre>
+                <pre className="font-mono text-xs wrap-break-word whitespace-pre-wrap sm:text-sm">{fileContent}</pre>
               </div>
             )}
           </div>
@@ -727,9 +721,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New File</DialogTitle>
-            <DialogDescription className="break-all">
-              Create a new file in {currentPath}
-            </DialogDescription>
+            <DialogDescription className="break-all">Create a new file in {currentPath}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -801,9 +793,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Directory</DialogTitle>
-            <DialogDescription className="break-all">
-              Create a new directory in {currentPath}
-            </DialogDescription>
+            <DialogDescription className="break-all">Create a new directory in {currentPath}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

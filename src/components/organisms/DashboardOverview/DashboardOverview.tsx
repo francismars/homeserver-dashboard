@@ -70,7 +70,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                 {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
                   <div className="mt-2">
                     <p className="font-medium">Possible causes:</p>
-                    <ul className="mt-1 list-disc list-inside space-y-0.5">
+                    <ul className="mt-1 list-inside list-disc space-y-0.5">
                       <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
                       <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
                       <li>Homeserver is not running or unreachable</li>
@@ -138,7 +138,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
                   {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
                     <div className="mt-2">
                       <p className="font-medium">Possible causes:</p>
-                      <ul className="mt-1 list-disc list-inside space-y-0.5">
+                      <ul className="mt-1 list-inside list-disc space-y-0.5">
                         <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
                         <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
                         <li>Homeserver is not running or unreachable</li>
@@ -153,9 +153,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-                <span className="font-mono text-xs break-all text-foreground sm:text-sm">
-                  {homeserverPubkey}
-                </span>
+                <span className="font-mono text-xs break-all text-foreground sm:text-sm">{homeserverPubkey}</span>
                 {isPubkeySoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -169,9 +167,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Version:</span>
               <div className="flex flex-1 items-center gap-2 sm:flex-initial">
-                <span className="text-xs break-words text-foreground sm:text-sm">
-                  {homeserverVersion}
-                </span>
+                <span className="text-xs break-words text-foreground sm:text-sm">{homeserverVersion}</span>
                 {isVersionSoon && (
                   <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
                     <Info className="mr-1 h-3 w-3" />
@@ -185,7 +181,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             {info.pkarr_pubky_address && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Address:</span>
-                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all font-mono">
+                <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
                   {info.pkarr_pubky_address}
                 </code>
               </div>
@@ -195,7 +191,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
             {info.pkarr_icann_domain && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Domain:</span>
-                <code className="min-w-0 rounded bg-muted px-2 py-1 text-xs break-all font-mono">
+                <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
                   {info.pkarr_icann_domain}
                 </code>
               </div>

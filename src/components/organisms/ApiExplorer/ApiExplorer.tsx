@@ -186,7 +186,12 @@ const METRICS_ENDPOINTS: ApiEndpoint[] = [
   },
 ];
 
-export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, adminToken: _adminToken }: ApiExplorerProps) {
+export function ApiExplorer({
+  adminBaseUrl,
+  clientBaseUrl,
+  metricsBaseUrl,
+  adminToken: _adminToken,
+}: ApiExplorerProps) {
   const [selectedServer, setSelectedServer] = useState<'admin' | 'client' | 'metrics'>('admin');
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
   const [customMethod, setCustomMethod] = useState<
@@ -266,11 +271,11 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
       const endpoint = currentEndpoints.find(
         (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
       );
-      
+
       // For admin endpoints, use API route proxy; for others, use direct URL
       let baseUrl = currentGroup.baseUrl;
       let actualPath = path;
-      
+
       if (selectedServer === 'admin') {
         // WebDAV endpoints use the WebDAV API route
         if (path.startsWith('/dav')) {
@@ -284,9 +289,9 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
           actualPath = path.startsWith('/') ? path.substring(1) : path;
         }
       }
-      
+
       // Construct URL - ensure there's a / between baseUrl and actualPath
-      const url = actualPath 
+      const url = actualPath
         ? `${baseUrl}/${actualPath}`.replace(/\/+/g, '/') // Remove duplicate slashes
         : baseUrl;
       const headers: Record<string, string> = {};
@@ -311,7 +316,7 @@ export function ApiExplorer({ adminBaseUrl, clientBaseUrl, metricsBaseUrl, admin
       const webdavMethods = ['PROPFIND', 'MKCOL', 'MOVE', 'COPY'];
       const needsBody = method !== 'GET' && method !== 'HEAD' && requestBody.trim();
       const isWebDAV = webdavMethods.includes(method);
-      
+
       // For WebDAV methods, use POST with X-HTTP-Method-Override header
       let httpMethod = method;
       if (isWebDAV && selectedServer === 'admin') {

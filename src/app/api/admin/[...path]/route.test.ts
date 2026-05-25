@@ -47,9 +47,7 @@ describe('admin proxy route', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [urlArg, initArg] = fetchMock.mock.calls[0];
     expect(String(urlArg)).toContain('/users?limit=20');
-    expect((initArg as RequestInit).headers).toEqual(
-      expect.objectContaining({ 'X-Admin-Password': 'secret-token' }),
-    );
+    expect((initArg as RequestInit).headers).toEqual(expect.objectContaining({ 'X-Admin-Password': 'secret-token' }));
   });
 
   it('maps abort failures to timeout errors', async () => {

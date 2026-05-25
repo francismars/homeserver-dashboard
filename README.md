@@ -6,21 +6,22 @@ The UI lives under a single route: **`/dashboard`** (the home page redirects the
 
 ## Current UI
 
-The dashboard has 6 tabs:
+The dashboard has 5 tabs:
 
 - **Overview**: Shows homeserver stats from `GET /info` including connection status, public key, addresses, version, and user/storage statistics
-- **Users**: Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`. Shows a **mock** "disabled users list" (the count comes from `/info`, but the list entries are mock until there's an API)
+- **Users**: Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`. The disabled-users list is fetched live from the `/users/disabled` admin endpoint.
 - **Invites**: Generate signup tokens via `GET /generate_signup_token` with QR code display for easy mobile app signup; view invite statistics (total generated, used, unused)
 - **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth). Includes admin "Delete from path" for removing entries by path
-- **Logs**: Mock log viewer (no backend logs API wired yet)
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
+
+> A real-time **Logs** tab will be added once the homeserver exposes a logs admin endpoint; see `docs/AUDIT-2026-05-19.md` for the v1.0 punch list.
 
 The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config** (read-only view of the real `config.toml` with sensitive fields redacted) and **Cloudflare** (configure Cloudflare Tunnel token and domain for public access without port forwarding).
 
 ## Prerequisites
 
 - Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
-- A running Pubky homeserver (required for real data; some UI sections are still mock placeholders)
+- A running Pubky homeserver — every UI section above is wired to live admin endpoints
 
 ## Quick Start
 
@@ -54,7 +55,7 @@ ADMIN_TOKEN=your-admin-password
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ### 4. Build for Production
 
@@ -79,7 +80,8 @@ Run the container:
 
 ```bash
 docker run -d \
-  -p 3000:3000 \
+  -p 8080:8080 \
+  -e PORT=8080 \
   -e ADMIN_BASE_URL=http://homeserver:6288 \
   -e ADMIN_TOKEN=your-admin-password \
   homeserver-dashboard
@@ -95,6 +97,7 @@ The dashboard is included in the `pubky-homeserver` Umbrel app. When deployed vi
 - Access is provided through Umbrel's app proxy (no direct port exposure needed)
 
 The Dockerfile uses Next.js standalone output for optimal image size and includes:
+
 - Multi-stage build for smaller production image
 - Non-root user for security
 - Proper handling of server-only environment variables
@@ -103,11 +106,11 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 
 ### Environment Variables
 
-| Variable                  | Description                          | Required | Default                              | Notes                               |
-| ------------------------- | ------------------------------------ | -------- | ------------------------------------ | ----------------------------------- |
-| `ADMIN_BASE_URL`          | Homeserver admin API base URL        | Yes\*    | -                                    | Server-only (not exposed to client) |
-| `ADMIN_TOKEN`             | Admin password/token                 | Yes\*    | -                                    | Server-only (not exposed to client) |
-| `HOMESERVER_CONFIG_PATH`  | Path to homeserver `config.toml`     | No       | `/app/homeserver-data/config.toml`   | For non-Docker setups               |
+| Variable                 | Description                      | Required | Default                            | Notes                               |
+| ------------------------ | -------------------------------- | -------- | ---------------------------------- | ----------------------------------- |
+| `ADMIN_BASE_URL`         | Homeserver admin API base URL    | Yes\*    | -                                  | Server-only (not exposed to client) |
+| `ADMIN_TOKEN`            | Admin password/token             | Yes\*    | -                                  | Server-only (not exposed to client) |
+| `HOMESERVER_CONFIG_PATH` | Path to homeserver `config.toml` | No       | `/app/homeserver-data/config.toml` | For non-Docker setups               |
 
 \* Required to use the real homeserver APIs
 
@@ -125,7 +128,7 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 - **Tailwind CSS 4** - Styling
 - **Shadcn UI** - Component library
 - **Lucide React** - Icon library
-- **Vitest** - Testing framework (installed; no tests currently live in this package)
+- **Vitest** - Unit + integration test runner
 - **ESLint / Prettier / Knip** - Repo hygiene tooling
 
 ### Available Scripts
@@ -140,16 +143,17 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 - `npm run knip` - Check for unused files/deps/exports (see `knip.json`)
 - `npm test` - Run Vitest
 
-This is a standalone project. Contributions are welcome! Please ensure:
+## Contributing
+
+This project is maintained by the Pubky team at Synonym. Contributions are welcome via pull request. Please ensure:
 
 - Code follows the existing patterns
 - Components use Shadcn UI primitives
 - TypeScript types are properly defined
 - Error handling is comprehensive
-- Mock data is clearly marked with badges
-- Real vs mock implementations are documented
+- CI gates (`lint`, `typecheck`, `format:check`, `knip`, `test:coverage`, `build`, `docker`) pass before requesting review
 
 ## Related Projects
 
-- [Pubky Homeserver](https://github.com/synonymdev/pubky) - The homeserver this dashboard manages
-- [Franky](https://github.com/synonymdev/franky) - Reference UI implementation (design system source)
+- [pubky-core](https://github.com/pubky/pubky-core) — The homeserver this dashboard manages
+- [franky](https://github.com/pubky/franky) — Reference UI implementation (design system source)

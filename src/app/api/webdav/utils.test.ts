@@ -44,6 +44,25 @@ describe('webdav proxy utils', () => {
     expect(payload.type).toBe('bad_request');
   });
 
+  it.each([
+    [['..'], 'parent segment'],
+    [['user', '..', '..', 'etc'], 'mid-path parent'],
+    [['.'], 'current-dir segment'],
+    [['foo\0bar'], 'null byte'],
+    [['foo/bar'], 'embedded slash'],
+    [['foo\\bar'], 'embedded backslash'],
+  ])('rejects path with %s (%s)', async (path) => {
+    const fetchMock = vi.spyOn(global, 'fetch');
+    const request = new NextRequest('http://localhost:8080/api/webdav/' + path.join('/'));
+    const response = await proxyWebDavRequest(request, Promise.resolve({ path }), 'GET');
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.type).toBe('bad_request');
+    expect(payload.error).toBe('Invalid path segment');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('proxies PROPFIND responses successfully', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response('<multistatus />', {

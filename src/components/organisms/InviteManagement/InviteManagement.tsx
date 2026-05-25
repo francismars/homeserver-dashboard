@@ -135,7 +135,7 @@ export function InviteManagement({
         <div>
           <h3 className="mb-3 text-sm font-medium text-foreground">Invite codes</h3>
           {invites.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 py-12 px-4 text-center">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-4 py-12 text-center">
               <Gift className="mb-3 h-10 w-10 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">No invite codes yet</p>
               <p className="mt-1 max-w-sm text-xs text-muted-foreground">
@@ -149,9 +149,7 @@ export function InviteManagement({
                     Creating...
                   </>
                 ) : (
-                  <>
-                    Create invite
-                  </>
+                  <>Create invite</>
                 )}
               </Button>
             </div>
@@ -169,9 +167,7 @@ export function InviteManagement({
                             Invite {index + 1}
                           </span>
                         )}
-                        <code className="font-mono text-xs break-all sm:text-sm sm:break-normal">
-                          {invite}
-                        </code>
+                        <code className="font-mono text-xs break-all sm:text-sm sm:break-normal">{invite}</code>
                       </div>
                       <div className="flex shrink-0 gap-2">
                         <Button
@@ -182,11 +178,7 @@ export function InviteManagement({
                           title={copiedIndex === index ? 'Copied' : 'Copy code'}
                           aria-label={copiedIndex === index ? 'Copied invite code' : `Copy invite code ${index + 1}`}
                         >
-                          {copiedIndex === index ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
+                          {copiedIndex === index ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
                         {signupUrl && (
                           <Button
@@ -197,11 +189,7 @@ export function InviteManagement({
                             title={isExpanded ? 'Hide QR Code' : 'Show QR Code'}
                             aria-label={isExpanded ? 'Hide invite QR code' : 'Show invite QR code'}
                           >
-                            {isExpanded ? (
-                              <X className="h-4 w-4" />
-                            ) : (
-                              <QrCode className="h-4 w-4" />
-                            )}
+                            {isExpanded ? <X className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
                           </Button>
                         )}
                       </div>
@@ -214,7 +202,7 @@ export function InviteManagement({
                           Share invite — scan with Pubky Ring or copy the link
                         </p>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-                          <div className="flex flex-col items-center gap-2 shrink-0">
+                          <div className="flex shrink-0 flex-col items-center gap-2">
                             <div className="rounded-lg border border-border bg-white p-3 shadow-sm">
                               <QRCodeSVG value={signupUrl} size={160} level="M" />
                             </div>
@@ -222,7 +210,7 @@ export function InviteManagement({
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
-                              <code className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
+                              <code className="min-w-0 flex-1 font-mono text-xs break-all text-foreground">
                                 {signupUrl}
                               </code>
                               <Button
@@ -231,7 +219,9 @@ export function InviteManagement({
                                 onClick={() => handleCopyUrl(invite, index)}
                                 className="h-8 w-8 shrink-0"
                                 title={copiedUrlIndex === index ? 'Copied' : 'Copy URL'}
-                                aria-label={copiedUrlIndex === index ? 'Copied invite URL' : `Copy invite URL ${index + 1}`}
+                                aria-label={
+                                  copiedUrlIndex === index ? 'Copied invite URL' : `Copy invite URL ${index + 1}`
+                                }
                               >
                                 {copiedUrlIndex === index ? (
                                   <Check className="h-4 w-4" />

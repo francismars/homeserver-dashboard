@@ -55,10 +55,6 @@ export function logRouteInfo(payload: RouteLogPayload) {
   emitLog('info', payload);
 }
 
-export function logRouteWarn(payload: RouteLogPayload) {
-  emitLog('warn', payload);
-}
-
 export function logRouteError(payload: RouteLogPayload) {
   emitLog('error', payload);
 }

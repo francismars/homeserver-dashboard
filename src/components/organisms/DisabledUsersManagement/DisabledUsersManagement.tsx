@@ -6,13 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { copyToClipboard } from '@/libs/utils';
 import { Check, ClipboardPaste, Copy, Search, ShieldBan } from 'lucide-react';
 import type { DisabledUser } from '@/services/admin/admin.types';
@@ -187,7 +181,8 @@ export function DisabledUsersManagement({
 
               <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="secondary" className="shrink-0 text-xs">
-                  Disabled: {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsersWithDisplayName.length}
+                  Disabled:{' '}
+                  {typeof numDisabledUsers === 'number' ? numDisabledUsers : disabledUsersWithDisplayName.length}
                 </Badge>
                 <Button
                   variant="outline"
@@ -339,11 +334,9 @@ export function DisabledUsersManagement({
           }
         }}
       >
-        <DialogContent className="space-y-2 sm:space-y-3 pt-5 pb-4 sm:pt-6 sm:pb-5">
+        <DialogContent className="space-y-2 pt-5 pb-4 sm:space-y-3 sm:pt-6 sm:pb-5">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold sm:text-2xl">
-              Disable or enable user
-            </DialogTitle>
+            <DialogTitle className="text-xl font-bold sm:text-2xl">Disable or enable user</DialogTitle>
             <DialogDescription className="text-sm">
               Enter a user pubky to disable or enable their account
             </DialogDescription>
@@ -361,7 +354,7 @@ export function DisabledUsersManagement({
             <div className="space-y-1.5">
               <label
                 htmlFor="user-pubkey-input"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                className="text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase"
               >
                 User pubky
               </label>
@@ -446,7 +439,6 @@ export function DisabledUsersManagement({
               </Button>
             </div>
           </div>
-
         </DialogContent>
       </Dialog>
     </>
