@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup, and a paste-ready spec for the four pubky-core admin endpoints still needed to ship mock-free (see `docs/pubky-core-endpoints.md`).
+Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup.
 
 ### Added
 
@@ -17,7 +17,6 @@ Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code
 - `CHANGELOG.md` following Keep a Changelog.
 - `CONTRIBUTORS.md` crediting the original contractor.
 - `docs/AUDIT-2026-05-19.md` — forensic audit of the inherited state with the v1.0.0 punch list.
-- `docs/pubky-core-endpoints.md` — paste-ready issue drafts for the 4 admin endpoints (`/signup_tokens`, `/users/{pubkey}/usage`, `/logs`, `/config` + `/restart`) the dashboard needs from pubky-core before v1.0.0 ships mock-free.
 - `.github/dependabot.yml` for npm, github-actions, and docker updates.
 - `.github/workflows/codeql.yml` for static analysis.
 - CI gates: `knip`, `prettier --check`, and `docker build` in addition to existing lint/typecheck/test/build.
