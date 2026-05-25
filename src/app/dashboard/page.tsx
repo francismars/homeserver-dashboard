@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
-import { useCapabilities } from '@/hooks/admin/useCapabilities';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview } from '@/components/organisms/DashboardOverview';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
@@ -38,10 +37,11 @@ export default function DashboardPage() {
     removeDisabledUserLocally,
   } = useDisabledUsers();
 
-  const { logs: logsEnabled, configWrite: configWritable } = useCapabilities();
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
+  const [logsEnabled, setLogsEnabled] = useState(false);
+  const [configWritable, setConfigWritable] = useState(false);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
@@ -75,11 +75,17 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const detectSettingsAvailability = async () => {
+    // Per-endpoint feature probing. Each route exposes its own availability
+    // (via response status, or via a flag in the body):
+    //   - /api/server-config — 2xx means readable; body's `writable` flag drives edit affordance
+    //   - /api/cloudflare-config — body's `supported` flag drives the Cloudflare tab
+    //   - /api/logs — 2xx means the log file is readable, drives the Logs tab
+    const detectAvailability = async () => {
       try {
-        const [configRes, cloudflareRes] = await Promise.all([
+        const [configRes, cloudflareRes, logsRes] = await Promise.all([
           fetch('/api/server-config'),
           fetch('/api/cloudflare-config'),
+          fetch('/api/logs?lines=0'),
         ]);
 
         let isCloudflareSupported = false;
@@ -88,17 +94,24 @@ export default function DashboardPage() {
           isCloudflareSupported = Boolean(cloudflareData.supported);
         }
 
-        const isConfigVisible = configRes.ok;
+        let isConfigWritable = false;
+        if (configRes.ok) {
+          const configData = (await configRes.json()) as { writable?: boolean };
+          isConfigWritable = Boolean(configData.writable);
+        }
+
         if (!cancelled) {
-          setCanOpenSettings(isConfigVisible || isCloudflareSupported);
+          setCanOpenSettings(configRes.ok || isCloudflareSupported);
+          setConfigWritable(isConfigWritable);
+          setLogsEnabled(logsRes.ok);
         }
       } catch {
-        // Keep button visible when detection fails to avoid blocking access.
+        // Keep settings button visible when detection fails to avoid blocking access.
         if (!cancelled) setCanOpenSettings(true);
       }
     };
 
-    void detectSettingsAvailability();
+    void detectAvailability();
     return () => {
       cancelled = true;
     };
