@@ -21,11 +21,9 @@ type CacheEntry = { value: Capabilities; expires: number };
 
 // Module-scoped cache. Next.js gives each route handler a fresh request context
 // but the module state persists across requests, so a tiny LRU-of-one works.
+// Tests reset via `vi.resetModules()`, which re-evaluates this module and
+// gives them a fresh `cached`.
 let cached: CacheEntry | null = null;
-
-export function _resetCacheForTests() {
-  cached = null;
-}
 
 async function probe(): Promise<Capabilities> {
   const logs = LOG_PATH

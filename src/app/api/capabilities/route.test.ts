@@ -26,9 +26,9 @@ describe('capabilities route', () => {
     if (opts.config !== undefined) process.env.HOMESERVER_CONFIG_PATH = opts.config;
     if (opts.log === null) delete process.env.HOMESERVER_LOG_PATH;
     else if (opts.log !== undefined) process.env.HOMESERVER_LOG_PATH = opts.log;
-    const mod = await import('./route');
-    mod._resetCacheForTests();
-    return mod;
+    // `vi.resetModules()` in beforeEach gives us a fresh module (and thus a
+    // fresh `cached`) on every dynamic import.
+    return await import('./route');
   }
 
   it('returns logs:false when HOMESERVER_LOG_PATH is unset', async () => {
