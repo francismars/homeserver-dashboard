@@ -53,6 +53,6 @@
     "prettier-plugin-tailwindcss": "0.7.2",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
-    "vitest": "4.0.15"
+    "vitest": "4.1.7"
   }
 }
