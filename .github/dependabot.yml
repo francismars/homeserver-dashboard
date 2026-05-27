@@ -1,39 +1,33 @@
+# Roll all dependency updates into one PR per ecosystem, once per week.
+# At most three PRs land on a given Monday (npm + github-actions + docker).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+      day: monday
     groups:
-      radix-ui:
+      npm-dependencies:
         patterns:
-          - "@radix-ui/*"
-      eslint:
-        patterns:
-          - "eslint*"
-          - "@typescript-eslint/*"
-      react:
-        patterns:
-          - "react"
-          - "react-dom"
-          - "@types/react*"
-      vitest:
-        patterns:
-          - "vitest"
-          - "@vitest/*"
-      types:
-        patterns:
-          - "@types/*"
-        exclude-patterns:
-          - "@types/react*"
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    groups:
+      docker:
+        patterns:
+          - "*"
