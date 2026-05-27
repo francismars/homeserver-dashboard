@@ -50,7 +50,7 @@
     "knip": "^6.14.2",
     "postcss": "8.4.49",
     "prettier": "3.8.3",
-    "prettier-plugin-tailwindcss": "0.7.2",
+    "prettier-plugin-tailwindcss": "0.8.0",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vitest": "4.1.7"
