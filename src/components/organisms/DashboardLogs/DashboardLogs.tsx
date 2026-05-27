@@ -1,0 +1,218 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Download, Pause, Play, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/libs/utils';
+import type { LevelFilter, LogEntry, LogsResponse } from './DashboardLogs.types';
+
+const POLL_INTERVAL_MS = 5_000;
+const LINES = 500;
+const LEVEL_OPTIONS: LevelFilter[] = ['all', 'info', 'warn', 'error'];
+
+const LEVEL_BADGE: Record<string, string> = {
+  trace: 'bg-muted text-muted-foreground',
+  debug: 'bg-muted text-muted-foreground',
+  info: 'bg-blue-500/10 text-blue-300',
+  warn: 'bg-amber-500/15 text-amber-300',
+  error: 'bg-red-500/15 text-red-300',
+};
+
+function fmtTs(ts: string | undefined): string {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+  // HH:MM:SS.mmm
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+}
+
+function fmtFields(fields: Record<string, unknown> | undefined): string {
+  if (!fields) return '';
+  const pairs = Object.entries(fields)
+    .filter(([k]) => k !== 'message' && k !== 'msg')
+    .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`);
+  return pairs.join(' ');
+}
+
+export function DashboardLogs() {
+  const [items, setItems] = useState<LogEntry[]>([]);
+  const [partial, setPartial] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [level, setLevel] = useState<LevelFilter>('all');
+  const isMountedRef = useRef(true);
+
+  const fetchLogs = useCallback(async () => {
+    const params = new URLSearchParams({ lines: String(LINES) });
+    if (level !== 'all') params.set('level', level);
+    try {
+      const response = await fetch(`/api/logs?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || `Failed to fetch logs (${response.status})`);
+      }
+      const data = (await response.json()) as LogsResponse;
+      if (!isMountedRef.current) return;
+      setItems(data.items);
+      setPartial(Boolean(data.partial));
+      setError(null);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setError(err instanceof Error ? err.message : 'Failed to fetch logs');
+    } finally {
+      if (isMountedRef.current) setIsInitialLoading(false);
+    }
+  }, [level]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void fetchLogs();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchLogs]);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = setInterval(() => {
+      void fetchLogs();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [isPaused, fetchLogs]);
+
+  const handleDownload = useCallback(async () => {
+    const response = await fetch(`/api/logs?lines=5000`, { cache: 'no-store' });
+    if (!response.ok) return;
+    const data = (await response.json()) as LogsResponse;
+    const blob = new Blob([data.items.map((item) => JSON.stringify(item)).join('\n')], {
+      type: 'application/x-ndjson',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `homeserver-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const rendered = useMemo(
+    () =>
+      items.map((entry, i) => {
+        const isRaw = entry.raw !== undefined;
+        const lvl = (entry.level ?? '').toLowerCase();
+        const badgeClass = LEVEL_BADGE[lvl] ?? 'bg-muted text-muted-foreground';
+        return (
+          <div
+            key={i}
+            className="flex gap-2 border-b border-border/40 px-3 py-1 font-mono text-xs leading-relaxed hover:bg-muted/30"
+            data-testid="logs-row"
+          >
+            <span className="shrink-0 text-muted-foreground tabular-nums">{fmtTs(entry.ts)}</span>
+            {!isRaw && (
+              <Badge variant="outline" className={cn('h-5 shrink-0 px-1.5 uppercase', badgeClass)}>
+                {entry.level ?? '?'}
+              </Badge>
+            )}
+            {entry.target && (
+              <span className="max-w-[14rem] shrink-0 truncate text-muted-foreground/80">{entry.target}</span>
+            )}
+            <span className="break-words text-foreground/90">
+              {entry.raw ?? entry.msg ?? ''}
+              {entry.fields && fmtFields(entry.fields) && (
+                <span className="ml-2 text-muted-foreground/80">{fmtFields(entry.fields)}</span>
+              )}
+            </span>
+          </div>
+        );
+      }),
+    [items],
+  );
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle>Logs</CardTitle>
+          <CardDescription>
+            Live tail of the homeserver log file. Polls every {POLL_INTERVAL_MS / 1000}s while visible.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={level} onValueChange={(v) => setLevel(v as LevelFilter)}>
+            <SelectTrigger className="h-8 w-28" data-testid="logs-level-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LEVEL_OPTIONS.map((l) => (
+                <SelectItem key={l} value={l} data-testid={`logs-level-${l}`}>
+                  {l === 'all' ? 'All levels' : l}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={() => setIsPaused((p) => !p)} data-testid="logs-pause-toggle">
+            {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
+            <span className="ml-1.5">{isPaused ? 'Resume' : 'Pause'}</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void fetchLogs()} data-testid="logs-refresh">
+            <RefreshCw className="size-4" />
+            <span className="ml-1.5">Refresh</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void handleDownload()} data-testid="logs-download">
+            <Download className="size-4" />
+            <span className="ml-1.5">Download</span>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {partial && (
+          <Alert variant="default" className="mb-3">
+            <AlertCircle className="size-4" />
+            <AlertTitle>Partial tail</AlertTitle>
+            <AlertDescription>
+              The log file rotated while we were reading. Showing the bytes we could consistently capture; refresh to
+              retry against the fresh file.
+            </AlertDescription>
+          </Alert>
+        )}
+        {error && (
+          <Alert variant="destructive" className="mb-3" data-testid="logs-error">
+            <AlertCircle className="size-4" />
+            <AlertTitle>Couldn&apos;t load logs</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {isInitialLoading ? (
+          <div className="space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <Skeleton key={i} className="h-4 w-full" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div
+            className="rounded border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground"
+            data-testid="logs-empty"
+          >
+            No log entries to display.
+          </div>
+        ) : (
+          <div
+            className="max-h-[640px] overflow-y-auto rounded border border-border/60 bg-background/40"
+            data-testid="logs-viewport"
+          >
+            {rendered}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -11,7 +11,8 @@ import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersMan
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
-import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift } from 'lucide-react';
+import { DashboardLogs } from '@/components/organisms/DashboardLogs';
+import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -39,6 +40,8 @@ export default function DashboardPage() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
+  const [logsEnabled, setLogsEnabled] = useState(false);
+  const [configWritable, setConfigWritable] = useState(false);
 
   const handleSettingsClick = useCallback(() => {
     setIsConfigDialogOpen(true);
@@ -72,11 +75,17 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const detectSettingsAvailability = async () => {
+    // Per-endpoint feature probing. Each route exposes its own availability
+    // (via response status, or via a flag in the body):
+    //   - /api/server-config — 2xx means readable; body's `writable` flag drives edit affordance
+    //   - /api/cloudflare-config — body's `supported` flag drives the Cloudflare tab
+    //   - /api/logs — 2xx means the log file is readable, drives the Logs tab
+    const detectAvailability = async () => {
       try {
-        const [configRes, cloudflareRes] = await Promise.all([
+        const [configRes, cloudflareRes, logsRes] = await Promise.all([
           fetch('/api/server-config'),
           fetch('/api/cloudflare-config'),
+          fetch('/api/logs?lines=0'),
         ]);
 
         let isCloudflareSupported = false;
@@ -85,17 +94,24 @@ export default function DashboardPage() {
           isCloudflareSupported = Boolean(cloudflareData.supported);
         }
 
-        const isConfigVisible = configRes.ok;
+        let isConfigWritable = false;
+        if (configRes.ok) {
+          const configData = (await configRes.json()) as { writable?: boolean };
+          isConfigWritable = Boolean(configData.writable);
+        }
+
         if (!cancelled) {
-          setCanOpenSettings(isConfigVisible || isCloudflareSupported);
+          setCanOpenSettings(configRes.ok || isCloudflareSupported);
+          setConfigWritable(isConfigWritable);
+          setLogsEnabled(logsRes.ok);
         }
       } catch {
-        // Keep button visible when detection fails to avoid blocking access.
+        // Keep settings button visible when detection fails to avoid blocking access.
         if (!cancelled) setCanOpenSettings(true);
       }
     };
 
-    void detectSettingsAvailability();
+    void detectAvailability();
     return () => {
       cancelled = true;
     };
@@ -111,7 +127,11 @@ export default function DashboardPage() {
           />
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid md:grid-cols-5">
+            <TabsList
+              className={`scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid ${
+                logsEnabled ? 'md:grid-cols-6' : 'md:grid-cols-5'
+              }`}
+            >
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -128,6 +148,16 @@ export default function DashboardPage() {
                 <Files className="shrink-0" />
                 Files
               </TabsTrigger>
+              {logsEnabled && (
+                <TabsTrigger
+                  value="logs"
+                  className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
+                  data-testid="tab-logs"
+                >
+                  <ScrollText className="shrink-0" />
+                  Logs
+                </TabsTrigger>
+              )}
               <TabsTrigger value="api" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Plug className="shrink-0" />
                 API
@@ -175,6 +205,12 @@ export default function DashboardPage() {
               />
             </TabsContent>
 
+            {logsEnabled && (
+              <TabsContent value="logs" className="space-y-4">
+                <DashboardLogs />
+              </TabsContent>
+            )}
+
             <TabsContent value="api" className="space-y-4">
               <ApiExplorer
                 adminBaseUrl="/api/admin"
@@ -186,7 +222,9 @@ export default function DashboardPage() {
           </Tabs>
 
           {/* Config Dialog */}
-          {canOpenSettings && <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} />}
+          {canOpenSettings && (
+            <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} writable={configWritable} />
+          )}
 
           {/* Server Control Dialog */}
           <ServerControlDialog

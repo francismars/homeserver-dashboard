@@ -17,17 +17,29 @@ type HealthStatus = 'idle' | 'checking' | 'ok' | 'fail';
 interface ConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Drives whether the Config tab exposes an Edit button. Comes from /api/capabilities. */
+  writable?: boolean;
 }
 
-export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
+type SaveMessage = { type: 'success' | 'error' | 'conflict'; text: string };
+
+export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDialogProps) {
   const [activeTab, setActiveTab] = useState<Tab>('cloudflare');
   const [isConfigTabVisible, setIsConfigTabVisible] = useState(false);
 
   // Config file state
   const [configValue, setConfigValue] = useState('');
+  const [configChecksum, setConfigChecksum] = useState<string | null>(null);
+  const [configMtime, setConfigMtime] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const [isReloading, setIsReloading] = useState(false);
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<SaveMessage | null>(null);
 
   // Cloudflare state
   const [isCloudflareTabVisible, setIsCloudflareTabVisible] = useState(false);
@@ -43,7 +55,7 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
   const fetchConfig = async () => {
     setConfigError(null);
     try {
-      const res = await fetch('/api/server-config');
+      const res = await fetch('/api/server-config', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) {
         // Hide config tab if the file is missing/unavailable in this environment.
@@ -52,13 +64,20 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
         }
         setConfigError(data.error || `HTTP ${res.status}`);
         setConfigValue('');
+        setConfigChecksum(null);
+        setConfigMtime(null);
       } else {
         setIsConfigTabVisible(true);
         setConfigValue(data.config || '');
+        setEditValue(data.config || '');
+        setConfigChecksum(data.checksum ?? null);
+        setConfigMtime(data.mtime ?? null);
       }
     } catch {
       setConfigError('Failed to load config');
       setConfigValue('');
+      setConfigChecksum(null);
+      setConfigMtime(null);
     }
   };
 
@@ -67,6 +86,63 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
     await fetchConfig();
     setIsReloading(false);
   };
+
+  const handleStartEdit = () => {
+    setIsEditing(true);
+    setSaveMessage(null);
+    setEditValue(configValue);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setSaveMessage(null);
+    setEditValue(configValue);
+  };
+
+  const handleSave = async () => {
+    if (!configChecksum) return;
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      const res = await fetch('/api/server-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_toml: editValue, checksum: configChecksum }),
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        setSaveMessage({
+          type: 'conflict',
+          text:
+            data.error ||
+            'Config has been modified by someone else. Reload to see the latest, or save again to overwrite.',
+        });
+        // Pull the new checksum so a re-save can be a "force save" (one more click)
+        if (data.current_checksum) setConfigChecksum(data.current_checksum);
+        return;
+      }
+      if (!res.ok) {
+        setSaveMessage({ type: 'error', text: data.error || `Save failed (${res.status})` });
+        return;
+      }
+      // Success: refresh and exit edit mode
+      setConfigValue(editValue);
+      setConfigChecksum(data.checksum ?? null);
+      setConfigMtime(data.updated_at ?? null);
+      setIsEditing(false);
+      setSaveMessage({
+        type: 'success',
+        text:
+          data.message || 'Config saved. Stop and start the Pubky Homeserver app in Umbrel for changes to take effect.',
+      });
+    } catch {
+      setSaveMessage({ type: 'error', text: 'Request failed' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isDirty = isEditing && editValue !== configValue;
 
   // Fetch server config when dialog opens
   useEffect(() => {
@@ -217,20 +293,77 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">config.toml</span>
-                    <Badge variant="secondary" className="text-xs">
-                      Read-only
+                    <Badge variant="secondary" className="text-xs" data-testid="config-mode-badge">
+                      {writable ? (isEditing ? 'Editing' : 'Editable') : 'Read-only'}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2"
-                    onClick={handleReload}
-                    disabled={isReloading || configLoading}
-                  >
-                    <RefreshCw className={cn('h-3.5 w-3.5', (isReloading || configLoading) && 'animate-spin')} />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {writable && !isEditing && (
+                      <Button
+                        size="sm"
+                        className="h-7 px-3"
+                        onClick={handleStartEdit}
+                        disabled={configLoading || !!configError}
+                        data-testid="config-edit"
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    {writable && isEditing && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-3"
+                          onClick={handleCancelEdit}
+                          disabled={isSaving}
+                          data-testid="config-cancel"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 px-3"
+                          onClick={handleSave}
+                          disabled={isSaving || !isDirty}
+                          data-testid="config-save"
+                        >
+                          {isSaving ? 'Saving…' : saveMessage?.type === 'conflict' ? 'Save anyway' : 'Save'}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={handleReload}
+                      disabled={isReloading || configLoading || isSaving}
+                      data-testid="config-reload"
+                      aria-label="Reload"
+                    >
+                      <RefreshCw className={cn('h-3.5 w-3.5', (isReloading || configLoading) && 'animate-spin')} />
+                    </Button>
+                  </div>
                 </div>
+
+                {saveMessage && (
+                  <div
+                    className={cn(
+                      'flex items-start gap-2 rounded border px-3 py-2 text-sm',
+                      saveMessage.type === 'success' && 'border-brand/40 bg-brand/5 text-brand',
+                      saveMessage.type === 'error' && 'border-destructive/40 bg-destructive/5 text-destructive',
+                      saveMessage.type === 'conflict' && 'border-amber-500/40 bg-amber-500/5 text-amber-300',
+                    )}
+                    data-testid={`config-save-${saveMessage.type}`}
+                  >
+                    {saveMessage.type === 'success' ? (
+                      <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span>{saveMessage.text}</span>
+                  </div>
+                )}
 
                 {configLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -242,19 +375,42 @@ export function ConfigDialog({ open, onOpenChange }: ConfigDialogProps) {
                     <AlertCircle className="h-3.5 w-3.5" />
                     <span>{configError}</span>
                   </div>
+                ) : isEditing ? (
+                  <Textarea
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className={cn('flex-1 resize-none font-mono text-xs sm:text-sm')}
+                    placeholder="Configuration file content..."
+                    spellCheck={false}
+                    data-testid="config-editor"
+                  />
                 ) : (
                   <Textarea
                     value={configValue}
                     readOnly
                     className={cn('flex-1 resize-none font-mono text-xs sm:text-sm')}
                     placeholder="Configuration file content..."
+                    data-testid="config-viewer"
                   />
                 )}
 
-                <p className="text-xs text-muted-foreground/70">
-                  Sensitive fields (passwords, database URL) are redacted. Restart the app from Umbrel to apply config
-                  changes.
-                </p>
+                {writable ? (
+                  <p className="text-xs text-muted-foreground/70">
+                    Sensitive fields (passwords, database URL) are masked as <code>&quot;********&quot;</code> on
+                    display. Leave the placeholder untouched and the real value is preserved on save. Restart the Pubky
+                    Homeserver app from Umbrel to apply config changes.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground/70">
+                    Sensitive fields (passwords, database URL) are redacted. The config volume is read-only in this
+                    environment, so editing isn&apos;t available here.
+                  </p>
+                )}
+                {configMtime && (
+                  <p className="text-[10px] text-muted-foreground/50" data-testid="config-mtime">
+                    Last modified on disk: {new Date(configMtime).toLocaleString()}
+                  </p>
+                )}
               </div>
             )}
 

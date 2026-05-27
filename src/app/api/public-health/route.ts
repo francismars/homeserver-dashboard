@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
-import { isAllowedPublicHostname } from '@/lib/server/hostname';
+import { isAllowedPublicHostname, resolvesToPublicAddress } from '@/lib/server/hostname';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const CHECK_TIMEOUT_MS = 8000;
@@ -40,6 +40,25 @@ export async function GET(request: NextRequest) {
       errorType: error.type,
       message: error.message,
       meta: { domainLength: normalized.length },
+    });
+    return errorResponse(error, requestId);
+  }
+
+  // SSRF defense: a public-looking hostname can still resolve to a private
+  // address (10.x, 169.254.x, loopback, etc.). Resolve and reject before
+  // we open an outbound connection.
+  const isPublic = await resolvesToPublicAddress(normalized);
+  if (!isPublic) {
+    const error = new RouteError(400, 'bad_request', 'Domain does not resolve to a public address');
+    logRouteError({
+      requestId,
+      route: ROUTE_NAME,
+      method: 'GET',
+      statusCode: error.status,
+      durationMs: Date.now() - startedAt,
+      errorType: error.type,
+      message: error.message,
+      meta: { domain: normalized },
     });
     return errorResponse(error, requestId);
   }

@@ -13,6 +13,7 @@ export default defineConfig({
         'src/app/api/admin/generate_signup_token/route.ts',
         'src/app/api/cloudflare-config/route.ts',
         'src/app/api/health/route.ts',
+        'src/app/api/logs/route.ts',
         'src/app/api/public-health/route.ts',
         'src/app/api/server-config/route.ts',
         'src/app/api/webdav/utils.ts',
