@@ -13,9 +13,20 @@ updates:
         patterns:
           - "eslint*"
           - "@typescript-eslint/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
       types:
         patterns:
           - "@types/*"
+        exclude-patterns:
+          - "@types/react*"
 
   - package-ecosystem: github-actions
     directory: /
