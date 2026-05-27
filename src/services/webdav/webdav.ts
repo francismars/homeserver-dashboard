@@ -227,32 +227,6 @@ export class WebDavService {
       const resourcetype = response.querySelector('resourcetype');
       const isCollection = resourcetype?.querySelector('collection') !== null;
 
-      // Skip the base path itself (it's the directory we're listing)
-      // Normalize href for comparison
-      let normalizedHref = href;
-      if (href.startsWith(this.baseUrl)) {
-        normalizedHref = href.substring(this.baseUrl.length);
-      } else if (href.startsWith('http://') || href.startsWith('https://')) {
-        try {
-          const url = new URL(href);
-          normalizedHref = url.pathname;
-          // Remove /dav prefix if present
-          if (normalizedHref.startsWith('/dav')) {
-            normalizedHref = normalizedHref.substring(4);
-          }
-        } catch {
-          // Invalid URL, use as-is
-        }
-      }
-
-      // Remove any leading /dav/ from normalizedHref
-      while (normalizedHref.startsWith('/dav/')) {
-        normalizedHref = normalizedHref.substring(5);
-      }
-      if (normalizedHref === '/dav') {
-        normalizedHref = '/';
-      }
-
       // Extract relative path from href first (before filtering)
       let path = href;
       if (href.startsWith(this.baseUrl)) {

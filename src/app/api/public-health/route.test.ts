@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { promises as dns } from 'dns';
 import { GET } from './route';
 
 describe('public-health route', () => {
@@ -8,6 +9,9 @@ describe('public-health route', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Default: hostname resolves to a public IP. Individual tests override.
+    vi.spyOn(dns, 'resolve4').mockResolvedValue(['93.184.216.34']);
+    vi.spyOn(dns, 'resolve6').mockRejectedValue(new Error('ENOTFOUND'));
   });
 
   afterEach(() => {
@@ -36,6 +40,44 @@ describe('public-health route', () => {
     expect(response.status).toBe(400);
     expect(payload.type).toBe('bad_request');
     expect(payload.error).toBe('Domain not allowed');
+  });
+
+  it.each([
+    ['10.0.0.5', '10.0.0.0/8'],
+    ['127.0.0.1', 'loopback'],
+    ['169.254.169.254', 'link-local (AWS metadata)'],
+    ['172.16.4.2', '172.16.0.0/12'],
+    ['192.168.1.1', '192.168.0.0/16'],
+    ['100.64.0.1', 'CGNAT'],
+  ])('rejects domains that DNS-resolve to a private IPv4 (%s — %s)', async (privateIp) => {
+    vi.spyOn(dns, 'resolve4').mockResolvedValue([privateIp]);
+    const fetchMock = vi.spyOn(global, 'fetch');
+    const request = new NextRequest('http://localhost:8080/api/public-health?domain=internal.example.com');
+    const response = await GET(request);
+    const payload = await response.json();
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('Domain does not resolve to a public address');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a public-looking hostname that resolves to a loopback IPv6', async () => {
+    vi.spyOn(dns, 'resolve4').mockRejectedValue(new Error('ENOTFOUND'));
+    vi.spyOn(dns, 'resolve6').mockResolvedValue(['::1']);
+    const fetchMock = vi.spyOn(global, 'fetch');
+    const request = new NextRequest('http://localhost:8080/api/public-health?domain=internal.example.com');
+    const response = await GET(request);
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects when DNS resolution fails entirely', async () => {
+    vi.spyOn(dns, 'resolve4').mockRejectedValue(new Error('ENOTFOUND'));
+    vi.spyOn(dns, 'resolve6').mockRejectedValue(new Error('ENOTFOUND'));
+    const fetchMock = vi.spyOn(global, 'fetch');
+    const request = new NextRequest('http://localhost:8080/api/public-health?domain=nxdomain.example.com');
+    const response = await GET(request);
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('returns ok:true with upstream status on 2xx', async () => {
