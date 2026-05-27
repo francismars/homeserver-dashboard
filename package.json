@@ -48,7 +48,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "29.1.1",
     "knip": "^6.14.2",
-    "postcss": "8.4.49",
+    "postcss": "8.5.15",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.7.2",
     "tailwindcss": "4.1.17",
