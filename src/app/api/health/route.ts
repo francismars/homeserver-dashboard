@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
  *
  * Liveness probe. Returns 200 as long as the Next.js process can serve a
  * request. Does NOT consult downstream services (homeserver, Cloudflare,
- * filesystem) — those are separate concerns. Use this in the Dockerfile
+ * filesystem) - those are separate concerns. Use this in the Dockerfile
  * HEALTHCHECK directive, the docker-compose healthcheck, and any
  * orchestrator (Umbrel, Kubernetes) probe.
  *

@@ -102,13 +102,56 @@ describe('logs route', () => {
     expect(payload.type).toBe('bad_request');
   });
 
-  it('falls back to { raw } for non-JSON lines (legacy/plain-text file)', async () => {
+  it('falls back to { raw } for non-JSON, non-tracing lines', async () => {
     const logPath = path.join(tmpDir, 'homeserver.log');
     await fs.writeFile(logPath, 'plain text line 1\nplain text line 2\n');
     const GET = await loadRoute(logPath);
     const response = await GET(makeRequest());
     const payload = await response.json();
     expect(payload.items).toEqual([{ raw: 'plain text line 1' }, { raw: 'plain text line 2' }]);
+  });
+
+  it('parses tracing-subscriber plain-text format and strips ANSI', async () => {
+    // What pubky-core actually writes today: timestamp + level + target + msg, with ANSI codes
+    // around each field. The dashboard renders this until pubky-core ships JSON-line logging.
+    const ansiLine =
+      '\x1b[2m2026-05-28T14:07:38.112285Z\x1b[0m \x1b[32m INFO\x1b[0m \x1b[2mpubky_homeserver::data_directory\x1b[0m\x1b[2m:\x1b[0m Use data directory: /data';
+    const logPath = path.join(tmpDir, 'homeserver.log');
+    await fs.writeFile(logPath, ansiLine + '\n');
+    const GET = await loadRoute(logPath);
+    const response = await GET(makeRequest());
+    const payload = await response.json();
+    expect(payload.items).toEqual([
+      {
+        ts: '2026-05-28T14:07:38.112285Z',
+        level: 'info',
+        target: 'pubky_homeserver::data_directory',
+        msg: 'Use data directory: /data',
+      },
+    ]);
+  });
+
+  it('level filter works for parsed tracing-subscriber lines', async () => {
+    const logPath = path.join(tmpDir, 'homeserver.log');
+    const lines = [
+      '\x1b[2m2026-01-01T00:00:00Z\x1b[0m \x1b[32m INFO\x1b[0m \x1b[2mfoo\x1b[0m\x1b[2m:\x1b[0m hello',
+      '\x1b[2m2026-01-01T00:00:01Z\x1b[0m \x1b[33m WARN\x1b[0m \x1b[2mfoo\x1b[0m\x1b[2m:\x1b[0m heads up',
+      '\x1b[2m2026-01-01T00:00:02Z\x1b[0m \x1b[31m ERROR\x1b[0m \x1b[2mfoo\x1b[0m\x1b[2m:\x1b[0m broken',
+    ];
+    await fs.writeFile(logPath, lines.join('\n') + '\n');
+    const GET = await loadRoute(logPath);
+    const response = await GET(makeRequest({ level: 'warn' }));
+    const payload = await response.json();
+    expect(payload.items.map((l: { msg: string }) => l.msg)).toEqual(['heads up']);
+  });
+
+  it('strips ANSI from raw-fallback lines so the UI never shows literal escape glyphs', async () => {
+    const logPath = path.join(tmpDir, 'homeserver.log');
+    await fs.writeFile(logPath, '\x1b[33mWARNING: not in tracing format\x1b[0m\n');
+    const GET = await loadRoute(logPath);
+    const response = await GET(makeRequest());
+    const payload = await response.json();
+    expect(payload.items).toEqual([{ raw: 'WARNING: not in tracing format' }]);
   });
 
   it('clamps oversized `lines` to 5000', async () => {

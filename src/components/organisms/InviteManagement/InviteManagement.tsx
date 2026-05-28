@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,17 @@ export function InviteManagement({
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedUrlIndex, setCopiedUrlIndex] = useState<number | null>(null);
   const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
+
+  // Auto-expand the QR for a freshly-created invite, but not for invites
+  // already present on first mount. useAdminActions prepends new tokens at
+  // index 0 (`[result.token, ...prev]`), so the new invite is invites[0].
+  const justCreatedRef = useRef(false);
+  useEffect(() => {
+    if (justCreatedRef.current && invites.length > 0) {
+      setExpandedInviteIndex(0);
+      justCreatedRef.current = false;
+    }
+  }, [invites.length]);
 
   const hasStats = typeof signupCodesTotal === 'number' && typeof signupCodesUnused === 'number';
   const totalGenerated = hasStats ? signupCodesTotal : undefined;
@@ -65,6 +76,7 @@ export function InviteManagement({
   };
 
   const handleGenerate = async () => {
+    justCreatedRef.current = true;
     await onGenerate();
   };
 
@@ -112,19 +124,19 @@ export function InviteManagement({
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalGenerated ?? '—')}
+                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalGenerated ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">Total generated</div>
             </div>
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUsed ?? '—')}
+                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUsed ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">Used</div>
             </div>
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUnused ?? '—')}
+                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUnused ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">Unused</div>
             </div>
@@ -199,7 +211,7 @@ export function InviteManagement({
                     {isExpanded && signupUrl && (
                       <div className="mt-4 rounded-lg border bg-muted/30 p-4">
                         <p className="mb-3 text-xs font-medium text-muted-foreground">
-                          Share invite — scan with Pubky Ring or copy the link
+                          Share invite - scan with Pubky Ring or copy the link
                         </p>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
                           <div className="flex shrink-0 flex-col items-center gap-2">

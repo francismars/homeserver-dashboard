@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
   const [logsEnabled, setLogsEnabled] = useState(false);
+  const [disabledUsersEnabled, setDisabledUsersEnabled] = useState(false);
   const [configWritable, setConfigWritable] = useState(false);
 
   const handleSettingsClick = useCallback(() => {
@@ -77,15 +78,18 @@ export default function DashboardPage() {
 
     // Per-endpoint feature probing. Each route exposes its own availability
     // (via response status, or via a flag in the body):
-    //   - /api/server-config — 2xx means readable; body's `writable` flag drives edit affordance
-    //   - /api/cloudflare-config — body's `supported` flag drives the Cloudflare tab
-    //   - /api/logs — 2xx means the log file is readable, drives the Logs tab
+    //   - /api/server-config - 2xx means readable; body's `writable` flag drives edit affordance
+    //   - /api/cloudflare-config - body's `supported` flag drives the Cloudflare tab
+    //   - /api/logs - 2xx means the log file is readable, drives the Logs tab
+    //   - /api/admin/users/disabled - 2xx means the homeserver exposes the
+    //     disabled-users listing endpoint (pubky-core PR #327); drives the Users tab
     const detectAvailability = async () => {
       try {
-        const [configRes, cloudflareRes, logsRes] = await Promise.all([
+        const [configRes, cloudflareRes, logsRes, disabledUsersRes] = await Promise.all([
           fetch('/api/server-config'),
           fetch('/api/cloudflare-config'),
           fetch('/api/logs?lines=0'),
+          fetch('/api/admin/users/disabled?limit=1'),
         ]);
 
         let isCloudflareSupported = false;
@@ -104,6 +108,7 @@ export default function DashboardPage() {
           setCanOpenSettings(configRes.ok || isCloudflareSupported);
           setConfigWritable(isConfigWritable);
           setLogsEnabled(logsRes.ok);
+          setDisabledUsersEnabled(disabledUsersRes.ok);
         }
       } catch {
         // Keep settings button visible when detection fails to avoid blocking access.
@@ -129,17 +134,31 @@ export default function DashboardPage() {
           <Tabs defaultValue="overview" className="w-full">
             <TabsList
               className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
-                logsEnabled ? 'md:grid-cols-6' : 'md:grid-cols-5'
+                // Base tabs (Overview, Invites, Files, API) = 4; plus 1 each for
+                // Users (homeserver exposes /admin/users/disabled) and Logs (log
+                // file readable). Tailwind needs literal class names so this
+                // expands to one of three constants.
+                disabledUsersEnabled && logsEnabled
+                  ? 'md:grid-cols-6'
+                  : disabledUsersEnabled || logsEnabled
+                    ? 'md:grid-cols-5'
+                    : 'md:grid-cols-4'
               }`}
             >
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="users" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
-                <Users className="shrink-0" />
-                Users
-              </TabsTrigger>
+              {disabledUsersEnabled && (
+                <TabsTrigger
+                  value="users"
+                  className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
+                  data-testid="tab-users"
+                >
+                  <Users className="shrink-0" />
+                  Users
+                </TabsTrigger>
+              )}
               <TabsTrigger value="invites" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Gift className="shrink-0" />
                 Invites
@@ -168,22 +187,24 @@ export default function DashboardPage() {
               <DashboardOverview info={info} isLoading={infoLoading} error={infoError} />
             </TabsContent>
 
-            <TabsContent value="users" className="space-y-4">
-              <DisabledUsersManagement
-                onDisableUser={handleDisableUser}
-                onEnableUser={handleEnableUser}
-                isDisablingUser={isDisablingUser || isEnablingUser}
-                numUsersTotal={info?.num_users}
-                numDisabledUsers={info?.num_disabled_users}
-                disabledUsers={disabledUsers}
-                isLoadingDisabledUsers={isLoadingDisabledUsers}
-                isLoadingMoreDisabledUsers={isLoadingMoreDisabledUsers}
-                hasMoreDisabledUsers={Boolean(nextCursor)}
-                onLoadMoreDisabledUsers={loadMoreDisabledUsers}
-                onRefreshDisabledUsers={refetchDisabledUsers}
-                disabledUsersError={disabledUsersError?.message ?? null}
-              />
-            </TabsContent>
+            {disabledUsersEnabled && (
+              <TabsContent value="users" className="space-y-4">
+                <DisabledUsersManagement
+                  onDisableUser={handleDisableUser}
+                  onEnableUser={handleEnableUser}
+                  isDisablingUser={isDisablingUser || isEnablingUser}
+                  numUsersTotal={info?.num_users}
+                  numDisabledUsers={info?.num_disabled_users}
+                  disabledUsers={disabledUsers}
+                  isLoadingDisabledUsers={isLoadingDisabledUsers}
+                  isLoadingMoreDisabledUsers={isLoadingMoreDisabledUsers}
+                  hasMoreDisabledUsers={Boolean(nextCursor)}
+                  onLoadMoreDisabledUsers={loadMoreDisabledUsers}
+                  onRefreshDisabledUsers={refetchDisabledUsers}
+                  disabledUsersError={disabledUsersError?.message ?? null}
+                />
+              </TabsContent>
+            )}
 
             <TabsContent value="invites" className="space-y-4">
               <InviteManagement

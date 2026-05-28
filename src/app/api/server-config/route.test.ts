@@ -203,7 +203,7 @@ describe('server-config route', () => {
     it('redaction roundtrip: "********" in payload preserves the real on-disk secret', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       const { GET, POST } = await loadRoute();
-      // What the UI would see in GET — admin_password is masked
+      // What the UI would see in GET - admin_password is masked
       const redactedView = (await (await GET()).json()).config as string;
       expect(redactedView).toContain('admin_password = "********"');
       expect(redactedView).not.toContain('real-admin-password');

@@ -1,4 +1,4 @@
-# Homeserver Dashboard — Status Report
+# Homeserver Dashboard - Status Report
 
 ## What's Done
 
@@ -12,7 +12,7 @@
 | Cloudflare Tunnel config via UI                    | **Done** | Token + domain, persisted to disk           |
 | Umbrel app packaging                               | **Done** | docker-compose, gallery, x86 + ARM          |
 | Docker images                                      | **Done** | Dashboard + homeserver, multi-arch          |
-| API Explorer                                       | **Done** | Extra — lets admins test endpoints manually |
+| API Explorer                                       | **Done** | Extra - lets admins test endpoints manually |
 
 ## Partially Done
 
@@ -60,7 +60,7 @@ These endpoints need Rust-side work before the dashboard can move forward:
 
 ## Current Tasks (discussed with Chris)
 
-1. **Cloudflare + Ring investigation.** Figure out why Cloudflare tunnels are not working with Ring. Will do testing — may require changes on the SDK side.
+1. **Cloudflare + Ring investigation.** Figure out why Cloudflare tunnels are not working with Ring. Will do testing - may require changes on the SDK side.
 2. **PR on Core: blocked users list endpoint.** Add an admin API endpoint to list blocked/disabled users. This is a Core PR, not dashboard work.
 3. **Dashboard: blocked users list UI.** Once the Core endpoint lands, wire it into the dashboard Users tab.
 

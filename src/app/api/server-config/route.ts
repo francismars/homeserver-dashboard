@@ -11,7 +11,7 @@ const REDACTION_TOKEN = '********';
 
 // Top-level TOML tables that must be present for pubky-core to boot.
 // Validated structurally on POST so the dashboard refuses to write a config
-// that the homeserver can't load. We don't validate values — pubky-core does
+// that the homeserver can't load. We don't validate values - pubky-core does
 // that on startup.
 const REQUIRED_SECTIONS = ['general', 'drive', 'admin', 'storage'];
 

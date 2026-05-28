@@ -49,7 +49,7 @@ describe('public-health route', () => {
     ['172.16.4.2', '172.16.0.0/12'],
     ['192.168.1.1', '192.168.0.0/16'],
     ['100.64.0.1', 'CGNAT'],
-  ])('rejects domains that DNS-resolve to a private IPv4 (%s — %s)', async (privateIp) => {
+  ])('rejects domains that DNS-resolve to a private IPv4 (%s - %s)', async (privateIp) => {
     vi.spyOn(dns, 'resolve4').mockResolvedValue([privateIp]);
     const fetchMock = vi.spyOn(global, 'fetch');
     const request = new NextRequest('http://localhost:8080/api/public-health?domain=internal.example.com');

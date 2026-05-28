@@ -8,7 +8,7 @@ const ROUTE_NAME = '/api/logs';
 const DEFAULT_LINES = 500;
 const MAX_LINES = 5000;
 // Read at most this much of the tail. Each JSON-line is typically <500 bytes,
-// so 4MB is ~8k lines — generous enough that MAX_LINES tail requests
+// so 4MB is ~8k lines - generous enough that MAX_LINES tail requests
 // (5k lines) almost always fit. If the file is smaller than this, we read it
 // all and `startedAtZero` is true (no partial leading line to discard).
 const READ_WINDOW_BYTES = 4 * 1024 * 1024;
@@ -60,18 +60,45 @@ async function tailFile(path: string, maxBytes: number): Promise<TailResult> {
   }
 }
 
+// Matches `\x1b[<args><letter>` - CSI sequences from terminal-color output
+// (e.g. `\x1b[2m`, `\x1b[0m`, `\x1b[32m`). pubky-core's tracing subscriber
+// emits these around timestamp/level/target when colors are on. Strip before
+// parsing or returning, otherwise the UI shows literal `␛[2m...` glyphs.
+const ANSI_CSI = /\x1b\[[0-9;]*[A-Za-z]/g;
+
+// Matches the tracing-subscriber default plain-text format after ANSI strip:
+//   `<RFC3339 timestamp>  <LEVEL> <target>: <message>`
+// Example:
+//   `2026-05-28T14:07:38.112285Z  INFO pubky_homeserver: Use data directory: /data`
+// `target` must be greedy so it captures the `::` separators that Rust modules
+// use (e.g. `pubky_homeserver::data_directory::persistent_data_dir`); the regex
+// engine backtracks until the final `:` lands before a space.
+const TRACING_LINE =
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+(\S+):\s+(.*)$/;
+
+function parseLine(line: string): LogLine {
+  // JSON-line path: preferred shape, future-proof for when pubky-core ships
+  // the structured logging change we asked for.
+  try {
+    const parsed = JSON.parse(line);
+    if (parsed && typeof parsed === 'object') return parsed as LogLine;
+  } catch {
+    // fall through
+  }
+
+  // Plain-text path: strip ANSI then try the tracing-subscriber regex.
+  const stripped = line.replace(ANSI_CSI, '');
+  const match = TRACING_LINE.exec(stripped);
+  if (match) {
+    return { ts: match[1], level: match[2].toLowerCase(), target: match[3], msg: match[4] };
+  }
+  return { raw: stripped };
+}
+
 function parseLines(text: string, dropFirst: boolean): LogLine[] {
   const split = text.split('\n').filter((line) => line.length > 0);
   const effective = dropFirst && split.length > 0 ? split.slice(1) : split;
-  return effective.map<LogLine>((line) => {
-    try {
-      const parsed = JSON.parse(line);
-      if (parsed && typeof parsed === 'object') return parsed as LogLine;
-      return { raw: line };
-    } catch {
-      return { raw: line };
-    }
-  });
+  return effective.map<LogLine>((line) => parseLine(line));
 }
 
 /**
@@ -81,8 +108,8 @@ function parseLines(text: string, dropFirst: boolean): LogLine[] {
  * written into the shared data dir). Read-only.
  *
  * Query params:
- *   - `lines` (default 500, clamped to [1, 5000]) — number of trailing lines.
- *   - `level` (optional, one of trace|debug|info|warn|error) — filter.
+ *   - `lines` (default 500, clamped to [1, 5000]) - number of trailing lines.
+ *   - `level` (optional, one of trace|debug|info|warn|error) - filter.
  *
  * Behaviour:
  *   - 503 if `HOMESERVER_LOG_PATH` is unset (logs are not enabled).
