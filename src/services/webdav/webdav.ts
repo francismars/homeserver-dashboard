@@ -58,9 +58,14 @@ export class WebDavService {
     });
 
     if (!response.ok) {
+      const envelope = await response
+        .clone()
+        .json()
+        .catch(() => null as { error?: string; type?: string } | null);
       const error: WebDavError = {
-        message: `Request failed: ${response.status} ${response.statusText}`,
+        message: envelope?.error ?? `Request failed: ${response.status} ${response.statusText}`,
         status: response.status,
+        type: envelope?.type,
       };
       throw error;
     }

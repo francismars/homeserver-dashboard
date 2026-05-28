@@ -61,4 +61,13 @@ describe('admin proxy route', () => {
     expect(payload.type).toBe('timeout');
     expect(payload).not.toHaveProperty('baseUrl');
   });
+
+  it('does not retry the upstream fetch when it aborts (timeout)', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockRejectedValue(new DOMException('Timed out', 'AbortError'));
+    const request = new NextRequest('http://localhost:8080/api/admin/info');
+
+    await GET(request, { params: Promise.resolve({ path: ['info'] }) });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

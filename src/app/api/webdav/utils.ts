@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
-const UPSTREAM_TIMEOUT_MS = 8000;
-const MAX_RETRIES = 2;
+const UPSTREAM_TIMEOUT_MS = 60000;
+const MAX_RETRIES = 0;
 const SUPPORTED_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PROPFIND', 'MKCOL', 'MOVE', 'COPY']);
 
 function getActualMethod(request: NextRequest, fallbackMethod: string): string {

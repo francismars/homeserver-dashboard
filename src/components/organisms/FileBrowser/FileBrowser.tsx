@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useWebDav } from '@/hooks/webdav';
 import { useAdminActions } from '@/hooks/admin';
-import type { WebDavFile } from '@/services/webdav';
+import type { WebDavFile, WebDavError } from '@/services/webdav';
 import {
   ClipboardPaste,
   Folder,
@@ -76,32 +76,40 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
+  // Listing errors are separate from the hook's general `error` state, which is
+  // shared with readFile / writeFile / deleteFile / createDirectory / moveFile.
+  // We need the distinction so an action failure on a populated directory
+  // doesn't wipe the file list and doesn't show a Retry button that would
+  // re-run the listing, not the failed action.
+  const [listingError, setListingError] = useState<WebDavError | null>(null);
+
   const loadDirectory = useCallback(
     async (path: string) => {
-      // Clear files immediately when path changes to show loading state
       setFiles([]);
-      const directory = await listDirectory(path);
-      if (directory) {
-        setFiles(directory.files);
-        return;
-      }
-
-      // Some deployments return 500 for root /dav/ listing; fall back to homeserver pub directory.
-      if (path === '/' && homeserverPubkey) {
-        const pubPath = `/${homeserverPubkey}/pub/`;
-        const pubDirectory = await listDirectory(pubPath);
-        if (pubDirectory) {
-          setCurrentPath(pubPath);
-          setFiles(pubDirectory.files);
-        }
+      setListingError(null);
+      const result = await listDirectory(path);
+      if ('directory' in result) {
+        setFiles(result.directory.files);
+      } else {
+        setListingError(result.error);
       }
     },
-    [homeserverPubkey, listDirectory],
+    [listDirectory],
   );
 
   useEffect(() => {
     loadDirectory(currentPath);
   }, [currentPath, loadDirectory]);
+
+  // Some homeservers reject a root /dav/ listing but accept /dav/<pubkey>/pub/.
+  // Fire that fallback only when the root failure is endpoint-shaped (e.g. 404
+  // or upstream_error), not a timeout: a slow homeserver isn't going to be
+  // faster at the pub path.
+  useEffect(() => {
+    if (currentPath === '/' && listingError && listingError.type !== 'timeout' && homeserverPubkey) {
+      setCurrentPath(`/${homeserverPubkey}/pub/`);
+    }
+  }, [listingError, currentPath, homeserverPubkey]);
 
   const handleFileClick = async (file: WebDavFile) => {
     if (file.isCollection) {
@@ -467,27 +475,66 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             )}
           </div>
 
-          {/* Error Alert */}
-          {(error || validationError) && (
+          {/* Listing error: type-aware copy + Retry. Hides the file list because
+              the listing it would render is either empty or stale. */}
+          {listingError && (
             <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error?.message || validationError}</AlertDescription>
+              <AlertTitle>
+                {listingError.type === 'timeout'
+                  ? "Couldn't reach the homeserver"
+                  : listingError.type === 'upstream_error'
+                    ? "Couldn't connect to the homeserver"
+                    : 'Error'}
+              </AlertTitle>
+              <AlertDescription className="flex flex-col items-start gap-2">
+                <span>
+                  {listingError.type === 'timeout'
+                    ? 'It may be slow or unreachable. Try again in a moment.'
+                    : listingError.type === 'upstream_error'
+                      ? 'Check that the homeserver is running, then retry.'
+                      : listingError.message}
+                </span>
+                <Button size="sm" variant="outline" onClick={() => loadDirectory(currentPath)} disabled={isLoading}>
+                  <RefreshCw className="mr-1 h-4 w-4" />
+                  Retry
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
 
-          {/* File List */}
-          {isLoading && files.length === 0 ? (
+          {/* Action error (open / save / delete / upload / move). Keeps the file
+              list visible so the user does not lose their place; no Retry button
+              because a listing retry would not redo the failed action. */}
+          {error && !listingError && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Inline form validation (e.g. invalid file names). */}
+          {validationError && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{validationError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* File list, skeleton, and empty state hide ONLY on a listing error
+              (the listing didn't produce anything to show). Action errors render
+              above but the file list keeps rendering its last-known state. */}
+          {!listingError && isLoading && files.length === 0 ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : filteredAndSortedFiles.length === 0 ? (
+          ) : !listingError && filteredAndSortedFiles.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <Folder className="mx-auto mb-2 h-12 w-12 opacity-50" />
               <p>{files.length === 0 ? 'This directory is empty' : `No files match "${debouncedSearchQuery}"`}</p>
             </div>
-          ) : (
+          ) : !listingError ? (
             <>
               {/* Desktop Table View */}
               <div className="hidden overflow-x-auto rounded-md border md:block">
@@ -675,7 +722,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 ))}
               </div>
             </>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 

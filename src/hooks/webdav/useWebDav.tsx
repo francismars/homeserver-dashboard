@@ -18,19 +18,19 @@ export function useWebDav() {
   }, []);
 
   const listDirectory = useCallback(
-    async (path: string): Promise<WebDavDirectory | null> => {
+    async (path: string): Promise<{ directory: WebDavDirectory } | { error: WebDavError }> => {
       setIsLoading(true);
       setError(null);
 
       try {
         const service = getService();
         const directory = await service.listDirectory(path);
-        return directory;
+        return { directory };
       } catch (err) {
         const webdavError: WebDavError =
           err instanceof Error ? { message: err.message, status: 0 } : (err as WebDavError);
         setError(webdavError);
-        return null;
+        return { error: webdavError };
       } finally {
         setIsLoading(false);
       }
