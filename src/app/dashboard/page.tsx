@@ -128,7 +128,7 @@ export default function DashboardPage() {
 
           <Tabs defaultValue="overview" className="w-full">
             <TabsList
-              className={`scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid ${
+              className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
                 logsEnabled ? 'md:grid-cols-6' : 'md:grid-cols-5'
               }`}
             >
