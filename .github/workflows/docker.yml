@@ -1,0 +1,42 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: actions/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: pubky/ci-workflows/.github/actions/docker/build_and_push@main
+        with:
+          context: .
+          push: true
+          latest: true
+          tags: |
+            type=ref,event=tag
+          latest: true
+          platforms: |
+            linux/arm64/v8
+            linux/arm64/v7
+            linux/arm64
+            linux/amd64
+          image: homeserver-dashboard
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
