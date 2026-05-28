@@ -282,11 +282,17 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
 
           {/* Tab content */}
           <div className="flex flex-1 flex-col overflow-hidden p-6">
-            {tabs.length === 0 && (
-              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                Settings are not available in this environment.
-              </div>
-            )}
+            {tabs.length === 0 &&
+              (configLoading || cfLoading ? (
+                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Loading settings…
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                  Settings are not available in this environment.
+                </div>
+              ))}
 
             {activeTab === 'config' && isConfigTabVisible && (
               <div className="flex flex-1 flex-col gap-3 overflow-hidden">
