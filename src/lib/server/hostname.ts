@@ -38,7 +38,7 @@ function isPrivateIPv6(ip: string): boolean {
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique-local fc00::/7
   if (lower.startsWith('ff')) return true; // multicast
   if (lower.startsWith('::ffff:')) {
-    // IPv4-mapped IPv6 — check the embedded address
+    // IPv4-mapped IPv6 - check the embedded address
     const v4 = lower.replace('::ffff:', '');
     return isPrivateIPv4(v4);
   }

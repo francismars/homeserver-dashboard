@@ -77,9 +77,9 @@ export default function DashboardPage() {
 
     // Per-endpoint feature probing. Each route exposes its own availability
     // (via response status, or via a flag in the body):
-    //   - /api/server-config — 2xx means readable; body's `writable` flag drives edit affordance
-    //   - /api/cloudflare-config — body's `supported` flag drives the Cloudflare tab
-    //   - /api/logs — 2xx means the log file is readable, drives the Logs tab
+    //   - /api/server-config - 2xx means readable; body's `writable` flag drives edit affordance
+    //   - /api/cloudflare-config - body's `supported` flag drives the Cloudflare tab
+    //   - /api/logs - 2xx means the log file is readable, drives the Logs tab
     const detectAvailability = async () => {
       try {
         const [configRes, cloudflareRes, logsRes] = await Promise.all([
@@ -128,7 +128,7 @@ export default function DashboardPage() {
 
           <Tabs defaultValue="overview" className="w-full">
             <TabsList
-              className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
+              className={`scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid ${
                 logsEnabled ? 'md:grid-cols-6' : 'md:grid-cols-5'
               }`}
             >

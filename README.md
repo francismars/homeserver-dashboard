@@ -21,7 +21,7 @@ The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config
 ## Prerequisites
 
 - Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
-- A running Pubky homeserver — every UI section above is wired to live admin endpoints
+- A running Pubky homeserver - every UI section above is wired to live admin endpoints
 
 ## Quick Start
 
@@ -155,5 +155,5 @@ This project is maintained by the Pubky team at Synonym. Contributions are welco
 
 ## Related Projects
 
-- [pubky-core](https://github.com/pubky/pubky-core) — The homeserver this dashboard manages
-- [franky](https://github.com/pubky/franky) — Reference UI implementation (design system source)
+- [pubky-core](https://github.com/pubky/pubky-core) - The homeserver this dashboard manages
+- [franky](https://github.com/pubky/franky) - Reference UI implementation (design system source)

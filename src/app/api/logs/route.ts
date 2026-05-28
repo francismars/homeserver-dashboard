@@ -8,7 +8,7 @@ const ROUTE_NAME = '/api/logs';
 const DEFAULT_LINES = 500;
 const MAX_LINES = 5000;
 // Read at most this much of the tail. Each JSON-line is typically <500 bytes,
-// so 4MB is ~8k lines — generous enough that MAX_LINES tail requests
+// so 4MB is ~8k lines - generous enough that MAX_LINES tail requests
 // (5k lines) almost always fit. If the file is smaller than this, we read it
 // all and `startedAtZero` is true (no partial leading line to discard).
 const READ_WINDOW_BYTES = 4 * 1024 * 1024;
@@ -60,7 +60,7 @@ async function tailFile(path: string, maxBytes: number): Promise<TailResult> {
   }
 }
 
-// Matches `\x1b[<args><letter>` — CSI sequences from terminal-color output
+// Matches `\x1b[<args><letter>` - CSI sequences from terminal-color output
 // (e.g. `\x1b[2m`, `\x1b[0m`, `\x1b[32m`). pubky-core's tracing subscriber
 // emits these around timestamp/level/target when colors are on. Strip before
 // parsing or returning, otherwise the UI shows literal `␛[2m...` glyphs.
@@ -108,8 +108,8 @@ function parseLines(text: string, dropFirst: boolean): LogLine[] {
  * written into the shared data dir). Read-only.
  *
  * Query params:
- *   - `lines` (default 500, clamped to [1, 5000]) — number of trailing lines.
- *   - `level` (optional, one of trace|debug|info|warn|error) — filter.
+ *   - `lines` (default 500, clamped to [1, 5000]) - number of trailing lines.
+ *   - `level` (optional, one of trace|debug|info|warn|error) - filter.
  *
  * Behaviour:
  *   - 503 if `HOMESERVER_LOG_PATH` is unset (logs are not enabled).
