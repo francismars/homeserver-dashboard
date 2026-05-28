@@ -16,12 +16,12 @@ describe('useWebDav', () => {
 
     const { result } = renderHook(() => useWebDav());
 
-    let directory = null;
+    let outcome: Awaited<ReturnType<typeof result.current.listDirectory>> | null = null;
     await act(async () => {
-      directory = await result.current.listDirectory('/');
+      outcome = await result.current.listDirectory('/');
     });
 
-    expect(directory).toEqual({ path: '/', files: [] });
+    expect(outcome).toEqual({ directory: { path: '/', files: [] } });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBeNull();
   });
@@ -31,11 +31,15 @@ describe('useWebDav', () => {
 
     const { result } = renderHook(() => useWebDav());
 
+    let outcome: Awaited<ReturnType<typeof result.current.listDirectory>> | null = null;
     await act(async () => {
-      await result.current.listDirectory('/');
+      outcome = await result.current.listDirectory('/');
     });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error?.message).toContain('WebDAV failed');
+    // The error is also returned inline so callers can distinguish a listing
+    // failure from a later action failure without consulting the shared state.
+    expect(outcome).toMatchObject({ error: { message: expect.stringContaining('WebDAV failed') } });
   });
 });

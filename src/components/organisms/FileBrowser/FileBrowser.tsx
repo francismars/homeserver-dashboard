@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useWebDav } from '@/hooks/webdav';
 import { useAdminActions } from '@/hooks/admin';
-import type { WebDavFile } from '@/services/webdav';
+import type { WebDavFile, WebDavError } from '@/services/webdav';
 import {
   ClipboardPaste,
   Folder,
@@ -76,11 +76,23 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
+  // Listing errors are separate from the hook's general `error` state, which is
+  // shared with readFile / writeFile / deleteFile / createDirectory / moveFile.
+  // We need the distinction so an action failure on a populated directory
+  // doesn't wipe the file list and doesn't show a Retry button that would
+  // re-run the listing, not the failed action.
+  const [listingError, setListingError] = useState<WebDavError | null>(null);
+
   const loadDirectory = useCallback(
     async (path: string) => {
       setFiles([]);
-      const directory = await listDirectory(path);
-      if (directory) setFiles(directory.files);
+      setListingError(null);
+      const result = await listDirectory(path);
+      if ('directory' in result) {
+        setFiles(result.directory.files);
+      } else {
+        setListingError(result.error);
+      }
     },
     [listDirectory],
   );
@@ -94,10 +106,10 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
   // or upstream_error), not a timeout: a slow homeserver isn't going to be
   // faster at the pub path.
   useEffect(() => {
-    if (currentPath === '/' && error && error.type !== 'timeout' && homeserverPubkey) {
+    if (currentPath === '/' && listingError && listingError.type !== 'timeout' && homeserverPubkey) {
       setCurrentPath(`/${homeserverPubkey}/pub/`);
     }
-  }, [error, currentPath, homeserverPubkey]);
+  }, [listingError, currentPath, homeserverPubkey]);
 
   const handleFileClick = async (file: WebDavFile) => {
     if (file.isCollection) {
@@ -463,23 +475,24 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             )}
           </div>
 
-          {/* WebDAV listing error, with type-aware copy and a Retry button. */}
-          {error && (
+          {/* Listing error: type-aware copy + Retry. Hides the file list because
+              the listing it would render is either empty or stale. */}
+          {listingError && (
             <Alert variant="destructive">
               <AlertTitle>
-                {error.type === 'timeout'
+                {listingError.type === 'timeout'
                   ? "Couldn't reach the homeserver"
-                  : error.type === 'upstream_error'
+                  : listingError.type === 'upstream_error'
                     ? "Couldn't connect to the homeserver"
                     : 'Error'}
               </AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-2">
                 <span>
-                  {error.type === 'timeout'
+                  {listingError.type === 'timeout'
                     ? 'It may be slow or unreachable. Try again in a moment.'
-                    : error.type === 'upstream_error'
+                    : listingError.type === 'upstream_error'
                       ? 'Check that the homeserver is running, then retry.'
-                      : error.message}
+                      : listingError.message}
                 </span>
                 <Button size="sm" variant="outline" onClick={() => loadDirectory(currentPath)} disabled={isLoading}>
                   <RefreshCw className="mr-1 h-4 w-4" />
@@ -489,7 +502,17 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </Alert>
           )}
 
-          {/* Separate alert for inline validation errors (e.g. invalid file names). */}
+          {/* Action error (open / save / delete / upload / move). Keeps the file
+              list visible so the user does not lose their place; no Retry button
+              because a listing retry would not redo the failed action. */}
+          {error && !listingError && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Inline form validation (e.g. invalid file names). */}
           {validationError && (
             <Alert variant="destructive">
               <AlertTitle>Error</AlertTitle>
@@ -497,20 +520,21 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </Alert>
           )}
 
-          {/* File list: skeleton, empty state, and table render only when there's no
-              error. When error is set, the Alert above is the entire surface. */}
-          {!error && isLoading && files.length === 0 ? (
+          {/* File list, skeleton, and empty state hide ONLY on a listing error
+              (the listing didn't produce anything to show). Action errors render
+              above but the file list keeps rendering its last-known state. */}
+          {!listingError && isLoading && files.length === 0 ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : !error && filteredAndSortedFiles.length === 0 ? (
+          ) : !listingError && filteredAndSortedFiles.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <Folder className="mx-auto mb-2 h-12 w-12 opacity-50" />
               <p>{files.length === 0 ? 'This directory is empty' : `No files match "${debouncedSearchQuery}"`}</p>
             </div>
-          ) : !error ? (
+          ) : !listingError ? (
             <>
               {/* Desktop Table View */}
               <div className="hidden overflow-x-auto rounded-md border md:block">
