@@ -30,8 +30,6 @@ jobs:
           tags: |
             type=ref,event=tag
           platforms: |
-            linux/arm64/v8
-            linux/arm64/v7
             linux/arm64
             linux/amd64
           image: homeserver-dashboard
