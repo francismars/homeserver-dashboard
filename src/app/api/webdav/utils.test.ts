@@ -63,6 +63,23 @@ describe('webdav proxy utils', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does not retry the upstream fetch when it aborts (timeout)', async () => {
+    // Timeouts mean the upstream is slow or unreachable; retrying with the same
+    // AbortSignal would just throw again instantly and burn budget for no gain.
+    const fetchMock = vi.spyOn(global, 'fetch').mockRejectedValue(new DOMException('Timed out', 'AbortError'));
+    const request = new NextRequest('http://localhost:8080/api/webdav/user/pub/', {
+      method: 'POST',
+      headers: { 'X-HTTP-Method-Override': 'PROPFIND', Depth: '1' },
+    });
+
+    const response = await proxyWebDavRequest(request, Promise.resolve({ path: ['user', 'pub'] }), 'POST');
+    const payload = await response.json();
+
+    expect(response.status).toBe(504);
+    expect(payload.type).toBe('timeout');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('proxies PROPFIND responses successfully', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response('<multistatus />', {

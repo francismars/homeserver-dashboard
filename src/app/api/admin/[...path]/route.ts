@@ -3,8 +3,8 @@ import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 export const dynamic = 'force-dynamic';
-const UPSTREAM_TIMEOUT_MS = 8000;
-const MAX_RETRIES = 2;
+const UPSTREAM_TIMEOUT_MS = 60000;
+const MAX_RETRIES = 0;
 
 function getForwardHeaders(request: NextRequest): Record<string, string> {
   const allowlist = new Set(['accept', 'content-type', 'if-none-match', 'if-match', 'user-agent']);

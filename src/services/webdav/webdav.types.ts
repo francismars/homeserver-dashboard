@@ -22,4 +22,5 @@ export type WebDavServiceDeps = {
 export type WebDavError = {
   message: string;
   status: number;
+  type?: string;
 };

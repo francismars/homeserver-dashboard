@@ -50,6 +50,9 @@ Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code
 - `public-health` route: use the shared `isAbortError` helper so jsdom `DOMException` instances are correctly mapped to a 504 timeout rather than falling through to a 502.
 - `dashboard-ci.yml`: removed the stale `working-directory: homeserver-dashboard` block and corrected `cache-dependency-path` — the repo root is the dashboard, CI never ran correctly before.
 - `entrypoint.sh`: tightened Cloudflare config directory permissions from `0777`/`0666` to `0700`/`0600` so the tunnel token is not world-readable on a bind mount.
+- Files tab no longer renders a misleading "Request failed: 404 Not Found" with "This directory is empty" stacked underneath when the homeserver is slow or unreachable ([#36]). Three coupled fixes: (a) upstream `fetch` budget raised from 8s to 60s on the WebDAV and admin proxies, since a real PROPFIND against a populated bucket legitimately takes >8s; (b) the proxy retry-on-`AbortError` is disabled (`MAX_RETRIES` 2 → 0) because the same `AbortSignal` was reused across retries so the loop was already a no-op, and retrying a timeout against a slow upstream cannot help anyway; (c) the `WebDavService` client now parses the `{ error, type, requestId }` JSON envelope the proxy already emits, so the dashboard sees a descriptive message and a typed `error.type` instead of `"Request failed: 504 Gateway Timeout"`; (d) `FileBrowser` makes loading / empty / error / file-list branches mutually exclusive, renders type-aware copy ("Couldn't reach the homeserver" for timeout, "Couldn't connect to the homeserver" for `upstream_error`) with an explicit Retry button inside the Alert, and gates the silent `/<pubkey>/pub/` fallback to only fire on non-timeout failures (a slow homeserver isn't going to be faster at the pub path).
+
+[#36]: https://github.com/pubky/homeserver-dashboard/issues/36
 
 ### Security
 
