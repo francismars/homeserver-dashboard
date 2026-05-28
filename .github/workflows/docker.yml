@@ -23,6 +23,7 @@ jobs:
       - name: Build and push Docker image
         uses: pubky/ci-workflows/.github/actions/docker/build_and_push@main
         with:
+          registry: registry-1.docker.io/synonymsoft
           context: .
           push: true
           latest: true
@@ -34,5 +35,5 @@ jobs:
             linux/arm64
             linux/amd64
           image: homeserver-dashboard
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache_from: type=gha
+          cache_to: type=gha,mode=max
