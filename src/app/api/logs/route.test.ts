@@ -147,11 +147,42 @@ describe('logs route', () => {
 
   it('strips ANSI from raw-fallback lines so the UI never shows literal escape glyphs', async () => {
     const logPath = path.join(tmpDir, 'homeserver.log');
-    await fs.writeFile(logPath, '\x1b[33mWARNING: not in tracing format\x1b[0m\n');
+    await fs.writeFile(logPath, '\x1b[33msomething weird and unparseable\x1b[0m\n');
     const GET = await loadRoute(logPath);
     const response = await GET(makeRequest());
     const payload = await response.json();
-    expect(payload.items).toEqual([{ raw: 'WARNING: not in tracing format' }]);
+    expect(payload.items).toEqual([{ raw: 'something weird and unparseable' }]);
+  });
+
+  it('classifies bare WARNING: / ERROR: / INFO: prefixes as level so the filter and colouring still work', async () => {
+    // pubky-core's startup prints `WARNING: ...` via eprintln! before tracing
+    // is initialised, so these lines lack a timestamp/target/level structure.
+    const logPath = path.join(tmpDir, 'homeserver.log');
+    await fs.writeFile(
+      logPath,
+      [
+        'WARNING: Using default values for public_ip',
+        'ERROR: Could not bind to port',
+        'INFO: Cloudflare tunnel is healthy',
+      ].join('\n') + '\n',
+    );
+    const GET = await loadRoute(logPath);
+    const response = await GET(makeRequest());
+    const payload = await response.json();
+    expect(payload.items).toEqual([
+      { level: 'warn', msg: 'WARNING: Using default values for public_ip' },
+      { level: 'error', msg: 'ERROR: Could not bind to port' },
+      { level: 'info', msg: 'INFO: Cloudflare tunnel is healthy' },
+    ]);
+  });
+
+  it('level filter works against the prefix-detection fallback', async () => {
+    const logPath = path.join(tmpDir, 'homeserver.log');
+    await fs.writeFile(logPath, ['INFO: hello', 'WARNING: heads up', 'ERROR: bad'].join('\n') + '\n');
+    const GET = await loadRoute(logPath);
+    const response = await GET(makeRequest({ level: 'warn' }));
+    const payload = await response.json();
+    expect(payload.items.map((l: { msg: string }) => l.msg)).toEqual(['WARNING: heads up']);
   });
 
   it('clamps oversized `lines` to 5000', async () => {

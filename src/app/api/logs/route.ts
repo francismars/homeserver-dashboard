@@ -76,6 +76,21 @@ const ANSI_CSI = /\x1b\[[0-9;]*[A-Za-z]/g;
 const TRACING_LINE =
   /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+(\S+):\s+(.*)$/;
 
+// Matches a bare level prefix on unstructured stderr (e.g. the `WARNING: ...`
+// lines pubky-core prints from `eprintln!` before its tracing subscriber is
+// initialised). Maps "WARNING" to warn so the level filter and colour coding
+// still work on those lines.
+const LEVEL_PREFIX = /^(TRACE|DEBUG|INFO|WARNING|WARN|ERR(?:OR)?)\s*[:|-]\s*(.*)$/i;
+const LEVEL_PREFIX_MAP: Record<string, string> = {
+  trace: 'trace',
+  debug: 'debug',
+  info: 'info',
+  warn: 'warn',
+  warning: 'warn',
+  err: 'error',
+  error: 'error',
+};
+
 function parseLine(line: string): LogLine {
   // JSON-line path: preferred shape, future-proof for when pubky-core ships
   // the structured logging change we asked for.
@@ -88,9 +103,15 @@ function parseLine(line: string): LogLine {
 
   // Plain-text path: strip ANSI then try the tracing-subscriber regex.
   const stripped = line.replace(ANSI_CSI, '');
-  const match = TRACING_LINE.exec(stripped);
-  if (match) {
-    return { ts: match[1], level: match[2].toLowerCase(), target: match[3], msg: match[4] };
+  const tracing = TRACING_LINE.exec(stripped);
+  if (tracing) {
+    return { ts: tracing[1], level: tracing[2].toLowerCase(), target: tracing[3], msg: tracing[4] };
+  }
+
+  // Last-resort prefix match for unstructured stderr like `WARNING: ...`.
+  const prefix = LEVEL_PREFIX.exec(stripped);
+  if (prefix) {
+    return { level: LEVEL_PREFIX_MAP[prefix[1].toLowerCase()], msg: stripped };
   }
   return { raw: stripped };
 }
