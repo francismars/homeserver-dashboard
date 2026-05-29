@@ -11,5 +11,16 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   chmod 600 "$CLOUDFLARE_DIR/token" "$CLOUDFLARE_DIR/domain" 2>/dev/null || true
 fi
 
+# Make the homeserver's config.toml writable by the dashboard process.
+# pubky-core writes the file as its own user (e.g. node:node mode 0644), but
+# the dashboard runs as nextjs (UID 1001), so without this chmod the Save
+# button in Settings cannot persist edits even though the bind mount is rw.
+# Idempotent; runs each container start; non-fatal if the file does not
+# exist yet (first install before the homeserver has written one).
+HOMESERVER_DATA_DIR="/app/homeserver-data"
+if [ -f "$HOMESERVER_DATA_DIR/config.toml" ]; then
+  chmod 0666 "$HOMESERVER_DATA_DIR/config.toml" 2>/dev/null || true
+fi
+
 # Switch to nextjs user and run the app
 exec su-exec nextjs node server.js
