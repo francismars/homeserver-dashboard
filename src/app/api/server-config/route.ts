@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { constants as fsConstants, promises as fs } from 'fs';
+import { promises as fs } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { parse as parseToml } from 'smol-toml';
 import { RouteError, errorResponse } from '@/lib/server/errors';
@@ -113,28 +113,69 @@ export async function GET() {
   const requestId = randomUUID();
   const startedAt = Date.now();
   try {
-    const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
-    const stat = await fs.stat(CONFIG_PATH);
-    const writable = await fs
-      .access(CONFIG_PATH, fsConstants.W_OK)
-      .then(() => true)
-      .catch(() => false);
-    const checksum = computeChecksum(raw);
-    logRouteInfo({
-      requestId,
-      route: ROUTE_NAME,
-      method: 'GET',
-      statusCode: 200,
-      durationMs: Date.now() - startedAt,
-      message: 'Server config read',
-    });
-    return NextResponse.json({
-      config: redactConfig(raw),
-      checksum,
-      mtime: stat.mtime.toISOString(),
-      writable,
-      requestId,
-    });
+    // Single fd for everything: stat, read, and writability probe all happen
+    // against the same inode, so we cannot race with a concurrent rename or
+    // chmod. The open mode also IS the writability check: O_RDWR succeeds iff
+    // we can also save, no separate fs.access call needed (CodeQL flagged the
+    // multi-call pattern as a TOCTOU).
+    let fh: Awaited<ReturnType<typeof fs.open>>;
+    let writable = false;
+    let writableError: string | undefined;
+    try {
+      fh = await fs.open(CONFIG_PATH, 'r+');
+      writable = true;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') throw err; // bubble to the outer 404 branch
+      writableError = code ?? 'UNKNOWN';
+      fh = await fs.open(CONFIG_PATH, 'r');
+    }
+
+    try {
+      const stat = await fh.stat();
+      const buf = Buffer.alloc(stat.size);
+      await fh.read(buf, 0, stat.size, 0);
+      const raw = buf.toString('utf-8');
+
+      // Capability diagnostics. Useful for the operator to debug a stuck
+      // "Read-only" badge: compare process uid/gid with the file's, decode
+      // mode, see the exact errno. None of these are secrets - they are the
+      // identity of the running container and the bind-mounted file.
+      const diagnostics = {
+        process: {
+          uid: typeof process.getuid === 'function' ? process.getuid() : null,
+          gid: typeof process.getgid === 'function' ? process.getgid() : null,
+        },
+        file: {
+          path: CONFIG_PATH,
+          uid: stat.uid,
+          gid: stat.gid,
+          mode: '0' + (stat.mode & 0o7777).toString(8),
+        },
+        writable_error: writableError,
+      };
+
+      const checksum = computeChecksum(raw);
+      logRouteInfo({
+        requestId,
+        route: ROUTE_NAME,
+        method: 'GET',
+        statusCode: 200,
+        durationMs: Date.now() - startedAt,
+        message: 'Server config read',
+        meta: { writable, writableError },
+      });
+      return NextResponse.json({
+        config: redactConfig(raw),
+        checksum,
+        mtime: stat.mtime.toISOString(),
+        writable,
+        diagnostics,
+        requestId,
+      });
+    } finally {
+      await fh.close();
+    }
   } catch (e: unknown) {
     const isNotFound = (e as NodeJS.ErrnoException).code === 'ENOENT';
     if (isNotFound) {
