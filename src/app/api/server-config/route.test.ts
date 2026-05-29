@@ -124,7 +124,9 @@ describe('server-config route', () => {
     it('returns 500 internal_error on unexpected fs failure', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       const { GET } = await loadRoute();
-      vi.spyOn(fs, 'readFile').mockRejectedValueOnce(new Error('EACCES'));
+      // Both opens (r+ and the read-only fallback) fail. The route catches and
+      // maps to a sanitised 500 - we do not leak the underlying error message.
+      vi.spyOn(fs, 'open').mockRejectedValue(Object.assign(new Error('EACCES'), { code: 'EACCES' }));
       const response = await GET();
       const payload = await response.json();
       expect(response.status).toBe(500);
