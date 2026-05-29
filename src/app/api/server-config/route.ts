@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { constants as fsConstants, promises as fs } from 'fs';
+import { promises as fs } from 'fs';
 import { createHash, randomUUID } from 'crypto';
 import { parse as parseToml } from 'smol-toml';
 import { RouteError, errorResponse } from '@/lib/server/errors';
