@@ -96,12 +96,29 @@ describe('server-config route', () => {
       expect(payload.config).toContain('"********"');
     });
 
-    it('returns writable:false on a read-only config file', async () => {
+    it('returns writable:false on a read-only config file with a usable errno', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       await fs.chmod(configPath, 0o444);
       const { GET } = await loadRoute();
       const payload = await (await GET()).json();
       expect(payload.writable).toBe(false);
+      // Diagnostics let an operator debug a stuck Read-only badge from browser
+      // dev tools without SSH access.
+      expect(payload.diagnostics).toMatchObject({
+        process: { uid: expect.any(Number), gid: expect.any(Number) },
+        file: { path: expect.any(String), uid: expect.any(Number), gid: expect.any(Number), mode: '0444' },
+        writable_error: expect.stringMatching(/^E/),
+      });
+    });
+
+    it('exposes process uid/gid and file uid/gid/mode under diagnostics', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      await fs.chmod(configPath, 0o660);
+      const { GET } = await loadRoute();
+      const payload = await (await GET()).json();
+      expect(payload.diagnostics.file.mode).toBe('0660');
+      expect(payload.diagnostics.process.uid).toBe(process.getuid?.() ?? null);
+      expect(payload.diagnostics.writable_error).toBeUndefined();
     });
 
     it('returns 500 internal_error on unexpected fs failure', async () => {
