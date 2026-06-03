@@ -70,4 +70,21 @@ describe('WebDavService error envelope', () => {
     expect(thrown!.type).toBeUndefined();
     expect(thrown!.message).toContain('500');
   });
+
+  it('translates a 404 PROPFIND into an empty directory listing', async () => {
+    // pubky-core lazily creates a user's namespace on first write, so a
+    // PROPFIND against a not-yet-created /<pubkey>/pub/ comes back 404. That
+    // is "no data yet", not a fault, and the FileBrowser should render the
+    // standard empty state, not the red error Alert.
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Not Found', type: 'not_found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const directory = await service.listDirectory('/somepubkey/pub/');
+    expect(directory.files).toEqual([]);
+    expect(directory.path).toBe('/somepubkey/pub/');
+  });
 });
