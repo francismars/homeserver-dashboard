@@ -81,13 +81,15 @@ export class WebDavService {
   async listDirectory(path: string, depth: 0 | 1 | 'infinity' = 1): Promise<WebDavDirectory> {
     const normalizedPath = path.endsWith('/') ? path : `${path}/`;
 
-    const response = await this.request(normalizedPath, {
-      method: 'PROPFIND',
-      headers: {
-        Depth: depth.toString(),
-        'Content-Type': 'application/xml',
-      },
-      body: `<?xml version="1.0" encoding="utf-8"?>
+    let response: Response;
+    try {
+      response = await this.request(normalizedPath, {
+        method: 'PROPFIND',
+        headers: {
+          Depth: depth.toString(),
+          'Content-Type': 'application/xml',
+        },
+        body: `<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:">
   <d:prop>
     <d:displayname/>
@@ -97,7 +99,18 @@ export class WebDavService {
     <d:resourcetype/>
   </d:prop>
 </d:propfind>`,
-    });
+      });
+    } catch (err) {
+      // PROPFIND 404 means the collection does not exist yet. For pubky-core
+      // that is functionally an empty directory (the homeserver lazily creates
+      // a user's namespace on first write), not a fault, so surface it as an
+      // empty result. The FileBrowser renders the standard "directory is
+      // empty" state instead of a red error Alert.
+      if ((err as { status?: number }).status === 404) {
+        return { path: normalizedPath, files: [] };
+      }
+      throw err;
+    }
 
     const xmlText = await response.text();
     const files = this.parsePropfindResponse(xmlText, normalizedPath);
