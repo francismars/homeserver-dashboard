@@ -133,7 +133,7 @@ export default function DashboardPage() {
 
           <Tabs defaultValue="overview" className="w-full">
             <TabsList
-              className={`scrollbar-none flex w-full flex-nowrap overflow-x-auto md:grid ${
+              className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
                 // Base tabs (Overview, Invites, Files, API) = 4; plus 1 each for
                 // Users (homeserver exposes /admin/users/disabled) and Logs (log
                 // file readable). Tailwind needs literal class names so this
