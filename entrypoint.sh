@@ -7,12 +7,14 @@ CLOUDFLARE_DIR="/app/cloudflare-config"
 if [ -d "$CLOUDFLARE_DIR" ]; then
   touch "$CLOUDFLARE_DIR/token" "$CLOUDFLARE_DIR/domain" 2>/dev/null || true
   chown -R nextjs:nodejs "$CLOUDFLARE_DIR" 2>/dev/null || true
-  chmod 750 "$CLOUDFLARE_DIR" 2>/dev/null || true
   # token must be readable by cloudflared (distroless image, UID 65532) which
   # mounts this same bind mount and reads TUNNEL_TOKEN_FILE. Owner=nextjs can
   # still rewrite the file via fs.writeFile (mode is preserved on truncate);
-  # cloudflared's nonroot UID joins via the group bit.
-  chgrp 65532 "$CLOUDFLARE_DIR/token" 2>/dev/null || true
+  # cloudflared's nonroot UID joins via the group bit. The DIRECTORY also
+  # needs its group set to 65532 - without execute/traverse on the parent
+  # dir, cloudflared cannot open the file regardless of file perms.
+  chgrp 65532 "$CLOUDFLARE_DIR" "$CLOUDFLARE_DIR/token" 2>/dev/null || true
+  chmod 750 "$CLOUDFLARE_DIR" 2>/dev/null || true
   chmod 640 "$CLOUDFLARE_DIR/token" 2>/dev/null || true
   chmod 600 "$CLOUDFLARE_DIR/domain" 2>/dev/null || true
 fi
