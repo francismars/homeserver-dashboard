@@ -10,8 +10,10 @@ describe('public-health route', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: hostname resolves to a public IP. Individual tests override.
-    vi.spyOn(dns, 'resolve4').mockResolvedValue(['93.184.216.34']);
-    vi.spyOn(dns, 'resolve6').mockRejectedValue(new Error('ENOTFOUND'));
+    // The `as never` cast is needed because dns.lookup has multiple overloads
+    // and vi.spyOn picks the single-address one; we use the all:true overload
+    // which returns an array.
+    vi.spyOn(dns, 'lookup').mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
   });
 
   afterEach(() => {
@@ -50,7 +52,7 @@ describe('public-health route', () => {
     ['192.168.1.1', '192.168.0.0/16'],
     ['100.64.0.1', 'CGNAT'],
   ])('rejects domains that DNS-resolve to a private IPv4 (%s - %s)', async (privateIp) => {
-    vi.spyOn(dns, 'resolve4').mockResolvedValue([privateIp]);
+    vi.spyOn(dns, 'lookup').mockResolvedValue([{ address: privateIp, family: 4 }] as never);
     const fetchMock = vi.spyOn(global, 'fetch');
     const request = new NextRequest('http://localhost:8080/api/public-health?domain=internal.example.com');
     const response = await GET(request);
@@ -61,8 +63,7 @@ describe('public-health route', () => {
   });
 
   it('rejects a public-looking hostname that resolves to a loopback IPv6', async () => {
-    vi.spyOn(dns, 'resolve4').mockRejectedValue(new Error('ENOTFOUND'));
-    vi.spyOn(dns, 'resolve6').mockResolvedValue(['::1']);
+    vi.spyOn(dns, 'lookup').mockResolvedValue([{ address: '::1', family: 6 }] as never);
     const fetchMock = vi.spyOn(global, 'fetch');
     const request = new NextRequest('http://localhost:8080/api/public-health?domain=internal.example.com');
     const response = await GET(request);
@@ -71,8 +72,7 @@ describe('public-health route', () => {
   });
 
   it('rejects when DNS resolution fails entirely', async () => {
-    vi.spyOn(dns, 'resolve4').mockRejectedValue(new Error('ENOTFOUND'));
-    vi.spyOn(dns, 'resolve6').mockRejectedValue(new Error('ENOTFOUND'));
+    vi.spyOn(dns, 'lookup').mockRejectedValue(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' }));
     const fetchMock = vi.spyOn(global, 'fetch');
     const request = new NextRequest('http://localhost:8080/api/public-health?domain=nxdomain.example.com');
     const response = await GET(request);

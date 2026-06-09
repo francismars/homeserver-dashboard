@@ -520,7 +520,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
 
                     <p className="text-xs text-muted-foreground/70">
                       Point the tunnel hostname to <code className="text-muted-foreground">http://homeserver:6286</code>
-                      . Restart the app after saving.
+                      . Restart the app after saving.{' '}
+                      <a
+                        href="/cloudflare-guide"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand underline-offset-2 hover:underline"
+                      >
+                        Full setup guide ↗
+                      </a>
                     </p>
                   </>
                 )}

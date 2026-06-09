@@ -12,7 +12,7 @@ import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
-import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText } from 'lucide-react';
+import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText, Cloud } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -288,6 +288,13 @@ export default function DashboardPage() {
               >
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Documentation</span>
+              </Link>
+              <Link
+                href="/cloudflare-guide"
+                className="flex items-center gap-1.5 transition-colors hover:text-foreground"
+              >
+                <Cloud className="h-3.5 w-3.5" />
+                <span>Cloudflare Tunnel guide</span>
               </Link>
               <Link
                 href="https://docs.pubky.org/issues"
