@@ -69,9 +69,7 @@ export async function resolvesToPublicAddress(hostname: string): Promise<boolean
     // every address so we can still reject if any single one is private.
     const results = await dns.lookup(hostname, { all: true, verbatim: true });
     if (results.length === 0) return false;
-    return results.every(({ address, family }) =>
-      family === 6 ? !isPrivateIPv6(address) : !isPrivateIPv4(address),
-    );
+    return results.every(({ address, family }) => (family === 6 ? !isPrivateIPv6(address) : !isPrivateIPv4(address)));
   } catch {
     return false;
   }

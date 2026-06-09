@@ -4,8 +4,7 @@ import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 
 export const metadata = {
   title: 'Cloudflare Tunnel Setup - Pubky Homeserver',
-  description:
-    'Step-by-step guide for exposing a Pubky Homeserver publicly via Cloudflare Tunnel.',
+  description: 'Step-by-step guide for exposing a Pubky Homeserver publicly via Cloudflare Tunnel.',
 };
 
 export default function CloudflareGuidePage() {
@@ -27,46 +26,41 @@ export default function CloudflareGuidePage() {
             <header className="flex flex-col gap-2">
               <h1 className="text-2xl font-semibold sm:text-3xl">Cloudflare Tunnel Setup</h1>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Expose your Pubky Homeserver to the public internet via a Cloudflare Tunnel, no port
-                forwarding required. The whole setup takes about 5 minutes.
+                Expose your Pubky Homeserver to the public internet via a Cloudflare Tunnel, no port forwarding
+                required. The whole setup takes about 5 minutes.
               </p>
             </header>
 
             <Section id="prerequisites" title="Prerequisites">
               <ul className="ml-5 list-disc space-y-2 text-sm sm:text-base">
                 <li>
-                  <strong>A domain on Cloudflare.</strong> Cloudflare must be managing its DNS, i.e.,
-                  the domain appears under <em>Websites</em> on{' '}
-                  <ExternalLink href="https://dash.cloudflare.com/">dash.cloudflare.com</ExternalLink>
-                  . Free plan is fine.
+                  <strong>A domain on Cloudflare.</strong> Cloudflare must be managing its DNS, i.e., the domain appears
+                  under <em>Websites</em> on{' '}
+                  <ExternalLink href="https://dash.cloudflare.com/">dash.cloudflare.com</ExternalLink>. Free plan is
+                  fine.
                 </li>
                 <li>
-                  <strong>A Pubky Homeserver running on Umbrel.</strong> The Settings dialog (gear
-                  icon, top-right) should show a <em>Cloudflare</em> tab.
+                  <strong>A Pubky Homeserver running on Umbrel.</strong> The Settings dialog (gear icon, top-right)
+                  should show a <em>Cloudflare</em> tab.
                 </li>
                 <li>
-                  <strong>An idea of which subdomain you want</strong>, e.g.{' '}
-                  <Code>pubky.yourdomain.com</Code> or <Code>hs.yourdomain.com</Code>.
+                  <strong>An idea of which subdomain you want</strong>, e.g. <Code>pubky.yourdomain.com</Code> or{' '}
+                  <Code>hs.yourdomain.com</Code>.
                 </li>
               </ul>
             </Section>
 
-            <Section id="cloudflare-side" title="Part A — Cloudflare side (create the tunnel)">
+            <Section id="cloudflare-side" title="Part A - Cloudflare side (create the tunnel)">
               <ol className="ml-5 list-decimal space-y-3 text-sm sm:text-base">
                 <li>
-                  Log in to{' '}
-                  <ExternalLink href="https://dash.cloudflare.com/">
-                    dash.cloudflare.com
-                  </ExternalLink>
-                  .
+                  Log in to <ExternalLink href="https://dash.cloudflare.com/">dash.cloudflare.com</ExternalLink>.
                 </li>
                 <li>
-                  In the left sidebar, click <strong>Zero Trust</strong>. First-time visitors will
-                  be prompted to pick a team name and plan, free tier is enough.
+                  In the left sidebar, click <strong>Zero Trust</strong>. First-time visitors will be prompted to pick a
+                  team name and plan, free tier is enough.
                 </li>
                 <li>
-                  Inside Zero Trust, navigate to{' '}
-                  <strong>Networks → Connectors → Cloudflare Tunnels</strong>.
+                  Inside Zero Trust, navigate to <strong>Networks → Connectors → Cloudflare Tunnels</strong>.
                 </li>
                 <li>
                   Click <strong>Create a tunnel</strong>.
@@ -78,28 +72,26 @@ export default function CloudflareGuidePage() {
                   Name your tunnel (e.g. <Code>umbrel-pubky</Code>) → <strong>Save tunnel</strong>.
                 </li>
                 <li>
-                  Cloudflare will show a screen titled <em>Install and run a connector</em> with
-                  per-OS install commands. <strong>Do not run any of these commands</strong>, your
-                  Umbrel app already runs cloudflared.
+                  Cloudflare will show a screen titled <em>Install and run a connector</em> with per-OS install
+                  commands. <strong>Do not run any of these commands</strong>, your Umbrel app already runs cloudflared.
                 </li>
                 <li>
-                  What you want from this screen is the <strong>tunnel token</strong>. The Docker
-                  tab shows a command like:
+                  What you want from this screen is the <strong>tunnel token</strong>. The Docker tab shows a command
+                  like:
                   <CodeBlock>
                     docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token{' '}
                     <span className="text-brand">&lt;LONG-STRING&gt;</span>
                   </CodeBlock>
-                  Copy the <Code>&lt;LONG-STRING&gt;</Code> part only (the value after{' '}
-                  <Code>--token</Code>). It starts with <Code>eyJ</Code> and looks like base64. This
-                  is your tunnel token. Save it for Part B.
+                  Copy the <Code>&lt;LONG-STRING&gt;</Code> part only (the value after <Code>--token</Code>). It starts
+                  with <Code>eyJ</Code> and looks like base64. This is your tunnel token. Save it for Part B.
                 </li>
                 <li>
-                  Click <strong>Next</strong>. The connector will show as <em>Inactive</em>, that is
-                  expected, it activates after Part B.
+                  Click <strong>Next</strong>. The connector will show as <em>Inactive</em>, that is expected, it
+                  activates after Part B.
                 </li>
                 <li>
-                  You are now on the <strong>Route traffic</strong> page. Open the{' '}
-                  <strong>Public hostnames</strong> (or <em>Published application hostname</em>) tab.
+                  You are now on the <strong>Route traffic</strong> page. Open the <strong>Public hostnames</strong> (or{' '}
+                  <em>Published application hostname</em>) tab.
                 </li>
                 <li>
                   Fill the fields:
@@ -121,18 +113,17 @@ export default function CloudflareGuidePage() {
                     </li>
                   </ul>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Port <Code>6286</Code> is the homeserver&apos;s HTTP listener. Not{' '}
-                    <Code>6288</Code> (admin) or <Code>8812</Code> (this dashboard).
+                    Port <Code>6286</Code> is the homeserver&apos;s HTTP listener. Not <Code>6288</Code> (admin) or{' '}
+                    <Code>8812</Code> (this dashboard).
                   </p>
                 </li>
                 <li>
-                  Click <strong>Save tunnel</strong>. Cloudflare creates the DNS record
-                  automatically.
+                  Click <strong>Save tunnel</strong>. Cloudflare creates the DNS record automatically.
                 </li>
               </ol>
             </Section>
 
-            <Section id="dashboard-side" title="Part B — Homeserver Dashboard side">
+            <Section id="dashboard-side" title="Part B - Homeserver Dashboard side">
               <ol className="ml-5 list-decimal space-y-3 text-sm sm:text-base">
                 <li>Open your Pubky Homeserver app from Umbrel.</li>
                 <li>
@@ -145,8 +136,8 @@ export default function CloudflareGuidePage() {
                   Fill in:
                   <ul className="mt-2 ml-5 list-disc space-y-1">
                     <li>
-                      <strong>Domain</strong>: the full hostname, e.g. <Code>pubky.example.com</Code>{' '}
-                      (no <Code>https://</Code>, no path, no port)
+                      <strong>Domain</strong>: the full hostname, e.g. <Code>pubky.example.com</Code> (no{' '}
+                      <Code>https://</Code>, no path, no port)
                     </li>
                     <li>
                       <strong>Tunnel token</strong>: paste the token from step A-8
@@ -157,25 +148,25 @@ export default function CloudflareGuidePage() {
                   Click <strong>Save</strong>.
                 </li>
                 <li>
-                  Restart the app from Umbrel: home screen → Pubky Homeserver tile → <strong>Restart</strong>{' '}
-                  (or the three-dot menu → Restart). Wait 30 to 60 seconds.
+                  Restart the app from Umbrel: home screen → Pubky Homeserver tile → <strong>Restart</strong> (or the
+                  three-dot menu → Restart). Wait 30 to 60 seconds.
                 </li>
               </ol>
             </Section>
 
-            <Section id="verify" title="Part C — Verify">
+            <Section id="verify" title="Part C - Verify">
               <ol className="ml-5 list-decimal space-y-3 text-sm sm:text-base">
                 <li>
-                  Back in Cloudflare → <strong>Zero Trust → Networks → Connectors → Cloudflare Tunnels</strong>
-                  , your tunnel should now show <strong>Healthy</strong> (green).
+                  Back in Cloudflare → <strong>Zero Trust → Networks → Connectors → Cloudflare Tunnels</strong>, your
+                  tunnel should now show <strong>Healthy</strong> (green).
                 </li>
                 <li>
-                  In the dashboard&apos;s Cloudflare tab, click the <strong>Check</strong> button
-                  next to the saved domain. Success means the tunnel is forwarding correctly.
+                  In the dashboard&apos;s Cloudflare tab, click the <strong>Check</strong> button next to the saved
+                  domain. Success means the tunnel is forwarding correctly.
                 </li>
                 <li>
-                  From any device, <Code>curl https://pubky.example.com/</Code> should return a
-                  response from your homeserver.
+                  From any device, <Code>curl https://pubky.example.com/</Code> should return a response from your
+                  homeserver.
                 </li>
               </ol>
             </Section>
@@ -183,37 +174,33 @@ export default function CloudflareGuidePage() {
             <Section id="gotchas" title="Gotchas">
               <div className="flex flex-col gap-3">
                 <Gotcha title="Domain must be on Cloudflare DNS">
-                  If the domain&apos;s nameservers point elsewhere, this will not work. Add the site
-                  on Cloudflare and switch nameservers at your registrar first.
+                  If the domain&apos;s nameservers point elsewhere, this will not work. Add the site on Cloudflare and
+                  switch nameservers at your registrar first.
                 </Gotcha>
                 <Gotcha title="The Service URL is homeserver:6286, not your domain">
-                  That field tells cloudflared <em>where inside the Umbrel network to send traffic</em>
-                  , not where it&apos;s coming from. Easy to paste your own domain there by mistake.
+                  That field tells cloudflared <em>where inside the Umbrel network to send traffic</em>, not where
+                  it&apos;s coming from. Easy to paste your own domain there by mistake.
                 </Gotcha>
                 <Gotcha title="HTTP, not HTTPS">
-                  The homeserver inside the container speaks plain HTTP on 6286. Cloudflare handles
-                  the public TLS for you. Selecting HTTPS makes cloudflared try to negotiate TLS
-                  with the homeserver and fail.
+                  The homeserver inside the container speaks plain HTTP on 6286. Cloudflare handles the public TLS for
+                  you. Selecting HTTPS makes cloudflared try to negotiate TLS with the homeserver and fail.
                 </Gotcha>
                 <Gotcha title="The token is shown only once">
-                  If you lose it before saving in the dashboard, regenerate it from the same
-                  Cloudflare tunnel page (open the tunnel → Configure → Refresh token). The old
-                  token is invalidated.
+                  If you lose it before saving in the dashboard, regenerate it from the same Cloudflare tunnel page
+                  (open the tunnel → Configure → Refresh token). The old token is invalidated.
                 </Gotcha>
                 <Gotcha title="Multi-level subdomains need an Advanced Certificate">
-                  e.g. <Code>pubky.internal.example.com</Code> (two levels before the apex) is not
-                  covered by Cloudflare&apos;s free wildcard cert. Stick to a single level like{' '}
-                  <Code>pubky.example.com</Code>.
+                  e.g. <Code>pubky.internal.example.com</Code> (two levels before the apex) is not covered by
+                  Cloudflare&apos;s free wildcard cert. Stick to a single level like <Code>pubky.example.com</Code>.
                 </Gotcha>
                 <Gotcha title="Restart, not just stop+start in the dashboard">
-                  The cloudflared container only reads the token at container start. Restart from
-                  Umbrel&apos;s app tile to ensure both containers come back up cleanly.
+                  The cloudflared container only reads the token at container start. Restart from Umbrel&apos;s app tile
+                  to ensure both containers come back up cleanly.
                 </Gotcha>
                 <Gotcha title="Zero Trust is a different dashboard from regular Cloudflare">
-                  Cloudflare has two dashboards now, the regular one for DNS/CDN and Zero Trust for
-                  tunnels. They&apos;re cross-linked, but the URLs differ (
-                  <Code>dash.cloudflare.com</Code> vs <Code>one.dash.cloudflare.com</Code>). Tunnels
-                  live in Zero Trust.
+                  Cloudflare has two dashboards now, the regular one for DNS/CDN and Zero Trust for tunnels.
+                  They&apos;re cross-linked, but the URLs differ (<Code>dash.cloudflare.com</Code> vs{' '}
+                  <Code>one.dash.cloudflare.com</Code>). Tunnels live in Zero Trust.
                 </Gotcha>
               </div>
             </Section>
@@ -224,17 +211,9 @@ export default function CloudflareGuidePage() {
   );
 }
 
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="flex flex-col gap-3 scroll-mt-6">
+    <section id={id} className="flex scroll-mt-6 flex-col gap-3">
       <h2 className="text-xl font-semibold sm:text-2xl">{title}</h2>
       <div>{children}</div>
     </section>
@@ -242,11 +221,7 @@ function Section({
 }
 
 function Code({ children }: { children: React.ReactNode }) {
-  return (
-    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">
-      {children}
-    </code>
-  );
+  return <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">{children}</code>;
 }
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
