@@ -61,13 +61,17 @@ function isPrivateIPv6(ip: string): boolean {
  */
 export async function resolvesToPublicAddress(hostname: string): Promise<boolean> {
   try {
-    const [v4, v6] = await Promise.allSettled([dns.resolve4(hostname), dns.resolve6(hostname)]);
-    const ips: string[] = [
-      ...(v4.status === 'fulfilled' ? v4.value : []),
-      ...(v6.status === 'fulfilled' ? v6.value : []),
-    ];
-    if (ips.length === 0) return false;
-    return ips.every((ip) => !isPrivateIPv4(ip) && !isPrivateIPv6(ip));
+    // Use dns.lookup (getaddrinfo) instead of dns.resolve4/6 (c-ares). c-ares
+    // can fail silently inside containers where /etc/resolv.conf points at
+    // Docker's embedded resolver (127.0.0.11); getaddrinfo handles it
+    // reliably. verbatim:true preserves the resolver's address order so we
+    // do not depend on Node's heuristic v6-vs-v4 sorting. all:true returns
+    // every address so we can still reject if any single one is private.
+    const results = await dns.lookup(hostname, { all: true, verbatim: true });
+    if (results.length === 0) return false;
+    return results.every(({ address, family }) =>
+      family === 6 ? !isPrivateIPv6(address) : !isPrivateIPv4(address),
+    );
   } catch {
     return false;
   }
