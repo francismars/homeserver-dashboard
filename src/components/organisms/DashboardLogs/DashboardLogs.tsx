@@ -5,7 +5,7 @@ import { AlertCircle, Download, Pause, Play, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/libs/utils';
@@ -140,12 +140,7 @@ export function DashboardLogs() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
-        <div>
-          <CardTitle>Logs</CardTitle>
-          <CardDescription>
-            Live tail of the homeserver log file. Polls every {POLL_INTERVAL_MS / 1000}s while visible.
-          </CardDescription>
-        </div>
+        <CardTitle>Logs</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={level} onValueChange={(v) => setLevel(v as LevelFilter)}>
             <SelectTrigger className="h-8 w-28" data-testid="logs-level-select">
