@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { cn } from '@/libs/utils';
 
 type Tab = 'config' | 'cloudflare';
@@ -40,6 +40,56 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<SaveMessage | null>(null);
+
+  // Admin password reveal state. Fetched lazily on first reveal, never on mount.
+  const [adminPassword, setAdminPassword] = useState<string | null>(null);
+  const [isAdminPasswordVisible, setIsAdminPasswordVisible] = useState(false);
+  const [adminPasswordError, setAdminPasswordError] = useState<string | null>(null);
+  const [adminPasswordCopied, setAdminPasswordCopied] = useState(false);
+
+  const ensureAdminPassword = async (): Promise<string | null> => {
+    if (adminPassword) return adminPassword;
+    try {
+      const res = await fetch('/api/admin-password', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch admin password');
+      setAdminPassword(data.password);
+      setAdminPasswordError(null);
+      return data.password;
+    } catch (err) {
+      setAdminPasswordError(err instanceof Error ? err.message : 'Failed to fetch admin password');
+      return null;
+    }
+  };
+
+  const handleToggleAdminPassword = async () => {
+    if (isAdminPasswordVisible) {
+      setIsAdminPasswordVisible(false);
+      return;
+    }
+    const password = await ensureAdminPassword();
+    if (password) setIsAdminPasswordVisible(true);
+  };
+
+  const handleCopyAdminPassword = async () => {
+    const password = await ensureAdminPassword();
+    if (!password) return;
+    try {
+      await navigator.clipboard.writeText(password);
+      setAdminPasswordCopied(true);
+      setTimeout(() => setAdminPasswordCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (insecure context); the eye toggle still works.
+    }
+  };
+
+  // Re-mask the password whenever the dialog closes.
+  useEffect(() => {
+    if (!open) {
+      setIsAdminPasswordVisible(false);
+      setAdminPasswordCopied(false);
+    }
+  }, [open]);
 
   // Cloudflare state
   const [isCloudflareTabVisible, setIsCloudflareTabVisible] = useState(false);
@@ -350,6 +400,48 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
                       <RefreshCw className={cn('h-3.5 w-3.5', (isReloading || configLoading) && 'animate-spin')} />
                     </Button>
                   </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 rounded border border-border/60 bg-muted/20 px-3 py-2">
+                  <span className="text-sm font-medium">Admin password</span>
+                  <code className="font-mono text-xs text-muted-foreground" data-testid="admin-password-value">
+                    {isAdminPasswordVisible && adminPassword ? adminPassword : '************'}
+                  </code>
+                  <div className="ml-auto flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => void handleToggleAdminPassword()}
+                      data-testid="admin-password-toggle"
+                      aria-label={isAdminPasswordVisible ? 'Hide admin password' : 'Show admin password'}
+                    >
+                      {isAdminPasswordVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => void handleCopyAdminPassword()}
+                      data-testid="admin-password-copy"
+                      aria-label="Copy admin password"
+                    >
+                      {adminPasswordCopied ? (
+                        <Check className="h-3.5 w-3.5 text-brand" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="w-full text-xs text-muted-foreground/70">
+                    Use this to connect other admin tools (e.g. pubky-cli) to your homeserver. Do not change{' '}
+                    <code>admin_password</code> in config.toml; it would disconnect this dashboard.
+                  </p>
+                  {adminPasswordError && (
+                    <p className="w-full text-xs text-destructive" data-testid="admin-password-error">
+                      {adminPasswordError}
+                    </p>
+                  )}
                 </div>
 
                 {saveMessage && (

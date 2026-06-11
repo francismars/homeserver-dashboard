@@ -150,6 +150,11 @@ export default function CloudflareGuidePage() {
                 <li>
                   Restart the app from Umbrel: home screen → Pubky Homeserver tile → <strong>Restart</strong> (or the
                   three-dot menu → Restart). Wait 30 to 60 seconds.
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    The restart does two things: connects the tunnel, and updates your homeserver&apos;s published
+                    record so other Pubky tools find it at your domain (<Code>icann_domain</Code> in config.toml is set
+                    automatically; no manual edit needed).
+                  </p>
                 </li>
               </ol>
             </Section>
@@ -167,6 +172,11 @@ export default function CloudflareGuidePage() {
                 <li>
                   From any device, <Code>curl https://pubky.example.com/</Code> should return a response from your
                   homeserver.
+                </li>
+                <li>
+                  Optional: paste your homeserver&apos;s public key (shown on the dashboard Overview) into{' '}
+                  <ExternalLink href="https://pkdns.net/">pkdns.net</ExternalLink>. The published record should point at
+                  your tunnel domain, confirming other Pubky tools can discover your homeserver.
                 </li>
               </ol>
             </Section>
@@ -196,6 +206,11 @@ export default function CloudflareGuidePage() {
                 <Gotcha title="Restart, not just stop+start in the dashboard">
                   The cloudflared container only reads the token at container start. Restart from Umbrel&apos;s app tile
                   to ensure both containers come back up cleanly.
+                </Gotcha>
+                <Gotcha title="Do not change admin_password in config.toml">
+                  On Umbrel the dashboard authenticates to the homeserver with a platform-generated password. Changing{' '}
+                  <Code>admin_password</Code> disconnects the dashboard. Need the password for another tool (e.g.
+                  pubky-cli)? Reveal it with the eye icon in Settings → Config.
                 </Gotcha>
                 <Gotcha title="Zero Trust is a different dashboard from regular Cloudflare">
                   Cloudflare has two dashboards now, the regular one for DNS/CDN and Zero Trust for tunnels.
