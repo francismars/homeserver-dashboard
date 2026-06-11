@@ -14,6 +14,10 @@ import { ServerControlDialog } from '@/components/organisms/ServerControlDialog'
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText, Cloud } from 'lucide-react';
 import Link from 'next/link';
+// The dashboard's own release version. The homeserver's version (from /info)
+// is shown on the Overview card, explicitly labeled; mixing the two in the
+// footer confused operators comparing against the Umbrel app version.
+import { version as dashboardVersion } from '../../../package.json';
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
@@ -261,8 +265,8 @@ export default function DashboardPage() {
             {/* Copyright and version */}
             <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
               <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:gap-4 sm:text-left">
-                <span className="text-xs sm:text-sm">Homeserver Dashboard</span>
-                <span className="text-xs">{info?.version ? `v${info.version}` : 'v0.1.0-dev'}</span>
+                <span className="text-xs sm:text-sm">Dashboard</span>
+                <span className="text-xs">v{dashboardVersion}</span>
               </div>
               <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
                 <span>Synonym Software, S.A. DE C.V. ©{new Date().getFullYear()}. All rights reserved.</span>

@@ -165,7 +165,7 @@ export function DashboardOverview({ info, isLoading, error }: DashboardOverviewP
 
             {/* Server Version */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Version:</span>
+              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver version:</span>
               <div className="flex flex-1 items-center gap-2 sm:flex-initial">
                 <span className="text-xs break-words text-foreground sm:text-sm">{homeserverVersion}</span>
                 {isVersionSoon && (
