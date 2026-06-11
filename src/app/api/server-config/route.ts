@@ -310,6 +310,42 @@ export async function POST(request: NextRequest) {
 
   const merged = restoreRedactedValues(incomingToml, existing);
 
+  // On managed deployments (Umbrel) the dashboard authenticates to the
+  // homeserver with a platform-generated password injected via env. If the
+  // user edits admin_password in config.toml the pairing silently breaks:
+  // the homeserver starts requiring the new password while the dashboard
+  // keeps sending the old one. Reject the edit with an explanation instead.
+  // ADMIN_PASSWORD_MANAGED is set by the platform compose, so native
+  // deployments (where the operator controls both sides) stay editable.
+  if (process.env.ADMIN_PASSWORD_MANAGED === 'true') {
+    const extractFirst = (toml: string, key: string): string | null => {
+      for (const line of toml.split('\n')) {
+        const value = extractStringValue(line.trim(), key);
+        if (value !== null) return value;
+      }
+      return null;
+    };
+    const incomingPassword = extractFirst(merged, 'admin_password');
+    const existingPassword = extractFirst(existing, 'admin_password');
+    if (existingPassword !== null && incomingPassword !== existingPassword) {
+      const error = new RouteError(
+        400,
+        'bad_request',
+        'admin_password is managed by Umbrel and cannot be changed here. Changing it would disconnect this dashboard from the homeserver. Use the eye icon in Settings to view the current password.',
+      );
+      logRouteError({
+        requestId,
+        route: ROUTE_NAME,
+        method: 'POST',
+        statusCode: error.status,
+        durationMs: Date.now() - startedAt,
+        errorType: error.type,
+        message: 'Rejected admin_password change on managed deployment',
+      });
+      return errorResponse(error, requestId);
+    }
+  }
+
   const validationError = validateTomlStructure(merged);
   if (validationError) {
     logRouteError({

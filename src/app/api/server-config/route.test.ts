@@ -253,6 +253,50 @@ describe('server-config route', () => {
       expect(onDisk).toContain('admin_password = "new-password-xyz"');
     });
 
+    it('managed deployment: rejects an admin_password change with 400', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      process.env.ADMIN_PASSWORD_MANAGED = 'true';
+      const { POST } = await loadRoute();
+      const newConfig = VALID_CONFIG.replace(
+        'admin_password = "real-admin-password"',
+        'admin_password = "user-chosen-password"',
+      );
+      const response = await POST(postRequest({ config_toml: newConfig, checksum: sha256(VALID_CONFIG) }));
+      const payload = await response.json();
+      expect(response.status).toBe(400);
+      expect(payload.error).toContain('managed by Umbrel');
+      // File untouched
+      const onDisk = await fs.readFile(configPath, 'utf-8');
+      expect(onDisk).toContain('admin_password = "real-admin-password"');
+    });
+
+    it('managed deployment: redaction-roundtrip placeholder is NOT treated as a change', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      process.env.ADMIN_PASSWORD_MANAGED = 'true';
+      const { GET, POST } = await loadRoute();
+      const redactedView = (await (await GET()).json()).config as string;
+      const userEdit = redactedView.replace('token_required', 'open');
+      const response = await POST(postRequest({ config_toml: userEdit, checksum: sha256(VALID_CONFIG) }));
+      expect(response.status).toBe(200);
+      const onDisk = await fs.readFile(configPath, 'utf-8');
+      expect(onDisk).toContain('admin_password = "real-admin-password"');
+      expect(onDisk).toContain('signup_mode = "open"');
+    });
+
+    it('unmanaged deployment: admin_password stays editable', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      delete process.env.ADMIN_PASSWORD_MANAGED;
+      const { POST } = await loadRoute();
+      const newConfig = VALID_CONFIG.replace(
+        'admin_password = "real-admin-password"',
+        'admin_password = "native-deploy-password"',
+      );
+      const response = await POST(postRequest({ config_toml: newConfig, checksum: sha256(VALID_CONFIG) }));
+      expect(response.status).toBe(200);
+      const onDisk = await fs.readFile(configPath, 'utf-8');
+      expect(onDisk).toContain('admin_password = "native-deploy-password"');
+    });
+
     it('atomic write: original file unchanged if rename fails mid-write', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       const { POST } = await loadRoute();
