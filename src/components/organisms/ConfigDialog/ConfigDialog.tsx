@@ -259,8 +259,17 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
     );
     setHealthStatus('idle');
     // The tunnel typically connects within seconds (cloudflared retries until
-    // the token file appears); probe once so the user sees it go green.
-    setTimeout(() => void checkHealth(hostname), 5_000);
+    // the token file appears), but edge DNS + the first connection can take
+    // longer. Probe up to 4 times before surfacing a failure so the user is
+    // not flashed a red "Not reachable" right after the green success state.
+    const probe = async (attempt: number) => {
+      const reachable = await checkHealth(hostname);
+      if (!reachable && attempt < 4) {
+        setHealthStatus('checking');
+        setTimeout(() => void probe(attempt + 1), 8_000);
+      }
+    };
+    setTimeout(() => void probe(1), 5_000);
   };
 
   const handleCfSave = async (e: React.FormEvent) => {
@@ -293,7 +302,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
     }
   };
 
-  const checkHealth = async (domain: string) => {
+  const checkHealth = async (domain: string): Promise<boolean> => {
     setHealthStatus('checking');
     setHealthError(null);
     try {
@@ -301,13 +310,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
       const data = await res.json();
       if (data.ok) {
         setHealthStatus('ok');
-      } else {
-        setHealthStatus('fail');
-        setHealthError(data.error || `HTTP ${data.status ?? res.status}`);
+        return true;
       }
+      setHealthStatus('fail');
+      setHealthError(data.error || `HTTP ${data.status ?? res.status}`);
+      return false;
     } catch {
       setHealthStatus('fail');
       setHealthError('Request failed');
+      return false;
     }
   };
 
