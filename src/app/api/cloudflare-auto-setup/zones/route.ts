@@ -54,16 +54,20 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
-    const error =
-      e instanceof CfApiError && (e.status === 401 || e.status === 403)
-        ? new RouteError(
-            401,
-            'unauthorized',
-            'Cloudflare rejected the token. Check that it exists, has not expired, and includes Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit and Zone > Zone > Read.',
-          )
-        : e instanceof CfApiError
-          ? new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || e.status}`)
-          : new RouteError(502, 'upstream_error', 'Could not reach the Cloudflare API');
+    // Real-API behaviors: invalid token -> 403; malformed Authorization
+    // header (e.g. token with stray characters) -> 400 with code 6003.
+    // Both mean "this token is not usable"; give the same friendly message.
+    const isAuthFailure =
+      e instanceof CfApiError && (e.status === 401 || e.status === 403 || (e.status === 400 && e.codes.includes(6003)));
+    const error = isAuthFailure
+      ? new RouteError(
+          401,
+          'unauthorized',
+          'Cloudflare rejected the token. Check that it exists, has not expired, and includes Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit and Zone > Zone > Read.',
+        )
+      : e instanceof CfApiError
+        ? new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || e.status}`)
+        : new RouteError(502, 'upstream_error', 'Could not reach the Cloudflare API');
     logRouteError({
       requestId,
       route: ROUTE_NAME,
