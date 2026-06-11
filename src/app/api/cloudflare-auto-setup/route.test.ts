@@ -31,9 +31,13 @@ function makeRules(overrides: Partial<Record<string, MockRule['reply']>> = {}): 
     ],
     ['listTunnels', (m, u) => m === 'GET' && u.includes('/cfd_tunnel?'), () => cfOk([])],
     [
+      // Per the API reference, the create response does NOT include a token
+      // field (the GET .../token endpoint exists for that). Some guide pages
+      // suggest otherwise; the route handles both, and the default mock
+      // mirrors the reference schema.
       'createTunnel',
       (m, u) => m === 'POST' && u.endsWith('/cfd_tunnel'),
-      () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver', token: 'run-token-xyz' }),
+      () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver', remote_config: true }),
     ],
     [
       'getTunnelToken',
@@ -114,10 +118,10 @@ describe('cloudflare-auto-setup route', () => {
       { key: 'dns', status: 'done' },
       { key: 'credentials', status: 'done' },
     ]);
-    // Files written with the run token from the create response (no extra GET)
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-xyz');
+    // Run token fetched via the dedicated GET (create responses do not carry it)
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-from-get');
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
-    expect(calls.some((c) => c.url.includes('/token'))).toBe(false);
+    expect(calls.some((c) => c.method === 'GET' && c.url.includes(`/cfd_tunnel/${TUNNEL_ID}/token`))).toBe(true);
     // Ingress body shape matches the documented config schema
     const ingressCall = calls.find((c) => c.method === 'PUT' && c.url.includes('/configurations'));
     expect(ingressCall?.body).toEqual({
@@ -229,17 +233,17 @@ describe('cloudflare-auto-setup route', () => {
     expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
   });
 
-  it('create response without a token falls back to the token GET', async () => {
+  it('uses a token from the create response when present (skips the GET)', async () => {
     installFetchMock(
       makeRules({
-        createTunnel: () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver' }),
+        createTunnel: () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver', token: 'run-token-inline' }),
       }),
       calls,
     );
     const res = await post(validBody);
     expect(res.status).toBe(200);
-    expect(calls.some((c) => c.method === 'GET' && c.url.includes(`/cfd_tunnel/${TUNNEL_ID}/token`))).toBe(true);
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-from-get');
+    expect(calls.some((c) => c.method === 'GET' && c.url.includes(`/cfd_tunnel/${TUNNEL_ID}/token`))).toBe(false);
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-inline');
   });
 
   it('tolerates the DNS-delete bare envelope (no success field)', async () => {
