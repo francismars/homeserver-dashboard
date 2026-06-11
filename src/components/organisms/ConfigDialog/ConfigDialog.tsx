@@ -7,8 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/libs/utils';
+import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
@@ -245,6 +246,20 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
       cancelled = true;
     };
   }, [open]);
+
+  // Manual tunnel form is collapsed behind a toggle once automatic setup is
+  // the primary path; stays expanded if a tunnel is already configured (the
+  // common reason to come back is rotating the token).
+  const [showManualSetup, setShowManualSetup] = useState(false);
+
+  const handleAutoConfigured = (hostname: string) => {
+    setCfDomain(hostname);
+    setCfConfig((c) => (c ? { ...c, domain: hostname, configured: true } : c));
+    setHealthStatus('idle');
+    // The tunnel typically connects within seconds (cloudflared retries until
+    // the token file appears); probe once so the user sees it go green.
+    setTimeout(() => void checkHealth(hostname), 5_000);
+  };
 
   const handleCfSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -558,70 +573,95 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
 
                     <div className="h-px bg-border/50" />
 
-                    {/* Save feedback */}
-                    {cfMessage && (
-                      <div
-                        className={cn(
-                          'flex items-center gap-2 text-sm',
-                          cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
+                    {/* Automatic setup (primary path) */}
+                    <CloudflareAutoSetup onConfigured={handleAutoConfigured} />
+
+                    <div className="h-px bg-border/50" />
+
+                    {/* Manual setup (collapsed escape hatch) */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setShowManualSetup((s) => !s)}
+                      data-testid="cf-manual-toggle"
+                    >
+                      {showManualSetup ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                      Set up manually instead
+                    </button>
+
+                    {showManualSetup && (
+                      <>
+                        {/* Save feedback */}
+                        {cfMessage && (
+                          <div
+                            className={cn(
+                              'flex items-center gap-2 text-sm',
+                              cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
+                            )}
+                          >
+                            {cfMessage.type === 'error' ? (
+                              <AlertCircle className="h-3.5 w-3.5" />
+                            ) : (
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            )}
+                            <span>{cfMessage.text}</span>
+                          </div>
                         )}
-                      >
-                        {cfMessage.type === 'error' ? (
-                          <AlertCircle className="h-3.5 w-3.5" />
-                        ) : (
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        )}
-                        <span>{cfMessage.text}</span>
-                      </div>
+
+                        {/* Configuration form */}
+                        <form onSubmit={handleCfSave} className="space-y-5">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="cf-domain" className="text-xs text-muted-foreground">
+                              Domain
+                            </Label>
+                            <Input
+                              id="cf-domain"
+                              type="text"
+                              placeholder="pubky.yourdomain.com"
+                              value={cfDomain}
+                              onChange={(e) => setCfDomain(e.target.value)}
+                              className="font-mono text-sm"
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="cf-token" className="text-xs text-muted-foreground">
+                              Tunnel token
+                            </Label>
+                            <Input
+                              id="cf-token"
+                              type="password"
+                              placeholder="Paste token from Cloudflare Zero Trust"
+                              value={cfToken}
+                              onChange={(e) => setCfToken(e.target.value)}
+                              className="font-mono text-sm"
+                              autoComplete="off"
+                            />
+                          </div>
+                          <Button type="submit" disabled={cfSaving} size="sm">
+                            {cfSaving ? 'Saving…' : 'Save'}
+                          </Button>
+                        </form>
+
+                        <p className="text-xs text-muted-foreground/70">
+                          Point the tunnel hostname to{' '}
+                          <code className="text-muted-foreground">http://homeserver:6286</code>. Restart the app after
+                          saving.{' '}
+                          <a
+                            href="/cloudflare-guide"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand underline-offset-2 hover:underline"
+                          >
+                            Full setup guide ↗
+                          </a>
+                        </p>
+                      </>
                     )}
-
-                    {/* Configuration form */}
-                    <form onSubmit={handleCfSave} className="space-y-5">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cf-domain" className="text-xs text-muted-foreground">
-                          Domain
-                        </Label>
-                        <Input
-                          id="cf-domain"
-                          type="text"
-                          placeholder="pubky.yourdomain.com"
-                          value={cfDomain}
-                          onChange={(e) => setCfDomain(e.target.value)}
-                          className="font-mono text-sm"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cf-token" className="text-xs text-muted-foreground">
-                          Tunnel token
-                        </Label>
-                        <Input
-                          id="cf-token"
-                          type="password"
-                          placeholder="Paste token from Cloudflare Zero Trust"
-                          value={cfToken}
-                          onChange={(e) => setCfToken(e.target.value)}
-                          className="font-mono text-sm"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <Button type="submit" disabled={cfSaving} size="sm">
-                        {cfSaving ? 'Saving…' : 'Save'}
-                      </Button>
-                    </form>
-
-                    <p className="text-xs text-muted-foreground/70">
-                      Point the tunnel hostname to <code className="text-muted-foreground">http://homeserver:6286</code>
-                      . Restart the app after saving.{' '}
-                      <a
-                        href="/cloudflare-guide"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand underline-offset-2 hover:underline"
-                      >
-                        Full setup guide ↗
-                      </a>
-                    </p>
                   </>
                 )}
               </div>
