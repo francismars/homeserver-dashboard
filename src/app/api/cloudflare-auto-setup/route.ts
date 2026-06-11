@@ -25,7 +25,7 @@ const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config'
 const SUBDOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 type StepKey = 'tunnel' | 'ingress' | 'dns' | 'credentials';
-type StepStatus = 'done' | 'failed' | 'skipped';
+type StepStatus = 'done' | 'failed';
 type Step = { key: StepKey; status: StepStatus; detail?: string };
 
 /**
@@ -115,11 +115,76 @@ export async function POST(request: NextRequest) {
     return fail(new RouteError(400, 'bad_request', `Resulting hostname is not valid: ${hostname}`));
   }
 
-  // --- 2. Adopt-or-create the tunnel ---------------------------------------
+  // --- 2. DNS conflict gate, BEFORE any mutation -----------------------------
+  // Nothing is created or modified in the user's account until this passes,
+  // so cancelling at the conflict prompt has zero side effects.
+  //
+  // Only address-bearing records conflict with our CNAME: A, AAAA, and
+  // foreign CNAMEs. MX/TXT/etc coexist with a flattened/proxied CNAME and
+  // are never touched - deleting a user's apex MX records would break their
+  // email. A CNAME already pointing at *.cfargotunnel.com is a previous
+  // tunnel install (possibly a stale tunnel id); repointing it is the
+  // expected reinstall behavior and needs no confirmation.
+  let existingCname: { id: string; content: string } | undefined;
+  let addressBlockers: Array<{ id: string; type: string; content: string }> = [];
+  try {
+    const existingRecords = await listDnsRecordsAtName(apiToken, zoneId, hostname);
+    const cname = existingRecords.find((r) => r.type === 'CNAME');
+    existingCname = cname ? { id: cname.id, content: cname.content } : undefined;
+    addressBlockers = existingRecords
+      .filter((r) => r.type === 'A' || r.type === 'AAAA')
+      .map((r) => ({ id: r.id, type: r.type, content: r.content }));
+
+    const needsConfirmation = [
+      ...addressBlockers,
+      ...(existingCname && !existingCname.content.endsWith('.cfargotunnel.com')
+        ? [{ type: 'CNAME', content: existingCname.content }]
+        : []),
+    ];
+    if (needsConfirmation.length > 0 && !overwriteDns) {
+      steps.push({ key: 'dns', status: 'failed', detail: 'Existing DNS record at this hostname' });
+      logRouteInfo({
+        requestId,
+        route: ROUTE_NAME,
+        method: 'POST',
+        statusCode: 409,
+        durationMs: Date.now() - startedAt,
+        message: 'DNS conflict requires user confirmation',
+        meta: { recordTypes: needsConfirmation.map((r) => r.type) },
+      });
+      return NextResponse.json(
+        {
+          error: `A DNS record already exists at ${hostname}`,
+          type: 'dns_conflict',
+          existing_records: needsConfirmation.map((r) => ({ type: r.type, content: r.content })),
+          steps,
+          requestId,
+        },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+  } catch (e) {
+    steps.push({ key: 'dns', status: 'failed' });
+    return fail(mapCfError(e, 'dns'), e instanceof Error ? e.message : String(e));
+  }
+
+  // --- 3. Adopt-or-create the tunnel ---------------------------------------
   let tunnelId: string;
   let runToken: string | undefined;
   try {
     const existing = await findTunnelByName(apiToken, accountId, TUNNEL_NAME);
+    if (existing && existing.remote_config === false) {
+      // A locally-managed tunnel ignores remote ingress config; "adopting" it
+      // would report success while routing nothing.
+      steps.push({ key: 'tunnel', status: 'failed', detail: 'Locally-managed tunnel with the same name' });
+      return fail(
+        new RouteError(
+          409,
+          'bad_request',
+          `A locally-managed tunnel named "${TUNNEL_NAME}" already exists in your Cloudflare account. Delete or rename it in the Cloudflare dashboard, then retry.`,
+        ),
+      );
+    }
     if (existing) {
       tunnelId = existing.id;
       steps.push({ key: 'tunnel', status: 'done', detail: 'Reusing existing tunnel' });
@@ -134,7 +199,7 @@ export async function POST(request: NextRequest) {
     return fail(mapCfError(e, 'tunnel'), e instanceof Error ? e.message : String(e));
   }
 
-  // --- 3. Ingress ------------------------------------------------------------
+  // --- 4. Ingress ------------------------------------------------------------
   try {
     await putTunnelIngress(apiToken, accountId, tunnelId, hostname);
     steps.push({ key: 'ingress', status: 'done' });
@@ -143,50 +208,20 @@ export async function POST(request: NextRequest) {
     return fail(mapCfError(e, 'tunnel'), e instanceof Error ? e.message : String(e));
   }
 
-  // --- 4. DNS ----------------------------------------------------------------
+  // --- 5. DNS reconcile --------------------------------------------------------
+  // The conflict gate already ran; anything still here is either ours, a
+  // stale tunnel CNAME (repoint), or an explicitly-confirmed overwrite.
   const target = `${tunnelId}.cfargotunnel.com`;
   try {
-    const existingRecords = await listDnsRecordsAtName(apiToken, zoneId, hostname);
-    const alreadyOurs = existingRecords.find((r) => r.type === 'CNAME' && r.content === target);
-    const conflicting = existingRecords.filter((r) => !(r.type === 'CNAME' && r.content === target));
-
-    if (alreadyOurs && conflicting.length === 0) {
+    // A/AAAA records only survive the gate when the user confirmed overwrite.
+    for (const blocker of addressBlockers) {
+      await deleteDnsRecord(apiToken, zoneId, blocker.id);
+    }
+    if (existingCname && existingCname.content === target) {
       steps.push({ key: 'dns', status: 'done', detail: 'DNS record already in place' });
-    } else if (conflicting.length > 0 && !overwriteDns) {
-      steps.push({ key: 'dns', status: 'failed', detail: 'Existing DNS record at this hostname' });
-      logRouteInfo({
-        requestId,
-        route: ROUTE_NAME,
-        method: 'POST',
-        statusCode: 409,
-        durationMs: Date.now() - startedAt,
-        message: 'DNS conflict requires user confirmation',
-        meta: { recordTypes: conflicting.map((r) => r.type) },
-      });
-      return NextResponse.json(
-        {
-          error: `A DNS record already exists at ${hostname}`,
-          type: 'dns_conflict',
-          existing_records: conflicting.map((r) => ({ type: r.type, content: r.content })),
-          steps,
-          requestId,
-        },
-        { status: 409, headers: { 'Cache-Control': 'no-store' } },
-      );
-    } else if (conflicting.length > 0) {
-      // Overwrite confirmed: CNAMEs are updated in place, other types are
-      // replaced (delete + create) since a CNAME cannot coexist with them.
-      for (const record of conflicting) {
-        if (record.type === 'CNAME') {
-          await updateDnsRecord(apiToken, zoneId, record.id, hostname, tunnelId);
-        } else {
-          await deleteDnsRecord(apiToken, zoneId, record.id);
-        }
-      }
-      if (!alreadyOurs && !conflicting.some((r) => r.type === 'CNAME')) {
-        await createDnsRecord(apiToken, zoneId, hostname, tunnelId);
-      }
-      steps.push({ key: 'dns', status: 'done', detail: 'Existing record replaced' });
+    } else if (existingCname) {
+      await updateDnsRecord(apiToken, zoneId, existingCname.id, hostname, tunnelId);
+      steps.push({ key: 'dns', status: 'done', detail: 'Existing record repointed' });
     } else {
       await createDnsRecord(apiToken, zoneId, hostname, tunnelId);
       steps.push({ key: 'dns', status: 'done' });

@@ -254,7 +254,9 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
 
   const handleAutoConfigured = (hostname: string) => {
     setCfDomain(hostname);
-    setCfConfig((c) => (c ? { ...c, domain: hostname, configured: true } : c));
+    setCfConfig((c) =>
+      c ? { ...c, domain: hostname, configured: true } : { domain: hostname, configured: true, supported: true },
+    );
     setHealthStatus('idle');
     // The tunnel typically connects within seconds (cloudflared retries until
     // the token file appears); probe once so the user sees it go green.

@@ -57,7 +57,10 @@ async function cfFetch<T>(apiToken: string, path: string, init?: RequestInit): P
     throw new CfApiError(response.status, [], [`Unexpected non-JSON response from Cloudflare`]);
   }
 
-  if (!response.ok || !envelope.success) {
+  // Some v4 endpoints (notably DNS-record DELETE) respond with a bare
+  // {"result": ...} and no success/errors fields. Treat a 2xx with
+  // success !== false as success; only an explicit false (or non-2xx) fails.
+  if (!response.ok || envelope.success === false) {
     const errors = Array.isArray(envelope.errors) ? envelope.errors : [];
     throw new CfApiError(
       response.status,
@@ -76,11 +79,19 @@ export interface CfZone {
 }
 
 /**
- * Lists zones the token can see. Doubles as token validation: an invalid or
+ * Lists zones the token can see, following pagination so accounts with many
+ * zones still find their domain. Doubles as token validation: an invalid or
  * expired token fails here with 401/403 before we touch anything else.
  */
-export function listZones(apiToken: string): Promise<CfZone[]> {
-  return cfFetch<CfZone[]>(apiToken, '/zones?per_page=50');
+export async function listZones(apiToken: string): Promise<CfZone[]> {
+  const zones: CfZone[] = [];
+  // Hard ceiling of 20 pages (1000 zones) as a runaway guard.
+  for (let page = 1; page <= 20; page++) {
+    const batch = await cfFetch<CfZone[]>(apiToken, `/zones?per_page=50&page=${page}`);
+    zones.push(...batch);
+    if (batch.length < 50) break;
+  }
+  return zones;
 }
 
 export function getZone(apiToken: string, zoneId: string): Promise<CfZone> {
@@ -92,6 +103,9 @@ export interface CfTunnel {
   name: string;
   /** Present on create responses; absent from list responses. */
   token?: string;
+  /** False for locally-managed tunnels (config file + credentials.json); our
+   * remote ingress PUT would be ignored by those. */
+  remote_config?: boolean;
 }
 
 export async function findTunnelByName(apiToken: string, accountId: string, name: string): Promise<CfTunnel | null> {

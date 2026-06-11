@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         ? new RouteError(
             401,
             'unauthorized',
-            'Cloudflare rejected the token. Check that it exists, has not expired, and includes Account > Cloudflare Tunnel > Edit and Zone > DNS > Edit.',
+            'Cloudflare rejected the token. Check that it exists, has not expired, and includes Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit and Zone > Zone > Read.',
           )
         : e instanceof CfApiError
           ? new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || e.status}`)

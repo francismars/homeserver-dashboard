@@ -21,6 +21,10 @@ const TOKEN_TEMPLATE_URL =
     JSON.stringify([
       { key: 'argotunnel', type: 'edit' },
       { key: 'dns', type: 'edit' },
+      // Zone Read covers GET /zones(/:id); DNS Edit alone may not grant zone
+      // detail reads, and without it the flow could never proceed past
+      // "Load domains" on some accounts.
+      { key: 'zone', type: 'read' },
     ]),
   ) +
   '&name=' +
@@ -29,7 +33,7 @@ const TOKEN_TEMPLATE_URL =
 type Zone = { id: string; name: string; status: string; account_id: string };
 type Step = {
   key: 'tunnel' | 'ingress' | 'dns' | 'credentials';
-  status: 'done' | 'failed' | 'skipped';
+  status: 'done' | 'failed';
   detail?: string;
 };
 type ConflictRecord = { type: string; content: string };
@@ -85,6 +89,15 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
     }
   };
 
+  /** Any change to what would be created invalidates a pending conflict
+   * prompt; "Replace record" must never act on a hostname whose records the
+   * user has not seen. */
+  const resetRunState = () => {
+    setConflict(null);
+    setSteps(null);
+    setError(null);
+  };
+
   const run = async (overwriteDns: boolean) => {
     setRunning(true);
     setError(null);
@@ -101,7 +114,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           overwrite_dns: overwriteDns,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}) as Record<string, never>);
       setSteps(data.steps ?? null);
       if (res.status === 409 && data.type === 'dns_conflict') {
         setConflict(data.existing_records ?? []);
@@ -182,8 +195,9 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           >
             Create one with the pre-filled link <ExternalLink className="h-3 w-3" />
           </a>{' '}
-          or any token with <code className="text-muted-foreground">Account &gt; Cloudflare Tunnel &gt; Edit</code> and{' '}
-          <code className="text-muted-foreground">Zone &gt; DNS &gt; Edit</code>. The token is only used during setup
+          or any token with <code className="text-muted-foreground">Account &gt; Cloudflare Tunnel &gt; Edit</code>,{' '}
+          <code className="text-muted-foreground">Zone &gt; DNS &gt; Edit</code> and{' '}
+          <code className="text-muted-foreground">Zone &gt; Zone &gt; Read</code>. The token is only used during setup
           and is not stored.
         </p>
       </div>
@@ -193,7 +207,13 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">2. Domain</Label>
-            <Select value={zoneId} onValueChange={setZoneId}>
+            <Select
+              value={zoneId}
+              onValueChange={(v) => {
+                setZoneId(v);
+                resetRunState();
+              }}
+            >
               <SelectTrigger className="font-mono text-sm" data-testid="cf-auto-zone">
                 <SelectValue placeholder="Pick a domain" />
               </SelectTrigger>
@@ -222,7 +242,10 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
                 type="text"
                 placeholder="pubky"
                 value={subdomain}
-                onChange={(e) => setSubdomain(e.target.value.trim().toLowerCase())}
+                onChange={(e) => {
+                  setSubdomain(e.target.value.trim().toLowerCase());
+                  resetRunState();
+                }}
                 className="max-w-[10rem] font-mono text-sm"
                 autoComplete="off"
                 data-testid="cf-auto-subdomain"
