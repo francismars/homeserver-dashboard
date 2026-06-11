@@ -28,7 +28,10 @@ const TOKEN_TEMPLATE_URL =
     ]),
   ) +
   '&name=' +
-  encodeURIComponent('Pubky Homeserver Setup');
+  encodeURIComponent('Pubky Homeserver Setup') +
+  // Pre-select "all accounts" / "all zones" so the form is submittable as
+  // opened; the user can narrow the zone scope before creating if they wish.
+  '&accountId=*&zoneId=all';
 
 type Zone = { id: string; name: string; status: string; account_id: string };
 type Step = {
