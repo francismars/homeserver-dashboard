@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
@@ -19,6 +19,25 @@ import Link from 'next/link';
 // footer confused operators comparing against the Umbrel app version.
 import packageJson from '../../../package.json';
 const dashboardVersion = packageJson.version;
+
+// Tab availability: 'unknown' hides the tab (the endpoint never answered),
+// 'available' shows it, 'unavailable' keeps a previously working tab rendered
+// with an inline notice - a transient probe failure must not silently remove
+// UI the operator was just using.
+type TabAvailability = 'unknown' | 'available' | 'unavailable';
+
+const downgrade = (prev: TabAvailability): TabAvailability => (prev === 'unknown' ? 'unknown' : 'unavailable');
+
+function TabUnavailableNotice() {
+  return (
+    <p
+      className="rounded-md border border-border/60 bg-muted/10 px-3 py-2 text-sm text-muted-foreground"
+      data-testid="tab-unavailable"
+    >
+      This section is temporarily unavailable. The homeserver may be restarting; it comes back on its own.
+    </p>
+  );
+}
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
@@ -45,8 +64,8 @@ export default function DashboardPage() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
-  const [logsEnabled, setLogsEnabled] = useState(false);
-  const [disabledUsersEnabled, setDisabledUsersEnabled] = useState(false);
+  const [logsTab, setLogsTab] = useState<TabAvailability>('unknown');
+  const [usersTab, setUsersTab] = useState<TabAvailability>('unknown');
   const [configWritable, setConfigWritable] = useState(false);
 
   const handleSettingsClick = useCallback(() => {
@@ -87,6 +106,22 @@ export default function DashboardPage() {
     [enableUser, refetchDisabledUsers, refetchInfo, removeDisabledUserLocally],
   );
 
+  // Probing while the homeserver is still booting reports everything as
+  // missing; once /info recovers from an error, probe again so tabs come
+  // back without a manual page reload.
+  const [detectionNonce, setDetectionNonce] = useState(0);
+  const wasInfoErroredRef = useRef(false);
+  useEffect(() => {
+    if (infoError) {
+      wasInfoErroredRef.current = true;
+      return;
+    }
+    if (info && wasInfoErroredRef.current) {
+      wasInfoErroredRef.current = false;
+      setDetectionNonce((n) => n + 1);
+    }
+  }, [info, infoError]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -125,12 +160,16 @@ export default function DashboardPage() {
         if (!cancelled) {
           setCanOpenSettings(configRes.ok || isCloudflareSupported);
           setConfigWritable(isConfigWritable);
-          setLogsEnabled(logsRes.ok);
-          setDisabledUsersEnabled(disabledUsersRes.ok);
+          setLogsTab((prev) => (logsRes.ok ? 'available' : downgrade(prev)));
+          setUsersTab((prev) => (disabledUsersRes.ok ? 'available' : downgrade(prev)));
         }
       } catch {
         // Keep settings button visible when detection fails to avoid blocking access.
-        if (!cancelled) setCanOpenSettings(true);
+        if (!cancelled) {
+          setCanOpenSettings(true);
+          setLogsTab(downgrade);
+          setUsersTab(downgrade);
+        }
       }
     };
 
@@ -138,7 +177,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [detectionNonce]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -156,9 +195,9 @@ export default function DashboardPage() {
                 // Users (homeserver exposes /admin/users/disabled) and Logs (log
                 // file readable). Tailwind needs literal class names so this
                 // expands to one of three constants.
-                disabledUsersEnabled && logsEnabled
+                usersTab !== 'unknown' && logsTab !== 'unknown'
                   ? 'md:grid-cols-6'
-                  : disabledUsersEnabled || logsEnabled
+                  : usersTab !== 'unknown' || logsTab !== 'unknown'
                     ? 'md:grid-cols-5'
                     : 'md:grid-cols-4'
               }`}
@@ -167,7 +206,7 @@ export default function DashboardPage() {
                 <Home className="shrink-0" />
                 Overview
               </TabsTrigger>
-              {disabledUsersEnabled && (
+              {usersTab !== 'unknown' && (
                 <TabsTrigger
                   value="users"
                   className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
@@ -185,7 +224,7 @@ export default function DashboardPage() {
                 <Files className="shrink-0" />
                 Files
               </TabsTrigger>
-              {logsEnabled && (
+              {logsTab !== 'unknown' && (
                 <TabsTrigger
                   value="logs"
                   className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
@@ -207,25 +246,30 @@ export default function DashboardPage() {
                 isLoading={infoLoading}
                 error={infoError}
                 onFixCloudflare={handleFixCloudflare}
+                onRetry={() => void refetchInfo()}
               />
             </TabsContent>
 
-            {disabledUsersEnabled && (
+            {usersTab !== 'unknown' && (
               <TabsContent value="users" className="space-y-4">
-                <DisabledUsersManagement
-                  onDisableUser={handleDisableUser}
-                  onEnableUser={handleEnableUser}
-                  isDisablingUser={isDisablingUser || isEnablingUser}
-                  numUsersTotal={info?.num_users}
-                  numDisabledUsers={info?.num_disabled_users}
-                  disabledUsers={disabledUsers}
-                  isLoadingDisabledUsers={isLoadingDisabledUsers}
-                  isLoadingMoreDisabledUsers={isLoadingMoreDisabledUsers}
-                  hasMoreDisabledUsers={Boolean(nextCursor)}
-                  onLoadMoreDisabledUsers={loadMoreDisabledUsers}
-                  onRefreshDisabledUsers={refetchDisabledUsers}
-                  disabledUsersError={disabledUsersError?.message ?? null}
-                />
+                {usersTab === 'unavailable' ? (
+                  <TabUnavailableNotice />
+                ) : (
+                  <DisabledUsersManagement
+                    onDisableUser={handleDisableUser}
+                    onEnableUser={handleEnableUser}
+                    isDisablingUser={isDisablingUser || isEnablingUser}
+                    numUsersTotal={info?.num_users}
+                    numDisabledUsers={info?.num_disabled_users}
+                    disabledUsers={disabledUsers}
+                    isLoadingDisabledUsers={isLoadingDisabledUsers}
+                    isLoadingMoreDisabledUsers={isLoadingMoreDisabledUsers}
+                    hasMoreDisabledUsers={Boolean(nextCursor)}
+                    onLoadMoreDisabledUsers={loadMoreDisabledUsers}
+                    onRefreshDisabledUsers={refetchDisabledUsers}
+                    disabledUsersError={disabledUsersError?.message ?? null}
+                  />
+                )}
               </TabsContent>
             )}
 
@@ -249,9 +293,9 @@ export default function DashboardPage() {
               />
             </TabsContent>
 
-            {logsEnabled && (
+            {logsTab !== 'unknown' && (
               <TabsContent value="logs" className="space-y-4">
-                <DashboardLogs />
+                {logsTab === 'unavailable' ? <TabUnavailableNotice /> : <DashboardLogs />}
               </TabsContent>
             )}
 

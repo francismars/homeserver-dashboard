@@ -7,6 +7,10 @@ const getService = () => {
   return new AdminService({ baseUrl: '', token: '' });
 };
 
+/** Retry cadence while the homeserver is unreachable (it can take up to a
+ * couple of minutes to come up after an app start or restart). */
+const RETRY_INTERVAL_MS = 5000;
+
 export function useAdminInfo() {
   const [data, setData] = useState<AdminInfoResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,29 +18,39 @@ export function useAdminInfo() {
 
   const isMountedRef = useRef(true);
   const fetchIdRef = useRef(0);
+  const inFlightRef = useRef(false);
 
-  const refetch = useCallback(async () => {
+  // `silent` fetches (the background retries) never touch isLoading, so the
+  // page keeps showing the error explanation instead of flashing skeletons.
+  const fetchInfo = useCallback(async (silent: boolean) => {
     const service = getService();
     const fetchId = ++fetchIdRef.current;
+    inFlightRef.current = true;
 
-    setIsLoading(true);
-    setError(null);
+    if (!silent) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const result = await service.getInfo();
       if (!isMountedRef.current) return;
       if (fetchId !== fetchIdRef.current) return;
       setData(result);
+      setError(null);
     } catch (err) {
       if (!isMountedRef.current) return;
       if (fetchId !== fetchIdRef.current) return;
       setError(err instanceof Error ? err : new Error('Failed to load server info'));
     } finally {
-      if (!isMountedRef.current) return;
-      if (fetchId !== fetchIdRef.current) return;
-      setIsLoading(false);
+      if (fetchId === fetchIdRef.current) inFlightRef.current = false;
+      if (isMountedRef.current && fetchId === fetchIdRef.current && !silent) {
+        setIsLoading(false);
+      }
     }
   }, []);
+
+  const refetch = useCallback(() => fetchInfo(false), [fetchInfo]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -45,6 +59,18 @@ export function useAdminInfo() {
       isMountedRef.current = false;
     };
   }, [refetch]);
+
+  // Boot-window recovery: while the info is errored or absent, retry in the
+  // background until the homeserver answers, then go back to fetch-on-demand
+  // only. The in-flight guard keeps slow requests from stacking.
+  useEffect(() => {
+    if (data && !error) return;
+    const id = setInterval(() => {
+      if (inFlightRef.current) return;
+      void fetchInfo(true);
+    }, RETRY_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [data, error, fetchInfo]);
 
   return { data, isLoading, error, refetch };
 }

@@ -6,12 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Info, CircleCheckBig, AlertCircle, RefreshCw } from 'lucide-react';
+import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { cn, copyToClipboard } from '@/libs/utils';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
-
-const FALLBACK_HOMESERVER_PUBKEY = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o';
-const FALLBACK_HOMESERVER_VERSION = '0.1.0-dev';
 
 type DomainHealth = 'not_set_up' | 'checking' | 'reachable' | 'unreachable';
 
@@ -22,7 +20,79 @@ function domainHostname(pkarrIcannDomain: string | undefined): string | null {
   return hostname;
 }
 
-export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: DashboardOverviewProps) {
+/** Connection failure explained for the operator first (on Umbrel there is no
+ * .env.local to fix); the env-var checklist only matters to developers and
+ * lives behind a collapsed disclosure. */
+function ConnectionErrorAlert({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <Alert variant="destructive" data-testid="connection-error">
+      <AlertTitle>Connection Error</AlertTitle>
+      <AlertDescription className="text-xs">
+        <p>Your homeserver may still be starting. Wait a minute - this page retries automatically.</p>
+        <p className="mt-1">If this persists, restart the Pubky Homeserver app from Umbrel.</p>
+        {onRetry && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 h-7 px-2 text-xs"
+            onClick={onRetry}
+            data-testid="connection-retry"
+          >
+            <RefreshCw className="mr-1 h-3 w-3" />
+            Retry now
+          </Button>
+        )}
+        <details className="mt-2" data-testid="connection-dev-details">
+          <summary className="cursor-pointer font-medium">Developer details</summary>
+          <p className="mt-1 break-words">{message}</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
+            <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
+            <li>Homeserver is not running or unreachable</li>
+          </ul>
+        </details>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** /info does not include this field: say so instead of inventing a value. */
+function NotAvailable() {
+  return (
+    <div className="flex min-w-0 flex-col sm:items-end">
+      <span className="text-xs text-foreground sm:text-sm">Not available</span>
+      <span className="text-xs text-muted-foreground">Not reported by this homeserver (it may be too old)</span>
+    </div>
+  );
+}
+
+function CopyValueButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await copyToClipboard({ text: value });
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable
+    }
+  };
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-6 shrink-0 px-1.5"
+      onClick={() => void copy()}
+      aria-label={label}
+    >
+      {copied ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3 w-3" />}
+    </Button>
+  );
+}
+
+export function DashboardOverview({ info, isLoading, error, onFixCloudflare, onRetry }: DashboardOverviewProps) {
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
@@ -120,35 +190,16 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
               </Badge>
             </div>
           </div>
-          {connectionError && (
-            <Alert variant="destructive">
-              <AlertTitle>Connection Error</AlertTitle>
-              <AlertDescription className="text-xs">
-                {connectionError}
-                {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
-                  <div className="mt-2">
-                    <p className="font-medium">Possible causes:</p>
-                    <ul className="mt-1 list-inside list-disc space-y-0.5">
-                      <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
-                      <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
-                      <li>Homeserver is not running or unreachable</li>
-                    </ul>
-                  </div>
-                ) : null}
-              </AlertDescription>
-            </Alert>
-          )}
+          {connectionError && <ConnectionErrorAlert message={connectionError} onRetry={onRetry} />}
         </CardContent>
       </Card>
     );
   }
 
-  const isPubkeySoon = !info.public_key && !info.pubkey;
-  const isVersionSoon = !info.version;
-
-  // Support both new (public_key) and legacy (pubkey) field names
-  const homeserverPubkey = info.public_key ?? info.pubkey ?? FALLBACK_HOMESERVER_PUBKEY;
-  const homeserverVersion = info.version ?? FALLBACK_HOMESERVER_VERSION;
+  // Support both new (public_key) and legacy (pubkey) field names. No
+  // fallback values: a made-up pubkey gets copied into pkdns and shared.
+  const homeserverPubkey = info.public_key ?? info.pubkey ?? null;
+  const homeserverVersion = info.version ?? null;
 
   return (
     <div className="space-y-4">
@@ -188,71 +239,75 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
             </div>
 
             {/* Connection Error Message */}
-            {connectionError && (
-              <Alert variant="destructive">
-                <AlertTitle>Connection Error</AlertTitle>
-                <AlertDescription className="text-xs">
-                  {connectionError}
-                  {connectionError.includes('ADMIN_BASE_URL') || connectionError.includes('ADMIN_TOKEN') ? (
-                    <div className="mt-2">
-                      <p className="font-medium">Possible causes:</p>
-                      <ul className="mt-1 list-inside list-disc space-y-0.5">
-                        <li>Missing or incorrect ADMIN_BASE_URL in .env.local</li>
-                        <li>Missing or incorrect ADMIN_TOKEN in .env.local</li>
-                        <li>Homeserver is not running or unreachable</li>
-                      </ul>
-                    </div>
-                  ) : null}
-                </AlertDescription>
-              </Alert>
+            {connectionError && <ConnectionErrorAlert message={connectionError} onRetry={onRetry} />}
+
+            {/* After a failed refetch the details below are from the last
+                successful read, not the present: say so and dim them. */}
+            {!isConnected && (
+              <p className="pt-1 text-xs font-medium text-muted-foreground" data-testid="stale-info-label">
+                Last known state
+              </p>
             )}
 
-            {/* Server Pubkey */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
-              <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-                <span className="font-mono text-xs break-all text-foreground sm:text-sm">{homeserverPubkey}</span>
-                {isPubkeySoon && (
-                  <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
-                    <Info className="mr-1 h-3 w-3" />
-                    Soon
-                  </Badge>
+            <div className={cn('space-y-3', !isConnected && 'opacity-70')}>
+              {/* Server Pubkey */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
+                {homeserverPubkey ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
+                    <span className="font-mono text-xs break-all text-foreground sm:text-sm">{homeserverPubkey}</span>
+                    <CopyValueButton value={homeserverPubkey} label="Copy pubkey" />
+                  </div>
+                ) : (
+                  <NotAvailable />
                 )}
               </div>
-            </div>
 
-            {/* Server Version */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver version:</span>
-              <div className="flex flex-1 items-center gap-2 sm:flex-initial">
-                <span className="text-xs break-words text-foreground sm:text-sm">{homeserverVersion}</span>
-                {isVersionSoon && (
-                  <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal">
-                    <Info className="mr-1 h-3 w-3" />
-                    Soon
-                  </Badge>
+              {/* Server Version */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver version:</span>
+                {homeserverVersion ? (
+                  <span className="text-xs break-words text-foreground sm:text-sm">{homeserverVersion}</span>
+                ) : (
+                  <NotAvailable />
                 )}
               </div>
-            </div>
 
-            {/* PKARR Pubky Address */}
-            {info.pkarr_pubky_address && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Address:</span>
-                <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
-                  {info.pkarr_pubky_address}
-                </code>
-              </div>
-            )}
+              {/* Pubky address (technically the PKARR address) */}
+              {info.pkarr_pubky_address && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="shrink-0 text-xs text-muted-foreground sm:text-sm" title="PKARR address">
+                      Pubky address:
+                    </span>
+                    <span className="text-xs text-muted-foreground/70">How Pubky apps find this server</span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
+                      {info.pkarr_pubky_address}
+                    </code>
+                    <CopyValueButton value={info.pkarr_pubky_address} label="Copy address" />
+                  </div>
+                </div>
+              )}
 
-            {/* PKARR ICANN Domain + live reachability */}
-            {info.pkarr_icann_domain && (
+              {/* Public domain (technically the PKARR ICANN domain) + live
+                  reachability. Always rendered: a missing or localhost value
+                  means public access was never set up, which is exactly what
+                  the row should say (without leaking the localhost value). */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">PKARR Domain:</span>
+                <span className="shrink-0 text-xs text-muted-foreground sm:text-sm" title="PKARR ICANN domain">
+                  Public domain:
+                </span>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
-                    {info.pkarr_icann_domain}
-                  </code>
+                  {probeHostname && info.pkarr_icann_domain && (
+                    <>
+                      <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
+                        {info.pkarr_icann_domain}
+                      </code>
+                      <CopyValueButton value={info.pkarr_icann_domain} label="Copy domain" />
+                    </>
+                  )}
                   {domainHealth === 'checking' && (
                     <span
                       className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
@@ -274,7 +329,7 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
                       className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
                       data-testid="domain-health-unreachable"
                     >
-                      <AlertCircle className="h-3 w-3" /> Not reachable
+                      <AlertCircle className="h-3 w-3" /> {restartPending ? 'Not reachable yet' : 'Not reachable'}
                     </span>
                   )}
                   {domainHealth === 'not_set_up' && (
@@ -294,20 +349,29 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
                       <RefreshCw className="h-3 w-3" />
                     </Button>
                   )}
-                  {(domainHealth === 'unreachable' || domainHealth === 'not_set_up') && onFixCloudflare && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 shrink-0 px-2 text-xs"
-                      onClick={onFixCloudflare}
-                      data-testid="domain-health-fix"
-                    >
-                      {domainHealth === 'not_set_up' ? 'Set up' : 'Fix it'}
-                    </Button>
+                  {/* Right after a setup the domain is expectedly unreachable
+                      until the app restarts; "Fix it" would point at a
+                      non-problem. */}
+                  {((domainHealth === 'unreachable' && !restartPending) || domainHealth === 'not_set_up') &&
+                    onFixCloudflare && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 shrink-0 px-2 text-xs"
+                        onClick={onFixCloudflare}
+                        data-testid="domain-health-fix"
+                      >
+                        {domainHealth === 'not_set_up' ? 'Set up' : 'Fix it'}
+                      </Button>
+                    )}
+                  {domainHealth === 'unreachable' && restartPending && (
+                    <span className="w-full text-xs text-muted-foreground" data-testid="domain-health-restart-hint">
+                      Restart the app from Umbrel to finish setup
+                    </span>
                   )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Durable restart signal next to the reachability/"Fix it" area */}
             {restartPending && <RestartCallout>Restart the app from Umbrel to apply your changes.</RestartCallout>}
