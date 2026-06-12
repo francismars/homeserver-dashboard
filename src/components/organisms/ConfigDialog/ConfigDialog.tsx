@@ -11,7 +11,7 @@ import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronD
 import { cn } from '@/libs/utils';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
-import { CloudflareTestDrive } from './CloudflareTestDrive';
+import { CloudflarePreview } from './CloudflarePreview';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
@@ -621,8 +621,8 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                     </button>
                     {showApiTokenSetup && <CloudflareAutoSetup onConfigured={handleAutoConfigured} />}
 
-                    {/* Option W: no-account temporary preview */}
-                    <CloudflareTestDrive />
+                    {/* Option W: no-account published preview */}
+                    <CloudflarePreview />
 
                     <div className="h-px bg-border/50" />
 

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/libs/utils';
+import { RestartCallout } from './RestartCallout';
 
 type ConnectStatus = 'idle' | 'waiting' | 'authorized' | 'completed';
 type Step = { key: 'tunnel' | 'dns' | 'config'; status: 'done' | 'failed'; detail?: string };
@@ -132,9 +133,9 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           <span>Cloudflare account connected{doneHostname ? ` - ${doneHostname}` : ''}</span>
         </div>
         {steps && <StepList steps={steps} />}
-        <p className="text-xs text-muted-foreground">
+        <RestartCallout>
           Restart the app from Umbrel to connect the tunnel and publish your domain to the Pubky network.
-        </p>
+        </RestartCallout>
       </div>
     );
   }
