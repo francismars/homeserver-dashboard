@@ -22,13 +22,21 @@ interface ConfigDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Drives whether the Config tab exposes an Edit button. Comes from /api/capabilities. */
   writable?: boolean;
+  /** Increment to force the dialog onto the Cloudflare tab (Overview "Fix it"). */
+  focusCloudflare?: number;
 }
 
 type SaveMessage = { type: 'success' | 'error' | 'conflict'; text: string };
 
-export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDialogProps) {
+export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudflare = 0 }: ConfigDialogProps) {
   const [activeTab, setActiveTab] = useState<Tab>('cloudflare');
   const [isConfigTabVisible, setIsConfigTabVisible] = useState(false);
+
+  // The Overview "Fix it" button bumps this nonce; jump to the Cloudflare
+  // tab even if a previous open left the dialog on Config.
+  useEffect(() => {
+    if (focusCloudflare > 0) setActiveTab('cloudflare');
+  }, [focusCloudflare]);
 
   // Config file state
   const [configValue, setConfigValue] = useState('');
