@@ -47,9 +47,20 @@ export async function GET() {
       .readFile(TOKEN_FILE, 'utf-8')
       .then((s) => s.trim().length > 0)
       .catch(() => false);
+    // Locally-managed mode (Connect flow) has no token; config.yml +
+    // credentials.json are its equivalent.
+    const hasLocalConfig =
+      (await fs.access(path.join(CONFIG_DIR, 'config.yml')).then(
+        () => true,
+        () => false,
+      )) &&
+      (await fs.access(path.join(CONFIG_DIR, 'credentials.json')).then(
+        () => true,
+        () => false,
+      ));
     const response = NextResponse.json({
       domain: domain || null,
-      configured: !!(domain && hasToken),
+      configured: !!(domain && (hasToken || hasLocalConfig)),
       supported,
     });
     logRouteInfo({
@@ -156,6 +167,12 @@ export async function POST(request: NextRequest) {
     }
     if (body.token !== undefined) {
       await fs.writeFile(TOKEN_FILE, token, 'utf-8');
+      if (token) {
+        // Switching to token mode: drop any locally-managed config so the
+        // cloudflared-local container stops claiming the old hostname.
+        await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
+        await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+      }
     }
     logRouteInfo({
       requestId,

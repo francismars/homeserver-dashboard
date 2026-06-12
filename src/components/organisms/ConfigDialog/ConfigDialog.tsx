@@ -255,24 +255,27 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
   const [showManualSetup, setShowManualSetup] = useState(false);
   const [showApiTokenSetup, setShowApiTokenSetup] = useState(false);
 
-  const handleAutoConfigured = (hostname: string) => {
+  const handleAutoConfigured = (hostname: string, probe = true) => {
     setCfDomain(hostname);
     setCfConfig((c) =>
       c ? { ...c, domain: hostname, configured: true } : { domain: hostname, configured: true, supported: true },
     );
     setHealthStatus('idle');
+    // The Connect flow's locally-managed tunnel only starts after an app
+    // restart, so probing now would just flash a guaranteed failure.
+    if (!probe) return;
     // The tunnel typically connects within seconds (cloudflared retries until
     // the token file appears), but edge DNS + the first connection can take
     // longer. Probe up to 4 times before surfacing a failure so the user is
     // not flashed a red "Not reachable" right after the green success state.
-    const probe = async (attempt: number) => {
+    const probeHealth = async (attempt: number) => {
       const reachable = await checkHealth(hostname);
       if (!reachable && attempt < 4) {
         setHealthStatus('checking');
-        setTimeout(() => void probe(attempt + 1), 8_000);
+        setTimeout(() => void probeHealth(attempt + 1), 8_000);
       }
     };
-    setTimeout(() => void probe(1), 5_000);
+    setTimeout(() => void probeHealth(1), 5_000);
   };
 
   const handleCfSave = async (e: React.FormEvent) => {
@@ -590,7 +593,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
                     <div className="h-px bg-border/50" />
 
                     {/* Option Z: browser-auth connect (primary path) */}
-                    <CloudflareConnect onConfigured={handleAutoConfigured} />
+                    <CloudflareConnect onConfigured={(h) => handleAutoConfigured(h, false)} />
 
                     <div className="h-px bg-border/50" />
 

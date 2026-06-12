@@ -3,13 +3,17 @@ import { RouteError, errorResponse } from '@/lib/server/errors';
 import {
   TESTDRIVE_LOG,
   TESTDRIVE_MAX_AGE_MS,
+  getCloudflaredBin,
   getTestdriveOrigin,
   TESTDRIVE_STATE,
+  claimState,
   clearState,
   isBinaryAvailable,
   isPidAlive,
   killPid,
   parseQuickTunnelUrl,
+  quickTunnelConnected,
+  quickTunnelFailed,
   readState,
   spawnDetached,
   writeState,
@@ -32,24 +36,37 @@ const ROUTE_NAME = '/api/cloudflare-test-drive';
  * Tunnels are auto-stopped after 30 minutes (enforced lazily on reads).
  */
 
-async function currentStatus() {
+async function currentStatus(): Promise<{
+  status: 'stopped' | 'starting' | 'running';
+  url?: string;
+  started_at?: string;
+  expires_at?: string;
+  error?: string;
+}> {
   const state = await readState(TESTDRIVE_STATE());
-  if (!state) return { status: 'stopped' as const };
+  if (!state) return { status: 'stopped' };
   const ageMs = Date.now() - Date.parse(state.started_at);
   const alive = isPidAlive(state.pid);
   if (!alive) {
+    const failed = await quickTunnelFailed();
     await clearState(TESTDRIVE_STATE());
-    return { status: 'stopped' as const };
+    return failed
+      ? { status: 'stopped', error: 'Cloudflare did not hand out a temporary URL. Try again in a minute.' }
+      : { status: 'stopped' };
   }
   if (ageMs > TESTDRIVE_MAX_AGE_MS) {
     killPid(state.pid);
     await clearState(TESTDRIVE_STATE());
-    return { status: 'stopped' as const };
+    return { status: 'stopped' };
   }
   const url = await parseQuickTunnelUrl();
+  const connected = await quickTunnelConnected();
+  // Show the URL only once the edge connection registered; before that a
+  // click would hit a Cloudflare 530.
+  const ready = Boolean(url) && connected;
   return {
-    status: url ? ('running' as const) : ('starting' as const),
-    url: url ?? undefined,
+    status: ready ? 'running' : 'starting',
+    url: ready ? (url ?? undefined) : undefined,
     started_at: state.started_at,
     expires_at: new Date(Date.parse(state.started_at) + TESTDRIVE_MAX_AGE_MS).toISOString(),
   };
@@ -94,7 +111,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(new RouteError(400, 'bad_request', 'action must be "start" or "stop"'), requestId);
   }
 
-  if (!isBinaryAvailable()) {
+  if (!(await isBinaryAvailable())) {
     return errorResponse(
       new RouteError(503, 'config_error', 'cloudflared is not available in this environment'),
       requestId,
@@ -107,8 +124,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ...existing, requestId }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
+  // Spawn mutex: O_EXCL claim on the state file. A concurrent start loses
+  // the claim and just reports the winner's status.
+  if (!(await claimState(TESTDRIVE_STATE()))) {
+    const winner = await currentStatus();
+    return NextResponse.json({ ...winner, requestId }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
   try {
-    const pid = await spawnDetached(['tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()], TESTDRIVE_LOG());
+    // `timeout 1800` enforces the 30-minute cap in the kernel, so the tunnel
+    // dies on schedule even if nobody ever polls again (dialog closed).
+    const pid = await spawnDetached(
+      ['timeout', '1800', getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()],
+      TESTDRIVE_LOG(),
+    );
     await writeState(TESTDRIVE_STATE(), { pid, started_at: new Date().toISOString() });
     logRouteInfo({
       requestId,
@@ -124,6 +153,7 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {
+    await clearState(TESTDRIVE_STATE());
     const error = new RouteError(500, 'internal_error', 'Failed to start the test tunnel');
     logRouteError({
       requestId,

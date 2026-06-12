@@ -8,12 +8,15 @@
  * (dev-mode reloads, multiple workers), so NO process state lives in module
  * memory. Children are spawned detached with their output redirected to log
  * files; every status read reconstructs reality from disk (state JSON + log
- * parse + pid liveness probe).
+ * parse + pid identity probe).
  */
-import { spawn, spawnSync } from 'child_process';
-import { closeSync, openSync } from 'fs';
+import { execFile, spawn } from 'child_process';
+import { promisify } from 'util';
+import { closeSync, openSync, readFileSync } from 'fs';
 import { promises as fs } from 'fs';
 import path from 'path';
+
+const execFileAsync = promisify(execFile);
 
 // Env is read lazily (call time, not module load) so tests and multi-env
 // deployments are never frozen to a stale value.
@@ -23,7 +26,7 @@ export const getConfigDir = () => process.env.CLOUDFLARE_CONFIG_DIR || '/app/clo
 export const getTestdriveOrigin = () => process.env.TESTDRIVE_ORIGIN || 'http://homeserver:6286';
 /** Quick tunnels are auto-stopped after this long. */
 export const TESTDRIVE_MAX_AGE_MS = 30 * 60 * 1000;
-/** A login attempt older than this is treated as expired. */
+/** A login attempt (and an unused authorization cert) older than this is expired. */
 export const CONNECT_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const TESTDRIVE_STATE = () => path.join(getConfigDir(), '.testdrive.json');
@@ -34,10 +37,33 @@ export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
 export const CREDENTIALS_PATH = () => path.join(getConfigDir(), 'credentials.json');
 export const LOCAL_CONFIG_PATH = () => path.join(getConfigDir(), 'config.yml');
 
-export function isBinaryAvailable(): boolean {
+// The --version probe result barely changes; cache it briefly so polling GETs
+// do not fork a process every few seconds. Module memory is acceptable for a
+// pure cache (worst case after a reload: one extra probe).
+let binaryProbe: { at: number; ok: boolean } | null = null;
+
+export async function isBinaryAvailable(): Promise<boolean> {
+  if (binaryProbe && Date.now() - binaryProbe.at < 60_000) return binaryProbe.ok;
   try {
-    const probe = spawnSync(getCloudflaredBin(), ['--version'], { timeout: 5000 });
-    return probe.status === 0;
+    await execFileAsync(getCloudflaredBin(), ['--version'], { timeout: 5000 });
+    binaryProbe = { at: Date.now(), ok: true };
+  } catch {
+    binaryProbe = { at: Date.now(), ok: false };
+  }
+  return binaryProbe.ok;
+}
+
+/**
+ * A pid from a state file may belong to a different process after a container
+ * restart (PID namespaces restart from 1; state files on the bind mount
+ * survive). Trust a pid only when it is alive AND its command is one we
+ * could have spawned - otherwise a stale state file could make us SIGTERM an
+ * arbitrary same-uid process, including the dashboard itself.
+ */
+function isOurProcess(pid: number): boolean {
+  try {
+    const comm = readFileSync(`/proc/${pid}/comm`, 'utf-8').trim();
+    return comm === 'cloudflared' || comm === 'timeout';
   } catch {
     return false;
   }
@@ -46,13 +72,14 @@ export function isBinaryAvailable(): boolean {
 export function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
   }
+  return isOurProcess(pid);
 }
 
 export function killPid(pid: number): void {
+  if (!isOurProcess(pid)) return;
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
@@ -61,11 +88,11 @@ export function killPid(pid: number): void {
 }
 
 /**
- * Spawns cloudflared detached with stdout+stderr appended to logPath.
+ * Spawns a command detached with stdout+stderr appended to logPath.
  * Returns the child's pid. The caller persists it in a state file.
  */
 export async function spawnDetached(
-  args: string[],
+  command: string[],
   logPath: string,
   env: Record<string, string> = {},
 ): Promise<number> {
@@ -73,7 +100,8 @@ export async function spawnDetached(
   await fs.writeFile(logPath, '', 'utf-8'); // fresh log per attempt
   const out = openSync(logPath, 'a');
   const err = openSync(logPath, 'a');
-  const child = spawn(getCloudflaredBin(), args, {
+  const [bin, ...args] = command;
+  const child = spawn(bin, args, {
     detached: true,
     stdio: ['ignore', out, err],
     env: { ...process.env, ...env },
@@ -81,36 +109,72 @@ export async function spawnDetached(
   child.unref();
   closeSync(out);
   closeSync(err);
-  if (child.pid === undefined) throw new Error('Failed to spawn cloudflared');
+  if (child.pid === undefined) throw new Error(`Failed to spawn ${bin}`);
   return child.pid;
 }
 
-/** One-shot cloudflared invocation (create / route dns). Returns combined output. */
-export function runCloudflared(
+/** One-shot cloudflared invocation (create / route dns / delete). Async so a
+ * slow Cloudflare cannot block the event loop for every dashboard user. */
+export async function runCloudflared(
   args: string[],
   env: Record<string, string> = {},
   timeoutMs = 30_000,
-): { ok: boolean; output: string } {
-  const result = spawnSync(getCloudflaredBin(), args, {
-    timeout: timeoutMs,
-    env: { ...process.env, ...env },
-    encoding: 'utf-8',
-  });
-  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim();
-  return { ok: result.status === 0, output };
+): Promise<{ ok: boolean; output: string }> {
+  try {
+    const { stdout, stderr } = await execFileAsync(getCloudflaredBin(), args, {
+      timeout: timeoutMs,
+      env: { ...process.env, ...env },
+      encoding: 'utf-8',
+    });
+    return { ok: true, output: `${stdout}\n${stderr}`.trim() };
+  } catch (e) {
+    const err = e as { stdout?: string; stderr?: string; message?: string };
+    return { ok: false, output: `${err.stdout ?? ''}\n${err.stderr ?? ''}\n${err.message ?? ''}`.trim() };
+  }
 }
 
-/** Live de-risk finding (2026-06-12): the URL prints to stderr ~9s in, boxed. */
-const QUICK_TUNNEL_URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+/**
+ * Live de-risk finding (2026-06-12): the assigned URL prints to stderr ~9s in.
+ * cloudflared's FAILURE output also contains a trycloudflare host
+ * (api.trycloudflare.com, the request endpoint), so the parse must take the
+ * first match that is NOT the API host.
+ */
+const QUICK_TUNNEL_URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/g;
 /** Live de-risk finding: login URL prints to stderr immediately. */
 const LOGIN_URL_PATTERN = /https:\/\/dash\.cloudflare\.com\/argotunnel\?[^\s]+/;
+const QUICK_TUNNEL_FAILURE_PATTERN = /failed to request quick Tunnel|ERR /;
 
 export async function parseQuickTunnelUrl(): Promise<string | null> {
   try {
     const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
-    return log.match(QUICK_TUNNEL_URL_PATTERN)?.[0] ?? null;
+    for (const match of log.match(QUICK_TUNNEL_URL_PATTERN) ?? []) {
+      if (!match.startsWith('https://api.')) return match;
+    }
+    return null;
   } catch {
     return null;
+  }
+}
+
+/** The tunnel is usable only after a connection registers with the edge
+ * (live finding: the URL prints ~5s before registration; clicking in that
+ * window hits a Cloudflare 530). */
+export async function quickTunnelConnected(): Promise<boolean> {
+  try {
+    const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
+    return /Registered tunnel connection/.test(log);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the test-drive log shows the quick-tunnel request failing. */
+export async function quickTunnelFailed(): Promise<boolean> {
+  try {
+    const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
+    return QUICK_TUNNEL_FAILURE_PATTERN.test(log) && !(await parseQuickTunnelUrl());
+  } catch {
+    return false;
   }
 }
 
@@ -139,9 +203,27 @@ export async function readState(file: string): Promise<ProcessState | null> {
   }
 }
 
+/**
+ * Atomically claims the state file (O_EXCL). Returns false when another
+ * request already holds it - the spawn mutex against double-start races.
+ */
+export async function claimState(file: string): Promise<boolean> {
+  await fs.mkdir(getConfigDir(), { recursive: true });
+  try {
+    const handle = await fs.open(file, 'wx');
+    await handle.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Atomic write (tmp + rename) so a racing read never parses a torn file. */
 export async function writeState(file: string, state: ProcessState): Promise<void> {
   await fs.mkdir(getConfigDir(), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(state), 'utf-8');
+  const tmp = `${file}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(state), 'utf-8');
+  await fs.rename(tmp, file);
 }
 
 export async function clearState(file: string): Promise<void> {

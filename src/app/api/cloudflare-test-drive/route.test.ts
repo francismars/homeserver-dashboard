@@ -13,6 +13,7 @@ vi.mock('@/lib/server/cloudflared-process', async (importOriginal) => {
     killPid: vi.fn(),
     spawnDetached: vi.fn(async () => 4242),
     parseQuickTunnelUrl: vi.fn(async () => null),
+    quickTunnelConnected: vi.fn(async () => true),
   };
 });
 
@@ -40,13 +41,21 @@ describe('cloudflare-test-drive route', () => {
     const lib = await import('@/lib/server/cloudflared-process');
     // The mock factory's fns persist across vi.resetModules; re-prime
     // defaults each test so per-test overrides never leak.
-    for (const fn of [lib.isBinaryAvailable, lib.isPidAlive, lib.killPid, lib.spawnDetached, lib.parseQuickTunnelUrl]) {
+    for (const fn of [
+      lib.isBinaryAvailable,
+      lib.isPidAlive,
+      lib.killPid,
+      lib.spawnDetached,
+      lib.parseQuickTunnelUrl,
+      lib.quickTunnelConnected,
+    ]) {
       (fn as Mock).mockReset();
     }
     (lib.isBinaryAvailable as Mock).mockReturnValue(true);
     (lib.isPidAlive as Mock).mockReturnValue(true);
     (lib.spawnDetached as Mock).mockResolvedValue(4242);
     (lib.parseQuickTunnelUrl as Mock).mockResolvedValue(null);
+    (lib.quickTunnelConnected as Mock).mockResolvedValue(true);
     const mod = await import('./route');
     return { lib, ...mod };
   }
@@ -71,8 +80,17 @@ describe('cloudflare-test-drive route', () => {
     const { lib, POST, GET } = await routes();
     const res = await post(POST, { action: 'start' });
     expect((await res.json()).status).toBe('starting');
+    // kernel-enforced 30-min cap via `timeout 1800`
     expect(lib.spawnDetached as Mock).toHaveBeenCalledWith(
-      ['tunnel', '--no-autoupdate', '--url', 'http://homeserver:6286'],
+      [
+        'timeout',
+        '1800',
+        expect.stringContaining('cloudflared'),
+        'tunnel',
+        '--no-autoupdate',
+        '--url',
+        'http://homeserver:6286',
+      ],
       expect.stringContaining('.testdrive.log'),
     );
     // status flips to running once the URL appears in the log
@@ -125,6 +143,32 @@ describe('cloudflare-test-drive route', () => {
     const data = await (await post(POST, { action: 'stop' })).json();
     expect(data.status).toBe('stopped');
     expect(lib.killPid as Mock).toHaveBeenCalledWith(555);
+  });
+
+  it('surfaces a friendly error when the quick-tunnel request failed', async () => {
+    const { lib, GET } = await routes();
+    (lib.isPidAlive as Mock).mockReturnValue(false);
+    await fs.writeFile(
+      path.join(tmpDir, '.testdrive.json'),
+      JSON.stringify({ pid: 4242, started_at: new Date().toISOString() }),
+    );
+    await fs.writeFile(
+      path.join(tmpDir, '.testdrive.log'),
+      'ERR failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel": dial tcp: timeout\n',
+    );
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('stopped');
+    expect(data.error).toContain('Try again');
+  });
+
+  it('stays in starting (no URL exposed) until the edge connection registers', async () => {
+    const { lib, POST } = await routes();
+    await post(POST, { action: 'start' });
+    (lib.parseQuickTunnelUrl as Mock).mockResolvedValue('https://early.trycloudflare.com');
+    (lib.quickTunnelConnected as Mock).mockResolvedValue(false);
+    const data = await (await post(POST, { action: 'start' })).json();
+    expect(data.status).toBe('starting');
+    expect(data.url).toBeUndefined();
   });
 
   it('503 when cloudflared is unavailable', async () => {

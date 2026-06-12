@@ -88,7 +88,7 @@ describe('cloudflare-connect route', () => {
     expect(data.status).toBe('waiting');
     expect(data.auth_url).toBe(AUTH_URL);
     expect(lib.spawnDetached as Mock).toHaveBeenCalledWith(
-      ['tunnel', 'login'],
+      [expect.stringContaining('cloudflared'), 'tunnel', 'login'],
       expect.stringContaining('.connect.log'),
       expect.objectContaining({ TUNNEL_ORIGIN_CERT: expect.stringContaining('cert.pem') }),
     );
@@ -164,17 +164,32 @@ describe('cloudflare-connect route', () => {
     expect(calls[2][0]).toEqual(['tunnel', 'route', 'dns', 'pubky-homeserver-local', 'pubky.example.com']);
   });
 
-  it('route dns "already exists" gives an actionable message', async () => {
+  it('route dns "already exists" gives an actionable message and deletes the created tunnel', async () => {
     const { lib, POST } = await routes();
     await writeCert();
     await writeCreds();
     (lib.runCloudflared as Mock)
       .mockReturnValueOnce({ ok: true, output: '' })
-      .mockReturnValueOnce({ ok: false, output: 'Failed: record with that host already exists' });
+      .mockReturnValueOnce({ ok: false, output: 'Failed: record with that host already exists' })
+      .mockReturnValue({ ok: true, output: '' });
     const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
     const data = await res.json();
     expect(res.status).toBe(502);
     expect(data.error).toContain('different subdomain');
+    // retry idempotency: the just-created tunnel is deleted again
+    const calls = (lib.runCloudflared as Mock).mock.calls;
+    expect(calls[2][0]).toEqual(['tunnel', 'delete', '-f', 'pubky-homeserver']);
+    await expect(fs.access(path.join(tmpDir, 'credentials.json'))).rejects.toThrow();
+  });
+
+  it('an authorization cert older than 15 minutes expires to idle', async () => {
+    const { GET } = await routes();
+    await writeCert();
+    const old = new Date(Date.now() - 16 * 60 * 1000);
+    await fs.utimes(path.join(tmpDir, 'cert.pem'), old, old);
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('idle');
+    await expect(fs.access(path.join(tmpDir, 'cert.pem'))).rejects.toThrow();
   });
 
   it('route dns wrong-zone error gives an actionable message', async () => {
@@ -183,7 +198,8 @@ describe('cloudflare-connect route', () => {
     await writeCreds();
     (lib.runCloudflared as Mock)
       .mockReturnValueOnce({ ok: true, output: '' })
-      .mockReturnValueOnce({ ok: false, output: 'failed to find zone for the hostname' });
+      .mockReturnValueOnce({ ok: false, output: 'failed to find zone for the hostname' })
+      .mockReturnValue({ ok: true, output: '' });
     const res = await post(POST, { action: 'complete', hostname: 'pubky.other.net' });
     const data = await res.json();
     expect(res.status).toBe(502);

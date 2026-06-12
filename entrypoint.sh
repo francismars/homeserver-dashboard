@@ -17,6 +17,21 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   chmod 750 "$CLOUDFLARE_DIR" 2>/dev/null || true
   chmod 640 "$CLOUDFLARE_DIR/token" 2>/dev/null || true
   chmod 600 "$CLOUDFLARE_DIR/domain" 2>/dev/null || true
+  # Locally-managed mode (Connect-account flow): credentials.json carries the
+  # tunnel secret and config.yml the ingress; both must be readable by the
+  # cloudflared-local container (UID 65532) but not world-readable.
+  for f in credentials.json config.yml; do
+    if [ -f "$CLOUDFLARE_DIR/$f" ]; then
+      chgrp 65532 "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+      chmod 640 "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+    fi
+  done
+  # A leftover login cert is a zone-admin credential; only the dashboard
+  # process ever needs it.
+  if [ -f "$CLOUDFLARE_DIR/cert.pem" ]; then
+    chown nextjs:nodejs "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
+    chmod 600 "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
+  fi
 fi
 
 # Make the homeserver's config.toml writable by the dashboard process.
