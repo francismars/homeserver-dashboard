@@ -224,6 +224,75 @@ describe('DashboardOverview server identity', () => {
   });
 });
 
+describe('DashboardOverview address scope badge', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const renderWithAddress = (pkarr_pubky_address: string | undefined) => {
+    mockBackend();
+    render(<DashboardOverview info={{ ...baseInfo, pkarr_pubky_address }} isLoading={false} error={null} />);
+  };
+
+  it('private address (Docker/LAN) gets the amber "Private network" badge with an explanation', () => {
+    renderWithAddress('10.21.0.23:6287');
+    const badge = screen.getByTestId('address-scope-badge');
+    expect(badge.textContent).toBe('Private network');
+    expect(badge.getAttribute('data-scope')).toBe('private');
+    expect(badge.getAttribute('title')).toBe(
+      'This is a private network address (LAN or Docker). Devices on the internet cannot reach your server through it. Set up a public address so Pubky apps can find you.',
+    );
+  });
+
+  it('loopback address gets the "Localhost only" badge even while public access is not set up', () => {
+    mockBackend();
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_pubky_address: '127.0.0.1:6286', pkarr_icann_domain: 'localhost:6286' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    const badge = screen.getByTestId('address-scope-badge');
+    expect(badge.textContent).toBe('Localhost only');
+    expect(badge.getAttribute('data-scope')).toBe('loopback');
+    expect(badge.getAttribute('title')).toBe(
+      'Only this machine can reach this address. Other devices and Pubky apps cannot connect through it.',
+    );
+    // the badge annotates the visible Pubky address; the hidden localhost
+    // domain on the Public address row stays hidden
+    expect(screen.getByText('127.0.0.1:6286')).toBeTruthy();
+    expect(screen.queryByText(/localhost:6286/)).toBeNull();
+  });
+
+  it('public IP gets the neutral "Public IP" badge with the no-verification caveat', () => {
+    renderWithAddress('203.0.113.7:6287');
+    const badge = screen.getByTestId('address-scope-badge');
+    expect(badge.textContent).toBe('Public IP');
+    expect(badge.getAttribute('data-scope')).toBe('public');
+    expect(badge.getAttribute('title')).toBe(
+      'This looks like a publicly routable IP address. Reachability from outside your network cannot be verified from here.',
+    );
+  });
+
+  it.each([
+    ['pubky.example.com:6287', 'hostname'],
+    ['pubky://x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o', 'pubky URI'],
+  ])('no badge for %s (%s)', (address) => {
+    renderWithAddress(address);
+    expect(screen.queryByTestId('address-scope-badge')).toBeNull();
+  });
+
+  it('no address, no badge (the row is not rendered at all)', () => {
+    renderWithAddress(undefined);
+    expect(screen.queryByText('Pubky address:')).toBeNull();
+    expect(screen.queryByTestId('address-scope-badge')).toBeNull();
+  });
+});
+
 describe('DashboardOverview get-started checklist', () => {
   beforeEach(() => {
     vi.restoreAllMocks();

@@ -35,11 +35,45 @@ await runSpec(
     );
 
     step('plain labels: jargon demoted to tooltips');
-    check((await page1.locator('span[title="PKARR address"]').count()) === 1, '"Pubky address" label carries the technical term as a tooltip');
+    check(
+      (await page1.locator('span[title="PKARR address"]').count()) === 1,
+      '"Pubky address" label carries the technical term as a tooltip',
+    );
     check((await page1.locator('text=Pubky address').count()) >= 1, 'Pubky address label shown');
     check((await page1.locator('text=How Pubky apps find this server').count()) === 1, 'address helper line shown');
     check((await page1.locator('text=Public address').count()) >= 1, 'Public address label shown');
     check((await page1.locator('text=PKARR').count()) === 0, 'no visible PKARR jargon');
+    check(
+      (await page1.locator('[data-testid="address-scope-badge"]').count()) === 0,
+      'no address-scope badge for a non-IP Pubky address',
+    );
+
+    step('address scope: a 10.x Pubky address gets the Private network badge');
+    const pageScope = await ctx.newPage();
+    await pageScope.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
+    );
+    await pageScope.route('**/api/admin/info', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.pkarr_pubky_address = '10.21.0.23:6287';
+      await route.fulfill({ response: res, json });
+    });
+    await pageScope.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageScope.waitForSelector('[data-testid="address-scope-badge"]', { timeout: 30000 });
+    const scopeBadge = pageScope.locator('[data-testid="address-scope-badge"]');
+    const scopeLabel = (await scopeBadge.textContent()).trim();
+    check(scopeLabel === 'Private network', 'private 10.x address shows the Private network badge', scopeLabel);
+    const scopeTitle = (await scopeBadge.getAttribute('title')) || '';
+    check(
+      scopeTitle.includes('Devices on the internet cannot reach your server through it'),
+      'badge tooltip explains the address is unreachable from the internet',
+    );
+    check(
+      (await pageScope.locator('text=10.21.0.23:6287').count()) >= 1,
+      'the 10.x address value is shown next to the badge',
+    );
+    await pageScope.close();
 
     step('get-started checklist: step states come from the admin signals');
     // Mock admin defaults: 5 signup codes, 3 users; no Cloudflare files, so
@@ -157,7 +191,10 @@ await runSpec(
     await page4.waitForSelector('[data-testid="domain-health-restart-hint"]', { timeout: 30000 });
     const yetLabel = (await page4.locator('[data-testid="domain-health-unreachable"]').textContent()).trim();
     check(yetLabel.includes('Not reachable yet'), 'pending restart reads "Not reachable yet"', yetLabel);
-    check((await page4.locator('[data-testid="domain-health-fix"]').count()) === 0, 'no Fix it while a restart is pending');
+    check(
+      (await page4.locator('[data-testid="domain-health-fix"]').count()) === 0,
+      'no Fix it while a restart is pending',
+    );
     const hint = (await page4.locator('[data-testid="domain-health-restart-hint"]').textContent()).trim();
     check(hint.includes('Restart the Pubky Homeserver app from Umbrel'), 'restart hint shown', hint);
 
@@ -184,7 +221,10 @@ await runSpec(
     const devDetails = page5.locator('[data-testid="connection-dev-details"]');
     check((await devDetails.count()) === 1, 'developer details present');
     check((await devDetails.getAttribute('open')) === null, 'developer details collapsed by default');
-    check((await page5.locator('[data-testid="tab-users"]').count()) === 0, 'Users tab hidden while the homeserver is down');
+    check(
+      (await page5.locator('[data-testid="tab-users"]').count()) === 0,
+      'Users tab hidden while the homeserver is down',
+    );
 
     adminDown = false; // the homeserver "finishes booting"
     await page5.waitForSelector('[data-testid="connection-error"]', { state: 'detached', timeout: 30000 });

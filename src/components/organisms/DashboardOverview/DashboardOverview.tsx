@@ -10,6 +10,7 @@ import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { cn, copyToClipboard } from '@/libs/utils';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { classifyAddress, type AddressScope } from '@/lib/address-scope';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
@@ -66,6 +67,49 @@ function NotAvailable() {
       <span className="text-xs text-foreground sm:text-sm">Not available</span>
       <span className="text-xs text-muted-foreground">Not reported by this homeserver (it may be too old)</span>
     </div>
+  );
+}
+
+/** Per-scope badge copy. Hostnames and unparseable values get no badge: a
+ * name's reachability depends on what it resolves to, which the reachability
+ * chip on the Public address row already answers. */
+const ADDRESS_SCOPE_BADGES: Partial<Record<AddressScope, { label: string; title: string; className: string }>> = {
+  loopback: {
+    label: 'Localhost only',
+    title: 'Only this machine can reach this address. Other devices and Pubky apps cannot connect through it.',
+    className: 'border-amber-400/40 text-amber-400',
+  },
+  private: {
+    label: 'Private network',
+    title:
+      'This is a private network address (LAN or Docker). Devices on the internet cannot reach your server through it. Set up a public address so Pubky apps can find you.',
+    className: 'border-amber-400/40 text-amber-400',
+  },
+  public: {
+    label: 'Public IP',
+    title:
+      'This looks like a publicly routable IP address. Reachability from outside your network cannot be verified from here.',
+    className: 'text-muted-foreground',
+  },
+};
+
+/** Tells the operator whether anyone else could reach a published IP address
+ * (a past config bug published docker-internal IPs that look fine but are
+ * unreachable). Renders nothing for hostnames and non-addresses. */
+function AddressScopeBadge({ address }: { address: string }) {
+  const scope = classifyAddress(address);
+  const badge = ADDRESS_SCOPE_BADGES[scope];
+  if (!badge) return null;
+  return (
+    <Badge
+      variant="outline"
+      className={cn('shrink-0', badge.className)}
+      title={badge.title}
+      data-testid="address-scope-badge"
+      data-scope={scope}
+    >
+      {badge.label}
+    </Badge>
   );
 }
 
@@ -311,11 +355,12 @@ export function DashboardOverview({
                     </span>
                     <span className="text-xs text-muted-foreground/70">How Pubky apps find this server</span>
                   </div>
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
                       {info.pkarr_pubky_address}
                     </code>
                     <CopyValueButton value={info.pkarr_pubky_address} label="Copy address" />
+                    <AddressScopeBadge address={info.pkarr_pubky_address} />
                   </div>
                 </div>
               )}
