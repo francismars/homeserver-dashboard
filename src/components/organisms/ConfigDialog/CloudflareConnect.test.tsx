@@ -52,14 +52,16 @@ describe('CloudflareConnect subdomain picker', () => {
   it('composes subdomain + authorized domain for the complete call', async () => {
     const posts = mockFetch(
       () => authorized('example.com'),
-      () => ({ json: { ok: true, hostname: 'hs.example.com', steps: [] } }),
+      () => ({ json: { ok: true, hostname: 'hs.example.com', steps: [], message: 'Tunnel configured.' } }),
     );
     const onConfigured = vi.fn();
     render(<CloudflareConnect onConfigured={onConfigured} />);
     await waitFor(() => expect(screen.getByTestId('cf-connect-subdomain')).toBeTruthy());
     fireEvent.click(screen.getByTestId('cf-connect-chip-hs'));
     fireEvent.click(screen.getByTestId('cf-connect-complete'));
-    await waitFor(() => expect(onConfigured).toHaveBeenCalledWith('hs.example.com'));
+    // The route's own restart message rides along so the Status callout
+    // never claims more than the route did.
+    await waitFor(() => expect(onConfigured).toHaveBeenCalledWith('hs.example.com', 'Tunnel configured.'));
     expect(posts).toContainEqual({ action: 'complete', hostname: 'hs.example.com' });
   });
 
@@ -94,6 +96,27 @@ describe('CloudflareConnect subdomain picker', () => {
     await waitFor(() => expect(screen.getByTestId('cf-connect-expired')).toBeTruthy());
     expect(screen.getByTestId('cf-connect-expired').textContent).toContain('authorization link expired');
     expect(screen.getByTestId('cf-connect-start')).toBeTruthy();
+  });
+
+  it('a pre-existing completed setup renders the pure action, not a success card', async () => {
+    mockFetch(() => ({ status: 'completed', hostname: 'pubky.example.com' }));
+    render(<CloudflareConnect onConfigured={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('cf-connect-start')).toBeTruthy());
+    expect(screen.queryByTestId('cf-connect-success')).toBeNull();
+    expect(screen.queryByText(/account connected/i)).toBeNull();
+  });
+
+  it('an in-card completion shows the success feedback', async () => {
+    mockFetch(
+      () => authorized('example.com'),
+      () => ({ json: { ok: true, hostname: 'pubky.example.com', steps: [] } }),
+    );
+    render(<CloudflareConnect onConfigured={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('cf-connect-subdomain')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('cf-connect-chip-pubky'));
+    fireEvent.click(screen.getByTestId('cf-connect-complete'));
+    await waitFor(() => expect(screen.getByTestId('cf-connect-success')).toBeTruthy());
+    expect(screen.getByTestId('cf-connect-success').textContent).toContain('pubky.example.com');
   });
 
   it('a complete that 409s resets the card to idle with the error visible', async () => {

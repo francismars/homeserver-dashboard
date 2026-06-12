@@ -15,13 +15,28 @@ const baseInfo: AdminInfoResponse = {
   version: '0.9.1',
 };
 
-function mockHealth(ok: boolean) {
-  vi.spyOn(global, 'fetch').mockResolvedValue(
-    new Response(JSON.stringify({ ok, status: ok ? 200 : 530 }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }),
+/** Routes the component's two fetches: the public-health probe and the
+ * restart-pending + mode read from /api/cloudflare-config. */
+function mockBackend({ healthOk = true, restartPending = null as boolean | null, mode = null as string | null } = {}) {
+  vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+    const url = String(input);
+    const json = url.startsWith('/api/cloudflare-config')
+      ? { restart_pending: restartPending, mode }
+      : { ok: healthOk, status: healthOk ? 200 : 530 };
+    return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  });
+}
+
+function healthCalls() {
+  return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter((c) =>
+    String(c[0]).startsWith('/api/public-health'),
   );
+}
+
+function mockClipboard() {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  return writeText;
 }
 
 describe('DashboardOverview domain health', () => {
@@ -33,10 +48,10 @@ describe('DashboardOverview domain health', () => {
   });
 
   it('probes the domain (without port) once and shows Reachable', async () => {
-    mockHealth(true);
+    mockBackend({ healthOk: true });
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(healthCalls()).toHaveLength(1);
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/public-health?domain=pubky.example.com', // port stripped
       expect.anything(),
@@ -45,17 +60,31 @@ describe('DashboardOverview domain health', () => {
   });
 
   it('shows Not reachable + Fix it on failure; Fix it opens the Cloudflare tab', async () => {
-    mockHealth(false);
+    mockBackend({ healthOk: false });
     const onFix = vi.fn();
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={onFix} />);
     await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+    expect(screen.getByTestId('domain-health-unreachable').textContent).toContain('Not reachable');
+    expect(screen.getByTestId('domain-health-unreachable').textContent).not.toContain('Not reachable yet');
     fireEvent.click(screen.getByTestId('domain-health-fix'));
     expect(onFix).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('domain-health-fix').textContent).toBe('Fix it');
   });
 
-  it('localhost domain: no probe, "Not set up" + Set up button', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch');
+  it('unreachable while a restart is pending: "Not reachable yet" + restart hint, no Fix it', async () => {
+    mockBackend({ healthOk: false, restartPending: true });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-restart-hint')).toBeTruthy());
+    expect(screen.getByTestId('domain-health-unreachable').textContent).toContain('Not reachable yet');
+    expect(screen.getByTestId('domain-health-restart-hint').textContent).toContain('To finish setup');
+    expect(screen.getByTestId('domain-health-restart-hint').textContent).toContain(
+      'Restart the Pubky Homeserver app from Umbrel',
+    );
+    expect(screen.queryByTestId('domain-health-fix')).toBeNull();
+  });
+
+  it('localhost domain: no probe, "Not set up" + Set up button, localhost value not shown', async () => {
+    mockBackend();
     const onFix = vi.fn();
     render(
       <DashboardOverview
@@ -66,23 +95,290 @@ describe('DashboardOverview domain health', () => {
       />,
     );
     await waitFor(() => expect(screen.getByTestId('domain-health-not-set-up')).toBeTruthy());
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(healthCalls()).toHaveLength(0);
     expect(screen.getByTestId('domain-health-fix').textContent).toBe('Set up');
+    expect(screen.queryByText(/localhost:6286/)).toBeNull();
     // no re-check button without a probeable hostname
     expect(screen.queryByTestId('domain-health-recheck')).toBeNull();
   });
 
+  it('missing domain: row still renders as "Not set up" + Set up button', async () => {
+    mockBackend();
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_icann_domain: undefined }}
+        isLoading={false}
+        error={null}
+        onFixCloudflare={() => {}}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('domain-health-not-set-up')).toBeTruthy());
+    expect(screen.getByText('Public address:')).toBeTruthy();
+    expect(screen.getByTestId('domain-health-fix').textContent).toBe('Set up');
+    expect(healthCalls()).toHaveLength(0);
+  });
+
   it('re-check button probes again', async () => {
-    mockHealth(true);
+    mockBackend({ healthOk: true });
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
     await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
     fireEvent.click(screen.getByTestId('domain-health-recheck'));
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(healthCalls()).toHaveLength(2));
   });
 
   it('probe network failure degrades to Not reachable', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('offline'));
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
     await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+  });
+
+  it('restart_pending true: shows the Umbrel restart callout even while reachable', async () => {
+    mockBackend({ healthOk: true, restartPending: true });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+    expect(screen.getByTestId('restart-callout').textContent).toContain('Restart the Pubky Homeserver app from Umbrel');
+    // Reachability is separate truth and must not suppress the callout.
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+  });
+
+  it.each([
+    ['false', false],
+    ['null (unknown)', null],
+  ])('restart_pending %s: no restart callout', async (_label, restartPending) => {
+    mockBackend({ healthOk: true, restartPending });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+  });
+
+  it('re-reads cloudflare-config when cloudflareRefreshKey changes (dialog closed)', async () => {
+    // Start with nothing pending; flip the backend to pending and bump the key,
+    // as the parent does when the Settings dialog closes after a setup.
+    let pending = false;
+    vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      const json = url.startsWith('/api/cloudflare-config')
+        ? { restart_pending: pending, mode: pending ? 'connect' : 'off' }
+        : { ok: true, status: 200 };
+      return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    const { rerender } = render(
+      <DashboardOverview info={baseInfo} isLoading={false} error={null} cloudflareRefreshKey={0} />,
+    );
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+
+    pending = true;
+    rerender(<DashboardOverview info={baseInfo} isLoading={false} error={null} cloudflareRefreshKey={1} />);
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+  });
+});
+
+describe('DashboardOverview server identity', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('never invents a pubkey or version: missing fields read "Not available"', async () => {
+    mockBackend();
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, public_key: undefined, pubkey: undefined, version: undefined }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    expect(screen.getAllByText('Not available')).toHaveLength(2);
+    expect(screen.getAllByText(/Not reported by this homeserver/)).toHaveLength(2);
+    expect(screen.queryByText(/x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o/)).toBeNull();
+    expect(screen.queryByText(/0\.1\.0-dev/)).toBeNull();
+    expect(screen.queryByText('Soon')).toBeNull();
+  });
+
+  it('renders plain labels with the technical terms as tooltips', async () => {
+    mockBackend();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    expect(screen.queryByText(/PKARR/)).toBeNull();
+    const address = screen.getByText('Pubky address:');
+    expect(address.getAttribute('title')).toBe('PKARR address');
+    expect(screen.getByText('How Pubky apps find this server')).toBeTruthy();
+    const domain = screen.getByText('Public address:');
+    expect(domain.getAttribute('title')).toBe('PKARR ICANN domain');
+    expect(screen.queryByTestId('stale-info-label')).toBeNull();
+  });
+
+  it('pubkey, address and domain rows offer copy buttons', async () => {
+    mockBackend();
+    const writeText = mockClipboard();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+
+    fireEvent.click(screen.getByLabelText('Copy pubkey'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.public_key));
+    fireEvent.click(screen.getByLabelText('Copy address'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_pubky_address));
+    fireEvent.click(screen.getByLabelText('Copy public address'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_icann_domain));
+  });
+});
+
+describe('DashboardOverview get-started checklist', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const wiring = {
+    onGoToInvites: () => {},
+    setupGuideDismissed: false,
+    onDismissSetupGuide: () => {},
+  };
+  const freshInstall = { ...baseInfo, num_users: 0, num_signup_codes: 0 };
+
+  it('reachable step is done only when the mode is active AND the probe answers ok', async () => {
+    mockBackend({ healthOk: true, mode: 'token' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('done'));
+    expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('pending');
+    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('mode off keeps the reachable step pending even when the probe answers ok', async () => {
+    mockBackend({ healthOk: true, mode: 'off' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('an active mode with an unreachable domain keeps the reachable step pending', async () => {
+    mockBackend({ healthOk: false, mode: 'connect' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('/info signals drive the invite and signup steps', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+        isLoading={false}
+        error={null}
+        {...wiring}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done'));
+    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('all three done: collapses to the slim all-set state', async () => {
+    mockBackend({ healthOk: true, mode: 'connect' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+        isLoading={false}
+        error={null}
+        {...wiring}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('setup-guide-allset')).toBeTruthy());
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+  });
+
+  it('CTAs reuse the existing affordances: Set up access opens Cloudflare, Open Invites switches tabs', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    const onFixCloudflare = vi.fn();
+    const onGoToInvites = vi.fn();
+    render(
+      <DashboardOverview
+        info={freshInstall}
+        isLoading={false}
+        error={null}
+        {...wiring}
+        onFixCloudflare={onFixCloudflare}
+        onGoToInvites={onGoToInvites}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('setup-step-reachable-cta'));
+    expect(onFixCloudflare).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId('setup-step-invite-cta'));
+    expect(onGoToInvites).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismissed (or dismissal not yet read) renders no checklist', async () => {
+    mockBackend();
+    const { rerender } = render(
+      <DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} setupGuideDismissed={true} />,
+    );
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+    rerender(
+      <DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} setupGuideDismissed={null} />,
+    );
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+  });
+});
+
+describe('DashboardOverview backup note', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('tells the operator where the data lives and to include it in Umbrel backups', async () => {
+    mockBackend();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    const note = screen.getByTestId('backup-note');
+    expect(note.textContent).toContain('data directory on your Umbrel');
+    expect(note.textContent).toContain('Include it in your Umbrel backups');
+    expect(note.textContent).toContain("losing this server's identity");
+  });
+});
+
+describe('DashboardOverview connection error', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('leads with operator guidance and collapses the developer details', async () => {
+    mockBackend();
+    const onRetry = vi.fn();
+    render(
+      <DashboardOverview info={null} isLoading={false} error={new Error('Request failed: 500')} onRetry={onRetry} />,
+    );
+
+    expect(screen.getByText(/Your homeserver may still be starting/)).toBeTruthy();
+    expect(screen.getByText(/this page retries automatically/)).toBeTruthy();
+    expect(screen.getByText(/Restart the Pubky Homeserver app from Umbrel/)).toBeTruthy();
+
+    const details = screen.getByTestId('connection-dev-details');
+    expect(details.hasAttribute('open')).toBe(false);
+    expect(details.textContent).toContain('Developer details');
+    expect(details.textContent).toContain('Request failed: 500');
+    expect(details.textContent).toContain('ADMIN_BASE_URL');
+    expect(details.textContent).toContain('ADMIN_TOKEN');
+
+    fireEvent.click(screen.getByTestId('connection-retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels stale details "Last known state" while errored', async () => {
+    mockBackend();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={new Error('Request failed: 502')} />);
+
+    expect(screen.getByText('Not Connected')).toBeTruthy();
+    expect(screen.getByTestId('stale-info-label').textContent).toBe('Last known state');
+    // the stale values are still shown, just labeled as such
+    expect(screen.getByText(baseInfo.public_key as string)).toBeTruthy();
+    expect(screen.getByTestId('connection-error')).toBeTruthy();
   });
 });

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.14]
+
+One source of truth in the UI, and a first-run experience that explains itself.
+
+### Added
+
+- The Status section is the single surface asserting Cloudflare state: server-derived mode badge (Connected account / API token / Preview / Off), one reachability chip, a published indicator, and the one Disconnect button with consequences stated before confirming. Setup cards are pure actions that collapse under "Switch setup method" once anything is configured; contradictory states (Status "Off" above a card claiming connected) are impossible by construction.
+- Durable "restart pending" signal: the server compares state-file changes against the last boot, so the restart callout survives reloads and disappears only when a restart actually happened. The Overview shows it too.
+- "Published" and "reachable" are separate truths: published means the running homeserver actually advertises your address to the Pubky network; reachable means HTTPS answers. The UI no longer suppresses the restart hint just because the tunnel responds.
+- Get-started checklist on the Overview (make it reachable, create your first invite, sign up from Pubky Ring), dismissible with a footer link to bring it back, plus a short backup note.
+- Invite generation failures are surfaced inline; the invite list is honestly labeled as session-only; Pubky Ring is linked where it is mentioned.
+
+### Changed
+
+- Overview: placeholder pubkey/version replaced by an explicit "Not available" state; auto-recovers while the homeserver starts (poll + Retry) instead of requiring a page reload; copy buttons on identity fields; plain-language labels with the technical terms in tooltips; "Not reachable yet" wording with a restart hint when a restart is known to be pending.
+- One canonical restart sentence everywhere, and a consistent user-facing glossary: "public address" vs "domain", "invite code", "public key (pubkey)".
+- Friendlier errors: tunnel 530/1033 mapped to "Tunnel not connected", Cloudflare API rate limits explained instead of a generic upstream error; re-running a setup over a live tunnel warns that the address stays down until the restart.
+- FileBrowser dialogs gained Cancel buttons; delete-by-path requires an explicit click and shows the resolved target first.
+- Logs: download errors surfaced, the download respects the level filter, and a triage caption notes that startup warnings are normal.
+- A transient server error no longer hides the entire Cloudflare tab (it shows a retry state instead) or permanently hides the Logs/Users tabs.
+
 ## [0.1.13]
 
 Setup-flow correctness: every Cloudflare state transition is now crash-safe, serialized, and cleans up after itself.

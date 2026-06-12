@@ -140,6 +140,37 @@ describe('cloudflare-auto-setup route', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
+  it('fresh setup (mode off at entry): message says the tunnel connects on its own', async () => {
+    installFetchMock(makeRules(), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.message).toContain('The tunnel connects within a minute');
+    expect(data.message).toContain('publishes your public address');
+    expect(data.message).not.toContain('unreachable');
+  });
+
+  it('re-setup over a working setup: message warns the domain stays unreachable until restart', async () => {
+    // A live token setup at entry: the running cloudflared never re-reads
+    // the token file, so DNS now points at a tunnel with no connector.
+    await fs.writeFile(path.join(tmpDir, 'token'), 'previous-run-token-aaaaaaaaaaaaaaaaaaaa', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'domain'), 'old.example.com', 'utf-8');
+    installFetchMock(makeRules(), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.message).toContain('unreachable until the app restarts');
+    expect(data.message).not.toContain('connects within a minute');
+  });
+
+  it('maps a Cloudflare 429 to a friendly rate-limit message', async () => {
+    installFetchMock(makeRules({ getZone: () => cfErr(429, 971, 'rate limited') }), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(429);
+    expect(data.error).toBe('Cloudflare is rate limiting requests. Wait a minute and try again.');
+  });
+
   it('apex: empty subdomain routes the zone itself', async () => {
     installFetchMock(makeRules(), calls);
     const res = await post({ api_token: TOKEN, zone_id: ZONE_ID });

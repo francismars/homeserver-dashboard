@@ -828,6 +828,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </div>
           </div>
           <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowUploadDialog(false)} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button onClick={handleUpload} disabled={!newFileName.trim() || isSaving}>
               {isSaving ? 'Creating...' : 'Create'}
             </Button>
@@ -889,6 +892,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </div>
           </div>
           <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowCreateDirDialog(false)} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button onClick={handleCreateDirectory} disabled={!newDirName.trim() || isSaving}>
               {isSaving ? 'Creating...' : 'Create'}
             </Button>
@@ -907,6 +913,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSaving}>
               {isSaving ? 'Deleting...' : 'Delete'}
             </Button>
@@ -980,6 +989,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </div>
           </div>
           <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRenameDialog(false)} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button onClick={handleRename} disabled={!renameValue.trim() || isSaving}>
               {isSaving ? 'Renaming...' : 'Rename'}
             </Button>
@@ -1014,9 +1026,9 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 onChange={(e) => setDeleteByPathInput(e.target.value)}
                 placeholder="/dav/<pubkey>/pub/file.txt"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleDeleteByPath();
-                  }
+                  // Destructive action: never fire on Enter. The Delete
+                  // button below is the only trigger.
+                  if (e.key === 'Enter') e.preventDefault();
                 }}
                 className="pr-16"
               />
@@ -1055,7 +1067,19 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
             </div>
           </div>
 
+          {normalizeAdminDeletePath(deleteByPathInput) && (
+            <p className="text-xs text-muted-foreground" data-testid="delete-by-path-preview">
+              Will delete:{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs break-all">
+                {normalizeAdminDeletePath(deleteByPathInput)}
+              </code>
+            </p>
+          )}
+
           <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDeleteByPathDialog(false)} disabled={isDeletingUrl}>
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleDeleteByPath} disabled={isDeletingUrl}>
               {isDeletingUrl ? 'Deleting...' : 'Delete'}
             </Button>

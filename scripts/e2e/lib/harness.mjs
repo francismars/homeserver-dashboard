@@ -261,6 +261,14 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
     nextLog,
     /** Read a file under the Cloudflare config dir ('' on absence). */
     readConfigFile: (name) => fs.readFile(path.join(configDir, name), 'utf-8').catch(() => null),
+    /** Simulates the init wrapper finishing an app boot: writes the boot
+     * stamp next to config.toml. Pass a Date to backdate it (e.g. "the
+     * wrapper last ran before this change"). */
+    writeBootStamp: async (when = new Date()) => {
+      const stamp = path.join(hsDir, '.wrapper-boot-stamp');
+      await fs.writeFile(stamp, String(Math.floor(when.getTime() / 1000)), 'utf-8');
+      await fs.utimes(stamp, when, when);
+    },
     fileExists: async (name) => {
       try {
         await fs.access(path.join(configDir, name));
@@ -317,9 +325,9 @@ export async function gotoDashboard(page, baseUrl) {
 }
 
 async function openSettingsDialog(page) {
-  await page.waitForSelector('[aria-label="Homeserver Configuration"]', { timeout: 60_000 });
+  await page.waitForSelector('[aria-label="Settings"]', { timeout: 60_000 });
   for (let i = 0; i < 20; i++) {
-    await page.click('[aria-label="Homeserver Configuration"]', { timeout: 10_000 }).catch(() => {});
+    await page.click('[aria-label="Settings"]', { timeout: 10_000 }).catch(() => {});
     try {
       await page.waitForSelector('[role="dialog"]', { timeout: 3_000 });
       return;

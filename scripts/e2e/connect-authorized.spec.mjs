@@ -62,7 +62,18 @@ await runSpec('connect-authorized', async ({ env, browser }) => {
   await page.click('[data-testid="cf-connect-complete"]');
   await page.waitForSelector('[data-testid="cf-connect-success"]', { timeout: 30000 });
   const successText = await page.locator('[data-testid="cf-connect-success"]').textContent();
-  check(successText.includes('pubky.example.com'), 'success card names the hostname', successText.slice(0, 80));
+  check(successText.includes('pubky.example.com'), 'success feedback names the hostname', successText.slice(0, 80));
+
+  step('Status surface picks up the new mode');
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="cf-mode-badge"]')?.textContent?.trim() === 'Connected account',
+    { timeout: 15000 },
+  );
+  check(true, 'mode badge says Connected account');
+  const statusAddress = (await page.locator('[data-testid="cf-status-address"]').textContent()).trim();
+  check(statusAddress === 'pubky.example.com', 'Status shows the new domain', statusAddress);
+  const restartCallouts = await page.locator('[data-testid="restart-callout"]').count();
+  check(restartCallouts === 1, 'exactly one restart callout, on the Status surface', `${restartCallouts}`);
 
   step('completion artifacts on disk');
   const configYml = await env.readConfigFile('config.yml');

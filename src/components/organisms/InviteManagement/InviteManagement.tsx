@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Copy, Check, QrCode, X, Gift, Plus } from 'lucide-react';
 import { copyToClipboard } from '@/libs/utils';
 import { QRCodeSVG } from 'qrcode.react';
@@ -13,16 +14,37 @@ export interface InviteManagementProps {
   invites: string[];
   onGenerate: () => Promise<void>;
   isGenerating?: boolean;
+  /** Last invite-generation failure; rendered as an inline alert. */
+  generateError?: string | null;
   signupCodesTotal?: number;
   signupCodesUnused?: number;
   isStatsLoading?: boolean;
   homeserverPubkey?: string;
 }
 
+/** "Get Pubky Ring" assist, shown wherever the app is a prerequisite. */
+function PubkyRingAssist() {
+  return (
+    <p className="text-xs text-muted-foreground">
+      Don&apos;t have Pubky Ring yet? Get it at{' '}
+      <a
+        href="https://pubky.org"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand underline-offset-2 hover:underline"
+      >
+        pubky.org
+      </a>
+      .
+    </p>
+  );
+}
+
 export function InviteManagement({
   invites,
   onGenerate,
   isGenerating,
+  generateError,
   signupCodesTotal,
   signupCodesUnused,
   isStatsLoading,
@@ -110,6 +132,20 @@ export function InviteManagement({
       <div className="mx-6 h-px bg-border/60" />
 
       <CardContent className="space-y-6 pt-4">
+        {/* Generation failure: without this the spinner just stops and the
+            user is left wondering whether a code was created. */}
+        {generateError && (
+          <Alert variant="destructive" data-testid="invite-generate-error">
+            <AlertTitle>Could not create an invite</AlertTitle>
+            <AlertDescription className="text-xs">
+              <p className="break-words">{generateError}</p>
+              <p className="mt-1">
+                The homeserver may be busy or restarting. Wait a moment and try again; no code was created.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Invite Statistics */}
         <div>
           <div className="mb-3 flex items-center gap-2">
@@ -143,17 +179,26 @@ export function InviteManagement({
           </div>
         </div>
 
-        {/* Generated invites */}
+        {/* Generated invites. Session-only by design: the homeserver does not
+            re-display codes, so the title and copy must not pretend this list
+            is the full history the stats above describe. */}
         <div>
-          <h3 className="mb-3 text-sm font-medium text-foreground">Invite codes</h3>
+          <h3 className="mb-1 text-sm font-medium text-foreground">Created this session</h3>
+          <p className="mb-3 text-xs text-muted-foreground/70">
+            Codes stay valid after a reload, but they cannot be displayed again. Share or save them while they are shown
+            here.
+          </p>
           {invites.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-4 py-12 text-center">
               <Gift className="mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">No invite codes yet</p>
+              <p className="text-sm font-medium text-foreground">No invites created in this session yet.</p>
               <p className="mt-1 max-w-sm text-xs text-muted-foreground">
                 Create an invite code to share with someone. They can use it in the Pubky Ring app to join this
                 homeserver.
               </p>
+              <div className="mt-2">
+                <PubkyRingAssist />
+              </div>
               <Button onClick={handleGenerate} disabled={isGenerating} size="sm" className="mt-4">
                 {isGenerating ? (
                   <>
@@ -241,6 +286,12 @@ export function InviteManagement({
                                   <Copy className="h-4 w-4" />
                                 )}
                               </Button>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground/70">
+                              The <code>pubkyauth://</code> link only opens on a device with Pubky Ring installed.
+                            </p>
+                            <div className="mt-1">
+                              <PubkyRingAssist />
                             </div>
                           </div>
                         </div>

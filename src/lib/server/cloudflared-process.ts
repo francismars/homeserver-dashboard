@@ -23,6 +23,10 @@ const execFileAsync = promisify(execFile);
 // deployments are never frozen to a stale value.
 export const getCloudflaredBin = () => process.env.CLOUDFLARED_BIN || '/usr/local/bin/cloudflared';
 export const getConfigDir = () => process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
+/** The fixed tunnel name the app owns. Re-runs adopt it (idempotency). */
+export const TUNNEL_NAME = 'pubky-homeserver';
+/** Where the tunnel forwards traffic inside the Umbrel network. */
+export const INGRESS_SERVICE = 'http://homeserver:6286';
 /** Where preview mode's instant quick tunnel forwards to. */
 export const getPreviewInstantOrigin = () => process.env.PREVIEW_INSTANT_ORIGIN || 'http://homeserver:6286';
 /** A login attempt (and an unused authorization cert) older than this is expired. */
@@ -42,6 +46,11 @@ export const PREVIEW_SERVICE_LOG = () => path.join(getConfigDir(), 'preview', 'q
 /** Handshake written by the config wrapper: the preview URL it actually
  * published into the homeserver config (removed when preview is off). */
 export const PREVIEW_PUBLISHED = () => path.join(getConfigDir(), 'preview', 'published');
+/** Touched whenever a preview teardown removes the marker: the deletion
+ * leaves no state file newer than the wrapper boot stamp, so restart
+ * detection needs this durable trace of it (transient files like locks and
+ * login logs must not count, which rules out the directory mtime). */
+export const PREVIEW_TEARDOWN_STAMP = () => path.join(getConfigDir(), '.preview-teardown-stamp');
 export const CONNECT_STATE = () => path.join(getConfigDir(), '.connect.json');
 export const CONNECT_LOG = () => path.join(getConfigDir(), '.connect.log');
 export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
@@ -52,6 +61,17 @@ export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
 export const CONNECT_SCRATCH_DIR = () => path.join(getConfigDir(), '.cloudflared');
 export const CREDENTIALS_PATH = () => path.join(getConfigDir(), 'credentials.json');
 export const LOCAL_CONFIG_PATH = () => path.join(getConfigDir(), 'config.yml');
+export const DOMAIN_PATH = () => path.join(getConfigDir(), 'domain');
+export const TOKEN_PATH = () => path.join(getConfigDir(), 'token');
+
+export async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // The --version probe result barely changes; cache it briefly so polling GETs
 // do not fork a process every few seconds. Module memory is acceptable for a

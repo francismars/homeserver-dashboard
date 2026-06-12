@@ -46,6 +46,9 @@ export function DisabledUsersManagement({
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [pubkeyToDisable, setPubkeyToDisable] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  // Confirmation after a disable/enable, shown on the card; without it the
+  // dialog just closes silently and the operator is left guessing.
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<'disable' | 'enable' | null>(null);
   const [copiedPubkey, setCopiedPubkey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +98,9 @@ export function DisabledUsersManagement({
       await onDisableUser(pubkey);
       setPubkeyToDisable('');
       setIsAccessDialogOpen(false);
+      setActionFeedback(
+        `Account ${formatDisplayName(pubkey)} disabled. It can no longer log in or write data; stored files are kept.`,
+      );
       if (onRefreshDisabledUsers) {
         await onRefreshDisabledUsers();
       }
@@ -118,6 +124,7 @@ export function DisabledUsersManagement({
       await onEnableUser(pubkey);
       setPubkeyToDisable('');
       setIsAccessDialogOpen(false);
+      setActionFeedback(`Account ${formatDisplayName(pubkey)} enabled. It can log in again.`);
       if (onRefreshDisabledUsers) {
         await onRefreshDisabledUsers();
       }
@@ -134,6 +141,7 @@ export function DisabledUsersManagement({
       setLocalError(null);
       try {
         await onEnableUser(pubkey);
+        setActionFeedback(`Account ${formatDisplayName(pubkey)} enabled. It can log in again.`);
         if (onRefreshDisabledUsers) {
           await onRefreshDisabledUsers();
         }
@@ -155,7 +163,9 @@ export function DisabledUsersManagement({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">Users</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Manage invites and user access</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">
+                Disable or re-enable accounts on this homeserver.
+              </CardDescription>
             </div>
             {typeof numUsersTotal === 'number' && (
               <Badge variant="secondary" className="shrink-0 text-xs font-normal">
@@ -176,7 +186,11 @@ export function DisabledUsersManagement({
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="text-sm font-medium">Disabled Users</div>
                 </div>
-                <div className="text-xs text-muted-foreground">List of disabled users</div>
+                <div className="text-xs text-muted-foreground" data-testid="disabled-users-explainer">
+                  {typeof numUsersTotal === 'number'
+                    ? `Your homeserver has ${numUsersTotal} ${numUsersTotal === 1 ? 'user' : 'users'}. Only disabled accounts are listed here.`
+                    : 'Only disabled accounts are listed here.'}
+                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
@@ -189,6 +203,7 @@ export function DisabledUsersManagement({
                   size="sm"
                   onClick={() => {
                     setLocalError(null);
+                    setActionFeedback(null);
                     setPubkeyToDisable('');
                     setIsAccessDialogOpen(true);
                   }}
@@ -245,6 +260,14 @@ export function DisabledUsersManagement({
                     )}
                   </div>
                 </div>
+              )}
+
+              {actionFeedback && (
+                <Alert data-testid="user-action-success">
+                  <Check className="h-4 w-4" />
+                  <AlertTitle>Done</AlertTitle>
+                  <AlertDescription>{actionFeedback}</AlertDescription>
+                </Alert>
               )}
 
               {disabledUsersError && (
@@ -338,7 +361,7 @@ export function DisabledUsersManagement({
           <DialogHeader>
             <DialogTitle className="text-xl font-bold sm:text-2xl">Disable or enable user</DialogTitle>
             <DialogDescription className="text-sm">
-              Enter a user pubky to disable or enable their account
+              Enter a user&apos;s public key (pubkey) to disable or enable their account.
             </DialogDescription>
           </DialogHeader>
 
@@ -356,13 +379,13 @@ export function DisabledUsersManagement({
                 htmlFor="user-pubkey-input"
                 className="text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase"
               >
-                User pubky
+                User pubkey
               </label>
               <div className="flex items-center rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2.5">
                 <Input
                   id="user-pubkey-input"
                   aria-label="User pubkey input"
-                  placeholder="Enter pubky"
+                  placeholder="Enter pubkey"
                   value={pubkeyToDisable}
                   onChange={(e) => {
                     setPubkeyToDisable(e.target.value);
@@ -400,6 +423,10 @@ export function DisabledUsersManagement({
                 </div>
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground" data-testid="disable-consequence">
+              Disabling: the account can no longer log in or write data; stored files are kept.
+            </p>
 
             {/* Actions */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

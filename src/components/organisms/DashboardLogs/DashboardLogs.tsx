@@ -13,7 +13,12 @@ import type { LevelFilter, LogEntry, LogsResponse } from './DashboardLogs.types'
 
 const POLL_INTERVAL_MS = 5_000;
 const LINES = 500;
-const LEVEL_OPTIONS: LevelFilter[] = ['all', 'info', 'warn', 'error'];
+const LEVEL_OPTIONS: { value: LevelFilter; label: string }[] = [
+  { value: 'all', label: 'All levels' },
+  { value: 'info', label: 'Info' },
+  { value: 'warn', label: 'Warn' },
+  { value: 'error', label: 'Error' },
+];
 
 const LEVEL_BADGE: Record<string, string> = {
   trace: 'bg-muted text-muted-foreground',
@@ -47,6 +52,7 @@ export function DashboardLogs() {
   const [error, setError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [level, setLevel] = useState<LevelFilter>('all');
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
 
   const fetchLogs = useCallback(async () => {
@@ -88,21 +94,32 @@ export function DashboardLogs() {
   }, [isPaused, fetchLogs]);
 
   const handleDownload = useCallback(async () => {
-    const response = await fetch(`/api/logs?lines=5000`, { cache: 'no-store' });
-    if (!response.ok) return;
-    const data = (await response.json()) as LogsResponse;
-    const blob = new Blob([data.items.map((item) => JSON.stringify(item)).join('\n')], {
-      type: 'application/x-ndjson',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `homeserver-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, []);
+    setDownloadError(null);
+    try {
+      // The download honors the active level filter, like the view does.
+      const params = new URLSearchParams({ lines: '5000' });
+      if (level !== 'all') params.set('level', level);
+      const response = await fetch(`/api/logs?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || `Download failed (${response.status})`);
+      }
+      const data = (await response.json()) as LogsResponse;
+      const blob = new Blob([data.items.map((item) => JSON.stringify(item)).join('\n')], {
+        type: 'application/x-ndjson',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `homeserver-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    }
+  }, [level]);
 
   const rendered = useMemo(
     () =>
@@ -148,8 +165,8 @@ export function DashboardLogs() {
             </SelectTrigger>
             <SelectContent>
               {LEVEL_OPTIONS.map((l) => (
-                <SelectItem key={l} value={l} data-testid={`logs-level-${l}`}>
-                  {l === 'all' ? 'All levels' : l}
+                <SelectItem key={l.value} value={l.value} data-testid={`logs-level-${l.value}`}>
+                  {l.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -169,13 +186,16 @@ export function DashboardLogs() {
         </div>
       </CardHeader>
       <CardContent>
+        <p className="mb-3 text-xs text-muted-foreground/70" data-testid="logs-triage-note">
+          Warnings during startup are normal.
+        </p>
         {partial && (
           <Alert variant="default" className="mb-3">
             <AlertCircle className="size-4" />
             <AlertTitle>Partial tail</AlertTitle>
             <AlertDescription>
-              The log file rotated while we were reading. Showing the bytes we could consistently capture; refresh to
-              retry against the fresh file.
+              The log file rotated while we were reading. Showing the most recent log lines; refresh to retry against
+              the fresh file.
             </AlertDescription>
           </Alert>
         )}
@@ -184,6 +204,13 @@ export function DashboardLogs() {
             <AlertCircle className="size-4" />
             <AlertTitle>Couldn&apos;t load logs</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {downloadError && (
+          <Alert variant="destructive" className="mb-3" data-testid="logs-download-error">
+            <AlertCircle className="size-4" />
+            <AlertTitle>Couldn&apos;t download logs</AlertTitle>
+            <AlertDescription>{downloadError}</AlertDescription>
           </Alert>
         )}
         {isInitialLoading ? (

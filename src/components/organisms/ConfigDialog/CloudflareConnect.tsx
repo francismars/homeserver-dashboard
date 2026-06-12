@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { RestartCallout } from './RestartCallout';
 import { StepList } from './StepList';
 
 type ConnectStatus = 'idle' | 'waiting' | 'authorized' | 'completed';
@@ -23,8 +22,9 @@ const SUBDOMAIN_SUGGESTIONS = ['pubky', 'hs', 'homeserver'] as const;
 const SUBDOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i;
 
 interface CloudflareConnectProps {
-  /** Called with the configured hostname after a successful completion. */
-  onConfigured: (hostname: string) => void;
+  /** Called with the configured hostname (and the route's own restart
+   * message, when present) after a successful completion. */
+  onConfigured: (hostname: string, message?: string) => void;
 }
 
 /**
@@ -32,6 +32,11 @@ interface CloudflareConnectProps {
  * auth link (or scans the QR with a phone), logs in on cloudflare.com, picks
  * their domain, clicks Authorize. The dashboard detects the authorization
  * and asks only for the hostname to publish.
+ *
+ * This card is a pure setup action: a setup completed in an earlier session
+ * renders as the idle action again. The Status surface in the dialog is the
+ * only place that asserts "connected"; the success branch here is in-session
+ * completion feedback only.
  */
 export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const [status, setStatus] = useState<ConnectStatus>('idle');
@@ -47,11 +52,6 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [doneHostname, setDoneHostname] = useState<string | null>(null);
-  // null = not probed yet, true/false = live reachability of the published
-  // hostname. Decides whether the restart callout is still warranted.
-  const [tunnelLive, setTunnelLive] = useState<boolean | null>(null);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const [disconnected, setDisconnected] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = async () => {
@@ -59,13 +59,12 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       const res = await fetch('/api/cloudflare-connect', { cache: 'no-store' });
       const data = await res.json();
       setSupported(Boolean(data.supported));
-      setStatus(data.status);
+      // A pre-existing completed setup renders as the pure idle action; only
+      // a completion performed through this card shows success feedback.
+      setStatus(data.status === 'completed' ? 'idle' : data.status);
       setAuthorizedDomain(data.authorized_domain ?? null);
       setExpired(Boolean(data.expired));
       if (data.auth_url) setAuthUrl(data.auth_url);
-      if (data.status === 'completed' && data.hostname && !doneHostname) {
-        setDoneHostname(data.hostname);
-      }
     } catch {
       // transient; next poll retries
     }
@@ -73,53 +72,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Once completed, check whether the tunnel is actually up: if the
-  // published hostname is reachable the restart clearly already happened
-  // and nagging about it would be wrong (field feedback).
-  useEffect(() => {
-    const hostname = doneHostname?.split(':')[0];
-    if (!hostname) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/public-health?domain=${encodeURIComponent(hostname)}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (!cancelled) setTunnelLive(Boolean(data.ok));
-      } catch {
-        if (!cancelled) setTunnelLive(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [doneHostname]);
-
-  const handleDisconnect = async () => {
-    if (!confirmDisconnect) {
-      setConfirmDisconnect(true);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/cloudflare-disconnect', { method: 'POST' });
-      const data = await res.json().catch(() => ({}) as Record<string, never>);
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      setDoneHostname(null);
-      setSteps(null);
-      setStatus('idle');
-      setTunnelLive(null);
-      setConfirmDisconnect(false);
-      setDisconnected(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   // Poll while waiting for the user to authorize on cloudflare.com.
   useEffect(() => {
@@ -132,7 +85,6 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   const act = async (body: Record<string, unknown>) => {
@@ -166,6 +118,9 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       setStatus(data.status);
       if (data.authorized_domain) setAuthorizedDomain(data.authorized_domain);
       if (data.auth_url) setAuthUrl(data.auth_url);
+      // A setup that completed elsewhere (another tab) surfaces as success
+      // feedback rather than a dead button.
+      if (data.status === 'completed' && data.hostname) setDoneHostname(data.hostname);
     }
   };
 
@@ -186,7 +141,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       setSteps(data.steps ?? null);
       setStatus('completed');
       setDoneHostname(data.hostname);
-      onConfigured(data.hostname);
+      onConfigured(data.hostname, typeof data.message === 'string' ? data.message : undefined);
     } else if (httpStatus === 409) {
       // The authorization is gone (expired between polls, or another tab is
       // mid-setup); the idle card with the error shown is the only state
@@ -200,7 +155,9 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
 
   if (!supported) return null;
 
-  if (status === 'completed' || doneHostname) {
+  // In-session completion feedback only; the persistent "connected" state
+  // lives on the dialog's Status surface.
+  if (status === 'completed') {
     return (
       <div className="space-y-3" data-testid="cf-connect-success">
         <div className="flex items-center gap-2 text-sm font-medium text-brand">
@@ -208,44 +165,13 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           <span>Cloudflare account connected{doneHostname ? ` - ${doneHostname}` : ''}</span>
         </div>
         {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-connect-steps" />}
-        {tunnelLive === true ? (
-          <p className="text-xs text-muted-foreground" data-testid="cf-connect-live">
-            Tunnel connected and your domain is published. The Overview tracks its reachability.
-          </p>
-        ) : (
-          <RestartCallout>
-            Restart the app from Umbrel to connect the tunnel and publish your domain to the Pubky network.
-          </RestartCallout>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-          disabled={busy}
-          onClick={() => void handleDisconnect()}
-          data-testid="cf-connect-disconnect"
-        >
-          {confirmDisconnect ? 'Click again to confirm disconnect' : 'Disconnect and start over'}
-        </Button>
-        {error && (
-          <div className="flex items-start gap-2 text-sm text-destructive">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        <p className="text-xs text-muted-foreground">The Status section above tracks this setup from here on.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3" data-testid="cf-connect">
-      {disconnected && (
-        <RestartCallout>
-          Disconnected. Restart the app from Umbrel to finish. The old tunnel and DNS record still exist in your
-          Cloudflare account; remove them there if you want to reuse the same hostname.
-        </RestartCallout>
-      )}
       <div>
         <p className="text-sm font-medium">Connect Cloudflare account (recommended)</p>
         <p className="text-xs text-muted-foreground">
@@ -287,7 +213,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       {status === 'waiting' && authUrl && (
         <div className="space-y-3 rounded border border-border/60 bg-muted/20 p-3" data-testid="cf-connect-waiting">
           <p className="text-sm">
-            1. Open the link below (any device works), log in, pick your domain, click <strong>Authorize</strong>:
+            Open the link below (any device works), log in, pick your domain, click <strong>Authorize</strong>:
           </p>
           <a
             href={authUrl}
@@ -375,7 +301,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="cf-connect-hostname" className="text-xs text-muted-foreground">
-                Public hostname (under the domain you just authorized)
+                Public address (under the domain you just authorized)
               </Label>
               <Input
                 id="cf-connect-hostname"

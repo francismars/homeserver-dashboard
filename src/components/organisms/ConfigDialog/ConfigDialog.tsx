@@ -9,14 +9,33 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/libs/utils';
+import { useAdminInfo } from '@/hooks/admin';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
 import { RestartCallout } from './RestartCallout';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 type Tab = 'config' | 'cloudflare';
-type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
+type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
+type RestartReason = 'setup_changed' | 'preview_changed' | 'config_changed';
+type CloudflareConfig = {
+  domain: string | null;
+  mode: CloudflareMode;
+  configured: boolean;
+  supported: boolean;
+  /** Server-derived (boot stamp vs state mtimes); null = unknown (no stamp). */
+  restart_pending?: boolean | null;
+  restart_reason?: RestartReason | null;
+};
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'fail';
+
+const MODE_LABELS: Record<CloudflareMode, string> = {
+  connect: 'Connected account',
+  token: 'API token',
+  preview: 'Preview',
+  off: 'Off',
+};
 
 interface ConfigDialogProps {
   open: boolean;
@@ -103,9 +122,13 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     }
   }, [open]);
 
-  // Cloudflare state
+  // Cloudflare state. The mode comes from the server (file fingerprints);
+  // the Status surface is the only place that asserts it. Setup cards are
+  // pure actions keyed by setupNonce so a disconnect remounts them and none
+  // can carry a stale "completed" state.
   const [isCloudflareTabVisible, setIsCloudflareTabVisible] = useState(false);
   const [cfConfig, setCfConfig] = useState<CloudflareConfig | null>(null);
+  const [cfError, setCfError] = useState<string | null>(null);
   const [cfLoading, setCfLoading] = useState(true);
   const [cfSaving, setCfSaving] = useState(false);
   const [cfDomain, setCfDomain] = useState('');
@@ -115,6 +138,77 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [healthError, setHealthError] = useState<string | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showSetupMethods, setShowSetupMethods] = useState(false);
+  const [setupNonce, setSetupNonce] = useState(0);
+  // Which flow just completed in this session; drives the restart callout on
+  // the Status surface until the next dialog open. recentMessage carries the
+  // completing route's own message (e.g. the re-setup-over-a-live-tunnel
+  // warning) so the callout never claims more than the route did.
+  const [recentChange, setRecentChange] = useState<'connect' | 'token' | null>(null);
+  const [recentMessage, setRecentMessage] = useState<string | null>(null);
+  // Publication truth: the running homeserver's /info reports the domain its
+  // pkarr record actually advertises. Separate from HTTPS reachability - the
+  // tunnel reconnects without a restart, the pkarr record does not.
+  const { data: adminInfo, refetch: refetchAdminInfo } = useAdminInfo();
+
+  const checkHealth = async (domain: string): Promise<boolean> => {
+    setHealthStatus('checking');
+    setHealthError(null);
+    try {
+      const res = await fetch(`/api/public-health?domain=${encodeURIComponent(domain)}`);
+      const data = await res.json();
+      if (data.ok) {
+        setHealthStatus('ok');
+        return true;
+      }
+      setHealthStatus('fail');
+      // 530 is Cloudflare's "origin unreachable" (error 1033: tunnel has no
+      // connector). Raw status codes mean nothing to the operator; name the
+      // actual condition and the way out.
+      const upstreamStatus = data.status ?? res.status;
+      setHealthError(
+        upstreamStatus === 530 || upstreamStatus === 1033
+          ? 'Tunnel not connected. If you just set this up, restart the app from Umbrel.'
+          : data.error || `HTTP ${upstreamStatus}`,
+      );
+      return false;
+    } catch {
+      setHealthStatus('fail');
+      setHealthError('Request failed');
+      return false;
+    }
+  };
+
+  const fetchCloudflareConfig = async (): Promise<CloudflareConfig | null> => {
+    setCfError(null);
+    try {
+      const res = await fetch('/api/cloudflare-config', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setCfConfig(data);
+      setIsCloudflareTabVisible(Boolean(data.supported));
+      if (data.domain) setCfDomain(data.domain);
+      return data;
+    } catch (err) {
+      // A failed read means "temporarily unavailable", not "unsupported":
+      // keep the tab and offer a retry instead of hiding the whole surface.
+      setCfError(err instanceof Error ? err.message : 'Request failed');
+      setIsCloudflareTabVisible(true);
+      return null;
+    }
+  };
+
+  const loadCloudflare = async () => {
+    setCfLoading(true);
+    const data = await fetchCloudflareConfig();
+    setCfLoading(false);
+    // One automatic reachability probe per load of an active domain setup;
+    // its failure drives the consolidated restart callout below the badge.
+    if (data?.domain && (data.mode === 'connect' || data.mode === 'token')) {
+      void checkHealth(data.domain);
+    }
+  };
 
   const handleDisconnectAll = async () => {
     if (!confirmDisconnect) {
@@ -126,11 +220,17 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       const res = await fetch('/api/cloudflare-disconnect', { method: 'POST' });
       const data = await res.json().catch(() => ({}) as Record<string, never>);
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      setCfConfig((c) => (c ? { ...c, domain: null, configured: false } : c));
       setCfDomain('');
       setCfToken('');
       setHealthStatus('idle');
-      setDisconnectMessage(data.message || 'Disconnected. Restart the app from Umbrel to finish.');
+      setRecentChange(null);
+      setRecentMessage(null);
+      setDisconnectMessage(data.message || `Disconnected. ${RESTART_APP_SENTENCE}`);
+      // Re-read the server-derived mode and remount the setup cards so the
+      // whole tab re-syncs from the single source of truth.
+      await fetchCloudflareConfig();
+      setSetupNonce((n) => n + 1);
+      setShowSetupMethods(false);
     } catch (err) {
       setCfMessage({ type: 'error', text: err instanceof Error ? err.message : 'Disconnect failed' });
     }
@@ -216,8 +316,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setIsEditing(false);
       setSaveMessage({
         type: 'success',
-        text:
-          data.message || 'Config saved. Stop and start the Pubky Homeserver app in Umbrel for changes to take effect.',
+        text: data.message || `Config saved. ${RESTART_APP_SENTENCE}`,
       });
     } catch {
       setSaveMessage({ type: 'error', text: 'Request failed' });
@@ -256,33 +355,51 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     }
   }, [activeTab, isConfigTabVisible, isCloudflareTabVisible, configLoading, cfLoading]);
 
-  // Fetch Cloudflare config when dialog opens
+  // Fetch Cloudflare config when the dialog opens; per-open feedback state
+  // (callouts, confirm arming, probe results) resets so the Status surface
+  // always reflects a fresh server read.
   useEffect(() => {
     if (!open) return;
+    setDisconnectMessage(null);
+    setRecentChange(null);
+    setRecentMessage(null);
+    setHealthStatus('idle');
+    setConfirmDisconnect(false);
+    setCfMessage(null);
+    setShowSetupMethods(false);
+    void loadCloudflare();
+    // Fresh publication truth: the app may have been restarted since mount.
+    void refetchAdminInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // The Status surface shows the preview address; poll until the tunnel has
+  // handed one out (the instant tunnel needs a few seconds after enable).
+  useEffect(() => {
+    if (!open || cfConfig?.mode !== 'preview') {
+      setPreviewUrl(null);
+      return;
+    }
     let cancelled = false;
-    setCfLoading(true);
-    fetch('/api/cloudflare-config')
-      .then((res) => res.json())
-      .then((data: CloudflareConfig) => {
-        if (!cancelled) {
-          setCfConfig(data);
-          setIsCloudflareTabVisible(Boolean(data.supported));
-          if (data.domain) setCfDomain(data.domain);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCfConfig({ domain: null, configured: false, supported: false });
-          setIsCloudflareTabVisible(false);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setCfLoading(false);
-      });
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/cloudflare-preview', { cache: 'no-store' });
+        const data = await res.json();
+        if (cancelled) return;
+        const url: string | null = data.instant?.url ?? data.published_url ?? null;
+        setPreviewUrl(url);
+        if (!url) timer = setTimeout(() => void load(), 3000);
+      } catch {
+        if (!cancelled) timer = setTimeout(() => void load(), 3000);
+      }
+    };
+    void load();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [open]);
+  }, [open, cfConfig?.mode]);
 
   // Four setup tiers live together: Connect (primary), API token and Manual
   // are collapsed escape hatches, Test drive sits apart as a no-account
@@ -290,19 +407,22 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [showManualSetup, setShowManualSetup] = useState(false);
   const [showApiTokenSetup, setShowApiTokenSetup] = useState(false);
 
-  const handleAutoConfigured = (hostname: string, probe = true) => {
+  const handleAutoConfigured = (hostname: string, source: 'connect' | 'token', message?: string) => {
     setCfDomain(hostname);
-    setCfConfig((c) =>
-      c ? { ...c, domain: hostname, configured: true } : { domain: hostname, configured: true, supported: true },
-    );
-    setHealthStatus('idle');
-    // The Connect flow's locally-managed tunnel only starts after an app
-    // restart, so probing now would just flash a guaranteed failure.
-    if (!probe) return;
-    // The tunnel typically connects within seconds (cloudflared retries until
-    // the token file appears), but edge DNS + the first connection can take
-    // longer. Probe up to 4 times before surfacing a failure so the user is
-    // not flashed a red "Not reachable" right after the green success state.
+    setDisconnectMessage(null);
+    setRecentChange(source);
+    setRecentMessage(message ?? null);
+    // Keep the just-completed card's feedback visible even though the cards
+    // now sit behind the "Switch setup method" disclosure.
+    setShowSetupMethods(true);
+    void fetchCloudflareConfig();
+    // Both flows' tunnels connect WITHOUT an app restart: the crash-looping
+    // cloudflared containers pick up the new token/config within a minute
+    // (the restart only publishes the domain to the Pubky network). Edge DNS
+    // plus the first connection can still take a while, so probe up to 4
+    // times before surfacing a failure: the user must not be flashed a red
+    // "Not reachable" right after the green success state.
+    setHealthStatus('checking');
     const probeHealth = async (attempt: number) => {
       const reachable = await checkHealth(hostname);
       if (!reachable && attempt < 4) {
@@ -311,6 +431,12 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       }
     };
     setTimeout(() => void probeHealth(1), 5_000);
+  };
+
+  const handlePreviewEnabled = () => {
+    setDisconnectMessage(null);
+    setShowSetupMethods(true);
+    void fetchCloudflareConfig();
   };
 
   const handleCfSave = async (e: React.FormEvent) => {
@@ -330,12 +456,17 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       }
       setCfMessage({
         type: 'success',
-        text: data.message || 'Saved. Restart the app from Umbrel for the tunnel to connect.',
+        text:
+          data.message ||
+          `Saved. The tunnel picks this up within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
       });
-      setCfConfig((c) =>
-        c ? { ...c, domain: cfDomain.trim() || null, configured: !!(cfDomain.trim() && cfToken) } : c,
-      );
       setHealthStatus('idle'); // Reset health check after save
+      const fresh = await fetchCloudflareConfig();
+      if (fresh?.mode === 'token') {
+        setRecentChange('token');
+        setRecentMessage(typeof data.message === 'string' ? data.message : null);
+        setShowSetupMethods(true);
+      }
     } catch {
       setCfMessage({ type: 'error', text: 'Request failed' });
     } finally {
@@ -343,30 +474,51 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     }
   };
 
-  const checkHealth = async (domain: string): Promise<boolean> => {
-    setHealthStatus('checking');
-    setHealthError(null);
-    try {
-      const res = await fetch(`/api/public-health?domain=${encodeURIComponent(domain)}`);
-      const data = await res.json();
-      if (data.ok) {
-        setHealthStatus('ok');
-        return true;
-      }
-      setHealthStatus('fail');
-      setHealthError(data.error || `HTTP ${data.status ?? res.status}`);
-      return false;
-    } catch {
-      setHealthStatus('fail');
-      setHealthError('Request failed');
-      return false;
-    }
-  };
-
+  // Cloudflare first: it is the dialog's default tab and the Overview's
+  // "Fix it"/"Set up" target, so the rail order matches where users land.
   const tabs: { id: Tab; label: string }[] = [
-    ...(isConfigTabVisible ? [{ id: 'config' as Tab, label: 'Config' }] : []),
     ...(isCloudflareTabVisible ? [{ id: 'cloudflare' as Tab, label: 'Cloudflare' }] : []),
+    ...(isConfigTabVisible ? [{ id: 'config' as Tab, label: 'Config' }] : []),
   ];
+
+  const cfMode: CloudflareMode = cfConfig?.mode ?? 'off';
+  // Server-derived restart signal; null means unknown (no boot stamp), in
+  // which case the in-session signals below carry today's behavior alone.
+  const restartPending = cfConfig?.restart_pending ?? null;
+  // Whether the running homeserver actually advertises the configured domain
+  // (pkarr publication), from /info. HTTPS reachability cannot answer this:
+  // the tunnel picks up changes without a restart, the pkarr record does not.
+  const publishedDomain = adminInfo?.pkarr_icann_domain?.split(':')[0].trim().toLowerCase() || null;
+  const publishState: 'published' | 'pending' | 'unknown' =
+    !adminInfo || !cfConfig?.domain
+      ? 'unknown'
+      : publishedDomain === cfConfig.domain.trim().toLowerCase()
+        ? 'published'
+        : 'pending';
+  // The Status surface owns the one restart callout for the whole tab.
+  const cfStatusCallout = (() => {
+    // restart_pending false = the wrapper has demonstrably run since the
+    // newest change, so any in-session "restart to finish" message is stale.
+    if (restartPending !== false) {
+      if (disconnectMessage) return disconnectMessage;
+      if (recentChange)
+        return (
+          recentMessage ??
+          `The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`
+        );
+      // Durable signal: survives page reloads, unlike the session state above.
+      if (restartPending === true) {
+        if (cfConfig?.restart_reason === 'config_changed')
+          return `${RESTART_APP_SENTENCE} The restart applies your configuration changes.`;
+        if (cfMode === 'connect' || cfMode === 'token')
+          return `${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
+        return `${RESTART_APP_SENTENCE} The restart applies your changes.`;
+      }
+    }
+    if ((cfMode === 'connect' || cfMode === 'token') && healthStatus === 'fail')
+      return `Your public address is not reachable yet. If you just set this up or restarted, give it a minute and use Check. If it stays unreachable: ${RESTART_APP_SENTENCE}`;
+    return null;
+  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -564,8 +716,8 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                 {writable ? (
                   <p className="text-xs text-muted-foreground/70">
                     Sensitive fields (passwords, database URL) are masked as <code>&quot;********&quot;</code> on
-                    display. Leave the placeholder untouched and the real value is preserved on save. Restart the Pubky
-                    Homeserver app from Umbrel to apply config changes.
+                    display. Leave the placeholder untouched and the real value is preserved on save. Config changes
+                    only take effect after a restart. {RESTART_APP_SENTENCE}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground/70">
@@ -588,39 +740,100 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                     <span>Loading…</span>
                   </div>
+                ) : cfError ? (
+                  <div className="flex flex-col items-start gap-3" data-testid="cf-unavailable">
+                    <div className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>Cloudflare settings are temporarily unavailable ({cfError}).</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadCloudflare()}
+                      data-testid="cf-retry"
+                    >
+                      Retry
+                    </Button>
+                  </div>
                 ) : (
                   <>
-                    {/* Status section */}
+                    {/* Status: the single surface that asserts Cloudflare state. */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Status</span>
-                        {cfConfig?.configured ? (
-                          <span className="text-sm font-medium text-brand">Configured</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Off</span>
-                        )}
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1.5 text-sm font-medium',
+                            cfMode === 'off' ? 'text-muted-foreground' : 'text-brand',
+                          )}
+                          data-testid="cf-mode-badge"
+                        >
+                          <span
+                            className={cn(
+                              'h-1.5 w-1.5 rounded-full',
+                              cfMode === 'off' ? 'bg-muted-foreground/50' : 'bg-brand',
+                            )}
+                          />
+                          {MODE_LABELS[cfMode]}
+                        </span>
                       </div>
 
-                      {disconnectMessage && <RestartCallout>{disconnectMessage}</RestartCallout>}
-                      {cfConfig?.configured && cfConfig.domain && (
+                      {cfStatusCallout && <RestartCallout>{cfStatusCallout}</RestartCallout>}
+                      {/* A setup just completed in this session: point at what
+                          comes after instead of leaving the user at a dead end. */}
+                      {recentChange && (
+                        <p className="text-xs text-muted-foreground" data-testid="cf-next-step">
+                          Next: create an invite in the Invites tab so you can sign up from Pubky Ring.
+                        </p>
+                      )}
+                      {cfMode !== 'off' && (
                         <div className="flex items-center justify-between gap-3">
-                          <code className="truncate font-mono text-xs text-muted-foreground">{cfConfig.domain}</code>
+                          <code
+                            className="truncate font-mono text-xs text-muted-foreground"
+                            data-testid="cf-status-address"
+                          >
+                            {cfMode === 'preview' ? (previewUrl ?? 'temporary address pending…') : cfConfig?.domain}
+                          </code>
                           <div className="flex shrink-0 items-center gap-2">
-                            {healthStatus === 'ok' && <span className="text-xs text-brand">Reachable</span>}
-                            {healthStatus === 'fail' && (
-                              <span className="text-xs text-destructive">
-                                Not reachable{healthError ? ` (${healthError})` : ''}
-                              </span>
+                            {(cfMode === 'connect' || cfMode === 'token') && cfConfig?.domain && (
+                              <>
+                                {publishState === 'published' && (
+                                  <span className="text-xs text-brand" data-testid="cf-status-published">
+                                    Published
+                                  </span>
+                                )}
+                                {publishState === 'pending' && (
+                                  <span className="text-xs text-amber-400" data-testid="cf-status-unpublished">
+                                    Restart to publish
+                                  </span>
+                                )}
+                                {healthStatus === 'ok' && (
+                                  <span className="text-xs text-brand" data-testid="cf-status-reachable">
+                                    Reachable
+                                  </span>
+                                )}
+                                {healthStatus === 'fail' && (
+                                  <span className="text-xs text-destructive" data-testid="cf-status-unreachable">
+                                    Not reachable{healthError ? ` (${healthError})` : ''}
+                                  </span>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  disabled={healthStatus === 'checking'}
+                                  onClick={() => checkHealth(cfConfig.domain!)}
+                                  data-testid="cf-check"
+                                >
+                                  {healthStatus === 'checking' ? (
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    'Check'
+                                  )}
+                                </Button>
+                              </>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              disabled={healthStatus === 'checking'}
-                              onClick={() => checkHealth(cfConfig.domain!)}
-                            >
-                              {healthStatus === 'checking' ? <RefreshCw className="h-3 w-3 animate-spin" /> : 'Check'}
-                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -633,119 +846,173 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                           </div>
                         </div>
                       )}
+
+                      {/* Consequences stated BEFORE the confirming click. */}
+                      {confirmDisconnect && (
+                        <div
+                          className="space-y-2 rounded border border-destructive/40 bg-destructive/5 p-3"
+                          data-testid="cf-disconnect-consequences"
+                        >
+                          <p className="text-xs text-foreground">
+                            Removes this dashboard&apos;s Cloudflare setup. The tunnel and DNS record stay in your
+                            Cloudflare account until you delete them there. Your public address stops working after the
+                            next restart.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setConfirmDisconnect(false)}
+                            data-testid="cf-disconnect-cancel"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Action feedback (e.g. a failed disconnect or a manual
+                          save) lives with the Status surface so it stays
+                          visible regardless of which disclosure is open. */}
+                      {cfMessage && (
+                        <div
+                          className={cn(
+                            'flex items-center gap-2 text-sm',
+                            cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
+                          )}
+                          data-testid="cf-message"
+                        >
+                          {cfMessage.type === 'error' ? (
+                            <AlertCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          )}
+                          <span>{cfMessage.text}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="h-px bg-border/50" />
 
-                    {/* Option Z: browser-auth connect (primary path) */}
-                    <CloudflareConnect onConfigured={(h) => handleAutoConfigured(h, false)} />
+                    {/* With an active mode the setup cards are demoted to a
+                        "switch method" disclosure; the Status surface above is
+                        what says "connected". */}
+                    {cfMode !== 'off' && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => setShowSetupMethods((s) => !s)}
+                        data-testid="cf-switch-method-toggle"
+                      >
+                        {showSetupMethods ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
+                        Switch setup method
+                      </button>
+                    )}
 
-                    <div className="h-px bg-border/50" />
+                    {(cfMode === 'off' || showSetupMethods) && (
+                      <div key={setupNonce} className="flex flex-col gap-6">
+                        {/* Option Z: browser-auth connect (primary path) */}
+                        <CloudflareConnect onConfigured={(h, m) => handleAutoConfigured(h, 'connect', m)} />
 
-                    {/* Option Y: API-token automatic setup (collapsed) */}
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setShowApiTokenSetup((s) => !s)}
-                      data-testid="cf-api-token-toggle"
-                    >
-                      {showApiTokenSetup ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                      Set up with an API token instead
-                    </button>
-                    {showApiTokenSetup && <CloudflareAutoSetup onConfigured={handleAutoConfigured} />}
+                        <div className="h-px bg-border/50" />
 
-                    {/* Option W: no-account published preview */}
-                    <CloudflarePreview />
-
-                    <div className="h-px bg-border/50" />
-
-                    {/* Option X: manual setup (collapsed escape hatch) */}
-                    <button
-                      type="button"
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setShowManualSetup((s) => !s)}
-                      data-testid="cf-manual-toggle"
-                    >
-                      {showManualSetup ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                      Set up manually instead
-                    </button>
-
-                    {showManualSetup && (
-                      <>
-                        {/* Save feedback */}
-                        {cfMessage && (
-                          <div
-                            className={cn(
-                              'flex items-center gap-2 text-sm',
-                              cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
-                            )}
-                          >
-                            {cfMessage.type === 'error' ? (
-                              <AlertCircle className="h-3.5 w-3.5" />
-                            ) : (
-                              <CheckCircle className="h-3.5 w-3.5" />
-                            )}
-                            <span>{cfMessage.text}</span>
-                          </div>
+                        {/* Option Y: API-token automatic setup (collapsed) */}
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                          onClick={() => setShowApiTokenSetup((s) => !s)}
+                          data-testid="cf-api-token-toggle"
+                        >
+                          {showApiTokenSetup ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          )}
+                          Set up with an API token instead
+                        </button>
+                        {showApiTokenSetup && (
+                          <CloudflareAutoSetup onConfigured={(h, m) => handleAutoConfigured(h, 'token', m)} />
                         )}
 
-                        {/* Configuration form */}
-                        <form onSubmit={handleCfSave} className="space-y-5">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="cf-domain" className="text-xs text-muted-foreground">
-                              Domain
-                            </Label>
-                            <Input
-                              id="cf-domain"
-                              type="text"
-                              placeholder="pubky.yourdomain.com"
-                              value={cfDomain}
-                              onChange={(e) => setCfDomain(e.target.value)}
-                              className="font-mono text-sm"
-                              autoComplete="off"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="cf-token" className="text-xs text-muted-foreground">
-                              Tunnel token
-                            </Label>
-                            <Input
-                              id="cf-token"
-                              type="password"
-                              placeholder="Paste token from Cloudflare Zero Trust"
-                              value={cfToken}
-                              onChange={(e) => setCfToken(e.target.value)}
-                              className="font-mono text-sm"
-                              autoComplete="off"
-                            />
-                          </div>
-                          <Button type="submit" disabled={cfSaving} size="sm">
-                            {cfSaving ? 'Saving…' : 'Save'}
-                          </Button>
-                        </form>
+                        {/* Option W: no-account published preview */}
+                        <CloudflarePreview onEnabled={handlePreviewEnabled} />
 
-                        <p className="text-xs text-muted-foreground/70">
-                          Point the tunnel hostname to{' '}
-                          <code className="text-muted-foreground">http://homeserver:6286</code>. Restart the app after
-                          saving.{' '}
-                          <a
-                            href="/cloudflare-guide"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand underline-offset-2 hover:underline"
-                          >
-                            Full setup guide ↗
-                          </a>
-                        </p>
-                      </>
+                        <div className="h-px bg-border/50" />
+
+                        {/* Option X: manual setup (collapsed escape hatch) */}
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                          onClick={() => setShowManualSetup((s) => !s)}
+                          data-testid="cf-manual-toggle"
+                        >
+                          {showManualSetup ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          )}
+                          Set up manually instead
+                        </button>
+
+                        {showManualSetup && (
+                          <>
+                            {/* Configuration form. Save feedback renders on the
+                                Status surface above so it survives this
+                                disclosure being closed. */}
+                            <form onSubmit={handleCfSave} className="space-y-5">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cf-domain" className="text-xs text-muted-foreground">
+                                  Public address
+                                </Label>
+                                <Input
+                                  id="cf-domain"
+                                  type="text"
+                                  placeholder="pubky.yourdomain.com"
+                                  value={cfDomain}
+                                  onChange={(e) => setCfDomain(e.target.value)}
+                                  className="font-mono text-sm"
+                                  autoComplete="off"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cf-token" className="text-xs text-muted-foreground">
+                                  Tunnel token
+                                </Label>
+                                <Input
+                                  id="cf-token"
+                                  type="password"
+                                  placeholder="Paste token from Cloudflare Zero Trust"
+                                  value={cfToken}
+                                  onChange={(e) => setCfToken(e.target.value)}
+                                  className="font-mono text-sm"
+                                  autoComplete="off"
+                                />
+                              </div>
+                              <Button type="submit" disabled={cfSaving} size="sm">
+                                {cfSaving ? 'Saving…' : 'Save'}
+                              </Button>
+                            </form>
+
+                            <p className="text-xs text-muted-foreground/70">
+                              Point the tunnel hostname to{' '}
+                              <code className="text-muted-foreground">http://homeserver:6286</code>. The tunnel picks
+                              the token up by itself; after saving, a restart publishes your public address.{' '}
+                              <a
+                                href="/cloudflare-guide"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand underline-offset-2 hover:underline"
+                              >
+                                Full setup guide ↗
+                              </a>
+                            </p>
+                          </>
+                        )}
+                      </div>
                     )}
                   </>
                 )}

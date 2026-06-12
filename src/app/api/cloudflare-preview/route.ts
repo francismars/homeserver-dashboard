@@ -4,15 +4,13 @@ import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import {
   AlreadyRunningError,
-  CREDENTIALS_PATH,
-  LOCAL_CONFIG_PATH,
   PREVIEW_ENV,
-  PREVIEW_PUBLISHED,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
   PREVIEW_INSTANT_LOG,
   PREVIEW_INSTANT_STATE,
   clearState,
+  fileExists,
   getCloudflaredBin,
   getConfigDir,
   getPreviewInstantOrigin,
@@ -28,6 +26,8 @@ import {
   withFlowLock,
   writeState,
 } from '@/lib/server/cloudflared-process';
+import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
+import { teardownPreview } from '@/lib/server/preview-teardown';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-preview';
@@ -53,27 +53,9 @@ const ROUTE_NAME = '/api/cloudflare-preview';
  * POST {action:'disable'} -> kill instant tunnel + remove marker
  */
 
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function hasPermanentSetup(): Promise<boolean> {
-  // Locally-managed tunnel (Connect flow)
-  if ((await fileExists(LOCAL_CONFIG_PATH())) && (await fileExists(CREDENTIALS_PATH()))) return true;
-  // Token-mode tunnel with a real domain (manual or API-token flow)
-  try {
-    const domain = (await fs.readFile(path.join(getConfigDir(), 'domain'), 'utf-8')).trim().toLowerCase();
-    const token = (await fs.readFile(path.join(getConfigDir(), 'token'), 'utf-8')).trim();
-    if (domain && !domain.startsWith('localhost') && !domain.endsWith('.trycloudflare.com') && token) return true;
-  } catch {
-    // files absent -> no permanent setup
-  }
-  return false;
+  const { mode } = await detectCloudflareMode();
+  return mode === 'connect' || mode === 'token';
 }
 
 async function instantStatus(): Promise<{ status: 'stopped' | 'starting' | 'running'; url?: string; error?: string }> {
@@ -120,18 +102,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.action === 'disable') {
-    const state = await readState(PREVIEW_INSTANT_STATE());
-    // killPid escalates (SIGTERM, wait, SIGKILL) and reports whether the
-    // child is actually gone; state is cleared either way, but the response
-    // must not claim a dead tunnel while a stuck child still serves it.
-    const instantGone = state ? await killPid(state.pid, state.starttime) : true;
-    await clearState(PREVIEW_INSTANT_STATE());
-    await fs.rm(PREVIEW_ENV(), { force: true });
-    // The wrapper handshake is authoritative for published_url whenever the
-    // marker exists; left behind, a later re-enable would report the previous
-    // (dead) trycloudflare URL as currently published until the new preview
-    // service writes a fresh one. Same cleanup as teardownPreview().
-    await fs.rm(PREVIEW_PUBLISHED(), { force: true });
+    // Shared teardown: kills the instant child, clears its state, removes the
+    // marker AND the wrapper handshake (left behind, a later re-enable would
+    // report the previous trycloudflare URL as currently published), and
+    // stamps the teardown for restart detection. The flag reports whether the
+    // child actually died - the response must not claim a dead tunnel while a
+    // stuck child still serves it.
+    const instantGone = await teardownPreview();
     logRouteInfo({
       requestId,
       route: ROUTE_NAME,
