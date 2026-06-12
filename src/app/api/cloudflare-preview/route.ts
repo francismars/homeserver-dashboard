@@ -9,12 +9,12 @@ import {
   PREVIEW_ENV,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
-  TESTDRIVE_LOG,
-  TESTDRIVE_STATE,
+  PREVIEW_INSTANT_LOG,
+  PREVIEW_INSTANT_STATE,
   clearState,
   getCloudflaredBin,
   getConfigDir,
-  getTestdriveOrigin,
+  getPreviewInstantOrigin,
   isBinaryAvailable,
   isPidAlive,
   killPid,
@@ -76,11 +76,11 @@ async function hasPermanentSetup(): Promise<boolean> {
 }
 
 async function instantStatus(): Promise<{ status: 'stopped' | 'starting' | 'running'; url?: string; error?: string }> {
-  const state = await readState(TESTDRIVE_STATE());
+  const state = await readState(PREVIEW_INSTANT_STATE());
   if (!state) return { status: 'stopped' };
   if (!isPidAlive(state.pid, state.starttime)) {
     const failed = await quickTunnelFailed();
-    await clearState(TESTDRIVE_STATE());
+    await clearState(PREVIEW_INSTANT_STATE());
     return failed
       ? { status: 'stopped', error: 'Cloudflare did not hand out a temporary URL. Try again in a minute.' }
       : { status: 'stopped' };
@@ -119,12 +119,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.action === 'disable') {
-    const state = await readState(TESTDRIVE_STATE());
+    const state = await readState(PREVIEW_INSTANT_STATE());
     // killPid escalates (SIGTERM, wait, SIGKILL) and reports whether the
     // child is actually gone; state is cleared either way, but the response
     // must not claim a dead tunnel while a stuck child still serves it.
     const instantGone = state ? await killPid(state.pid, state.starttime) : true;
-    await clearState(TESTDRIVE_STATE());
+    await clearState(PREVIEW_INSTANT_STATE());
     await fs.rm(PREVIEW_ENV(), { force: true });
     logRouteInfo({
       requestId,
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         // public by nature). chmod explicitly (mkdir mode is umask-clipped).
         await fs.mkdir(path.join(getConfigDir(), 'preview'), { recursive: true });
         await fs.chmod(path.join(getConfigDir(), 'preview'), 0o777);
-        await fs.writeFile(PREVIEW_ENV(), `TUNNEL_URL=${getTestdriveOrigin()}\n`, 'utf-8');
+        await fs.writeFile(PREVIEW_ENV(), `TUNNEL_URL=${getPreviewInstantOrigin()}\n`, 'utf-8');
 
         // Instant tunnel so the user gets a working URL right away (uncapped;
         // it dies with the container and the compose service takes over after
@@ -195,10 +195,10 @@ export async function POST(request: NextRequest) {
         const existing = await instantStatus();
         if (existing.status === 'stopped') {
           spawned = await spawnDetached(
-            [getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()],
-            TESTDRIVE_LOG(),
+            [getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getPreviewInstantOrigin()],
+            PREVIEW_INSTANT_LOG(),
           );
-          await writeState(TESTDRIVE_STATE(), { ...spawned, started_at: new Date().toISOString() });
+          await writeState(PREVIEW_INSTANT_STATE(), { ...spawned, started_at: new Date().toISOString() });
         }
         logRouteInfo({
           requestId,
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
         // make GET report enabled (and the next restart publish a preview
         // URL), and an unkilled child would keep an orphan tunnel serving.
         if (spawned) await killPid(spawned.pid, spawned.starttime);
-        await clearState(TESTDRIVE_STATE());
+        await clearState(PREVIEW_INSTANT_STATE());
         await fs.rm(PREVIEW_ENV(), { force: true });
         const error = new RouteError(500, 'internal_error', 'Failed to enable preview mode');
         logRouteError({

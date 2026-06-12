@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs';
-import { PREVIEW_ENV, PREVIEW_PUBLISHED, TESTDRIVE_STATE, clearState, killPid, readState } from './cloudflared-process';
+import { PREVIEW_ENV, PREVIEW_PUBLISHED, PREVIEW_INSTANT_STATE, clearState, killPid, readState } from './cloudflared-process';
 
 /**
  * Tears preview mode down when a real setup lands (connect complete,
@@ -10,9 +10,9 @@ import { PREVIEW_ENV, PREVIEW_PUBLISHED, TESTDRIVE_STATE, clearState, killPid, r
  * artifact already being gone.
  */
 export async function teardownPreview(): Promise<void> {
-  const state = await readState(TESTDRIVE_STATE());
+  const state = await readState(PREVIEW_INSTANT_STATE());
   if (state) await killPid(state.pid, state.starttime);
-  await clearState(TESTDRIVE_STATE());
+  await clearState(PREVIEW_INSTANT_STATE());
   await fs.rm(PREVIEW_ENV(), { force: true });
   await fs.rm(PREVIEW_PUBLISHED(), { force: true });
 }

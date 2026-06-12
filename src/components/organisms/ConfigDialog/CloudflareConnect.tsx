@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Check, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
-import { cn } from '@/libs/utils';
 import { RestartCallout } from './RestartCallout';
+import { StepList } from './StepList';
 
 type ConnectStatus = 'idle' | 'waiting' | 'authorized' | 'completed';
 type Step = { key: 'tunnel' | 'dns' | 'config'; status: 'done' | 'failed'; detail?: string };
@@ -207,7 +207,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           <CheckCircle className="h-4 w-4" />
           <span>Cloudflare account connected{doneHostname ? ` - ${doneHostname}` : ''}</span>
         </div>
-        {steps && <StepList steps={steps} />}
+        {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-connect-steps" />}
         {tunnelLive === true ? (
           <p className="text-xs text-muted-foreground" data-testid="cf-connect-live">
             Tunnel connected and your domain is published. The Overview tracks its reachability.
@@ -255,6 +255,11 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
 
       {status === 'idle' && (
         <div className="space-y-2">
+          <p className="text-xs text-muted-foreground" data-testid="cf-connect-prereqs">
+            You&apos;ll need: a free Cloudflare account with your domain added to it. Cloudflare&apos;s page will ask
+            you to pick the domain and click <strong>Authorize</strong>.
+          </p>
+          <p className="text-xs text-muted-foreground">No domain? Try Preview mode below.</p>
           {expired && (
             <p className="flex items-start gap-2 text-xs text-muted-foreground" data-testid="cf-connect-expired">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -403,7 +408,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       )}
 
       {/* failure progress (success renders in the completed branch above) */}
-      {steps && <StepList steps={steps} />}
+      {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-connect-steps" />}
 
       {error && (
         <div className="flex items-start gap-2 text-sm text-destructive" data-testid="cf-connect-error">
@@ -412,25 +417,5 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
         </div>
       )}
     </div>
-  );
-}
-
-function StepList({ steps }: { steps: Step[] }) {
-  return (
-    <ul className="space-y-1" data-testid="cf-connect-steps">
-      {steps.map((s) => (
-        <li key={s.key} className="flex items-center gap-2 text-xs">
-          {s.status === 'done' ? (
-            <Check className="h-3.5 w-3.5 text-brand" />
-          ) : (
-            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-          )}
-          <span className={cn(s.status === 'done' ? 'text-muted-foreground' : 'text-destructive')}>
-            {STEP_LABELS[s.key]}
-            {s.detail ? ` - ${s.detail}` : ''}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

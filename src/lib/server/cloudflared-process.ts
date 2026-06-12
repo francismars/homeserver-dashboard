@@ -1,7 +1,7 @@
 /**
  * Helpers for running the embedded cloudflared binary for the two flows that
  * need a child process:
- *   - "Test drive" (Quick Tunnel): cloudflared tunnel --url <origin>
+ *   - Preview mode's instant tunnel (Quick Tunnel): cloudflared tunnel --url <origin>
  *   - "Connect Cloudflare account": cloudflared tunnel login (+ create/route)
  *
  * Design constraint: Next.js route handlers have no stable module lifetime
@@ -23,15 +23,19 @@ const execFileAsync = promisify(execFile);
 // deployments are never frozen to a stale value.
 export const getCloudflaredBin = () => process.env.CLOUDFLARED_BIN || '/usr/local/bin/cloudflared';
 export const getConfigDir = () => process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
-/** Where the test-drive quick tunnel forwards to. */
-export const getTestdriveOrigin = () => process.env.TESTDRIVE_ORIGIN || 'http://homeserver:6286';
+/** Where preview mode's instant quick tunnel forwards to. */
+export const getPreviewInstantOrigin = () => process.env.PREVIEW_INSTANT_ORIGIN || 'http://homeserver:6286';
 /** A login attempt (and an unused authorization cert) older than this is expired. */
 export const CONNECT_MAX_AGE_MS = 15 * 60 * 1000;
 
-export const TESTDRIVE_STATE = () => path.join(getConfigDir(), '.testdrive.json');
-export const TESTDRIVE_LOG = () => path.join(getConfigDir(), '.testdrive.log');
+// The .testdrive.* on-disk names predate the feature's rename to "Preview
+// mode" and are kept for upgrade compatibility (they live on the bind mount).
+export const PREVIEW_INSTANT_STATE = () => path.join(getConfigDir(), '.testdrive.json');
+export const PREVIEW_INSTANT_LOG = () => path.join(getConfigDir(), '.testdrive.log');
 /** Marker that enables preview mode: gates the cloudflared-preview compose
- * service (env_file) AND tells the config wrapper to publish the URL. */
+ * service (env_file) AND tells the config wrapper to publish the URL. The
+ * on-disk name is testdrive.env because the shipped wrapper and compose
+ * reference it; it MUST NOT change. */
 export const PREVIEW_ENV = () => path.join(getConfigDir(), 'testdrive.env');
 /** Logfile of the cloudflared-preview compose service (post-restart). */
 export const PREVIEW_SERVICE_LOG = () => path.join(getConfigDir(), 'preview', 'quick.log');
@@ -209,7 +213,7 @@ const QUICK_TUNNEL_FAILURE_PATTERN = /failed to request quick Tunnel|ERR /;
 
 export async function parseQuickTunnelUrl(): Promise<string | null> {
   try {
-    const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
+    const log = await fs.readFile(PREVIEW_INSTANT_LOG(), 'utf-8');
     for (const match of log.match(QUICK_TUNNEL_URL_PATTERN) ?? []) {
       if (!match.startsWith('https://api.')) return match;
     }
@@ -246,7 +250,7 @@ export async function parsePreviewPublishedUrl(): Promise<string | null> {
  * window hits a Cloudflare 530). */
 export async function quickTunnelConnected(): Promise<boolean> {
   try {
-    const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
+    const log = await fs.readFile(PREVIEW_INSTANT_LOG(), 'utf-8');
     return /Registered tunnel connection/.test(log);
   } catch {
     return false;
@@ -256,7 +260,7 @@ export async function quickTunnelConnected(): Promise<boolean> {
 /** Whether the test-drive log shows the quick-tunnel request failing. */
 export async function quickTunnelFailed(): Promise<boolean> {
   try {
-    const log = await fs.readFile(TESTDRIVE_LOG(), 'utf-8');
+    const log = await fs.readFile(PREVIEW_INSTANT_LOG(), 'utf-8');
     return QUICK_TUNNEL_FAILURE_PATTERN.test(log) && !(await parseQuickTunnelUrl());
   } catch {
     return false;

@@ -110,21 +110,21 @@ describe('cloudflared-process log parsing', () => {
   });
 
   it('writeState round-trips atomically; clearState removes the file', async () => {
-    const { writeState, readState, clearState, TESTDRIVE_STATE } = await import('./cloudflared-process');
-    await writeState(TESTDRIVE_STATE(), { pid: 1234, started_at: new Date().toISOString() });
-    expect((await readState(TESTDRIVE_STATE()))?.pid).toBe(1234);
-    await clearState(TESTDRIVE_STATE());
-    expect(await readState(TESTDRIVE_STATE())).toBeNull();
+    const { writeState, readState, clearState, PREVIEW_INSTANT_STATE } = await import('./cloudflared-process');
+    await writeState(PREVIEW_INSTANT_STATE(), { pid: 1234, started_at: new Date().toISOString() });
+    expect((await readState(PREVIEW_INSTANT_STATE()))?.pid).toBe(1234);
+    await clearState(PREVIEW_INSTANT_STATE());
+    expect(await readState(PREVIEW_INSTANT_STATE())).toBeNull();
   });
 
   it('readState reaps an unparseable state file instead of leaving it half-present', async () => {
-    const { readState, TESTDRIVE_STATE } = await import('./cloudflared-process');
-    await fs.writeFile(TESTDRIVE_STATE(), '', 'utf-8');
-    expect(await readState(TESTDRIVE_STATE())).toBeNull();
-    await expect(fs.access(TESTDRIVE_STATE())).rejects.toThrow();
-    await fs.writeFile(TESTDRIVE_STATE(), '{"pid":"not-a-number"}', 'utf-8');
-    expect(await readState(TESTDRIVE_STATE())).toBeNull();
-    await expect(fs.access(TESTDRIVE_STATE())).rejects.toThrow();
+    const { readState, PREVIEW_INSTANT_STATE } = await import('./cloudflared-process');
+    await fs.writeFile(PREVIEW_INSTANT_STATE(), '', 'utf-8');
+    expect(await readState(PREVIEW_INSTANT_STATE())).toBeNull();
+    await expect(fs.access(PREVIEW_INSTANT_STATE())).rejects.toThrow();
+    await fs.writeFile(PREVIEW_INSTANT_STATE(), '{"pid":"not-a-number"}', 'utf-8');
+    expect(await readState(PREVIEW_INSTANT_STATE())).toBeNull();
+    await expect(fs.access(PREVIEW_INSTANT_STATE())).rejects.toThrow();
   });
 
   it('isPidAlive rejects a live pid that is not cloudflared (pid-reuse guard)', async () => {
