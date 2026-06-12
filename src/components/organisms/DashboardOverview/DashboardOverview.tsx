@@ -103,6 +103,7 @@ export function DashboardOverview({
   onGoToInvites,
   setupGuideDismissed,
   onDismissSetupGuide,
+  cloudflareRefreshKey,
 }: DashboardOverviewProps) {
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
@@ -156,7 +157,7 @@ export function DashboardOverview({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cloudflareRefreshKey]);
 
   if (isLoading) {
     return (

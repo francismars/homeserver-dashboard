@@ -150,6 +150,28 @@ describe('DashboardOverview domain health', () => {
     await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
     expect(screen.queryByTestId('restart-callout')).toBeNull();
   });
+
+  it('re-reads cloudflare-config when cloudflareRefreshKey changes (dialog closed)', async () => {
+    // Start with nothing pending; flip the backend to pending and bump the key,
+    // as the parent does when the Settings dialog closes after a setup.
+    let pending = false;
+    vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      const json = url.startsWith('/api/cloudflare-config')
+        ? { restart_pending: pending, mode: pending ? 'connect' : 'off' }
+        : { ok: true, status: 200 };
+      return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    const { rerender } = render(
+      <DashboardOverview info={baseInfo} isLoading={false} error={null} cloudflareRefreshKey={0} />,
+    );
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+
+    pending = true;
+    rerender(<DashboardOverview info={baseInfo} isLoading={false} error={null} cloudflareRefreshKey={1} />);
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+  });
 });
 
 describe('DashboardOverview server identity', () => {

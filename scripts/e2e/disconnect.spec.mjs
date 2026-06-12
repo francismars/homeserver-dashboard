@@ -133,6 +133,16 @@ await runSpec(
     step('disconnect re-arms the durable signal; it survives a full reload');
     const postDisconnect = await env.api('/api/cloudflare-config');
     check(postDisconnect.data.restart_pending === true, 'restart_pending true again after the disconnect');
+
+    step('closing the dialog refreshes the Overview without a reload');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 5000 });
+    await page.waitForSelector('[data-testid="restart-callout"]', { timeout: 15000 });
+    check(
+      (await page.locator('[data-testid="restart-callout"]').count()) > 0,
+      'Overview shows the restart callout after the dialog closes, no reload',
+    );
+
     await gotoDashboard(page, env.baseUrl);
     await page.waitForSelector('[data-testid="restart-callout"]', { timeout: 30000 });
     const overviewCallout = await page.locator('[data-testid="restart-callout"]').first().textContent();

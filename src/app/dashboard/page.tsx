@@ -110,6 +110,15 @@ export default function DashboardPage() {
     setIsConfigDialogOpen(true);
   }, []);
 
+  // The Overview reads Cloudflare mode + restart-pending once on mount; bump
+  // this when the Settings dialog closes so a setup/disconnect made inside the
+  // dialog is reflected without a page reload.
+  const [cloudflareRefreshKey, setCloudflareRefreshKey] = useState(0);
+  const handleConfigDialogOpenChange = useCallback((open: boolean) => {
+    setIsConfigDialogOpen(open);
+    if (!open) setCloudflareRefreshKey((n) => n + 1);
+  }, []);
+
   const handleGenerateInvite = useCallback(async () => {
     // The failure is surfaced via generateInviteError; swallowing the throw
     // here keeps it out of the console as an unhandled rejection.
@@ -285,6 +294,7 @@ export default function DashboardPage() {
                 onGoToInvites={handleGoToInvites}
                 setupGuideDismissed={setupGuideDismissed}
                 onDismissSetupGuide={dismissSetupGuide}
+                cloudflareRefreshKey={cloudflareRefreshKey}
               />
             </TabsContent>
 
@@ -352,7 +362,7 @@ export default function DashboardPage() {
           {canOpenSettings && (
             <ConfigDialog
               open={isConfigDialogOpen}
-              onOpenChange={setIsConfigDialogOpen}
+              onOpenChange={handleConfigDialogOpenChange}
               writable={configWritable}
               focusCloudflare={cloudflareFocusNonce}
             />

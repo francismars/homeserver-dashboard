@@ -14,4 +14,7 @@ export type DashboardOverviewProps = {
   setupGuideDismissed?: boolean | null;
   /** Persists the dismissal; the checklist renders only when this is wired. */
   onDismissSetupGuide?: () => void;
+  /** Re-reads Cloudflare mode + restart-pending when this changes (the parent
+   * bumps it when the Settings dialog closes). */
+  cloudflareRefreshKey?: number;
 };
