@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
@@ -40,6 +41,7 @@ describe('cloudflare-connect route', () => {
 
   afterEach(async () => {
     process.env = { ...originalEnv };
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
@@ -126,6 +128,56 @@ describe('cloudflare-connect route', () => {
       expect.stringContaining('.connect.log'),
       expect.objectContaining({ TUNNEL_ORIGIN_CERT: expect.stringContaining('cert.pem') }),
     );
+  });
+
+  // Fake only setTimeout so the route's real fs I/O still completes on the
+  // live event loop while its 500ms polling sleeps run on fake time.
+  const usePollFakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  /** Drains real I/O (setImmediate stays real) and hops 500ms of fake time
+   * whenever the route is parked on its polling sleep, until `p` settles. */
+  const flushPolling = async <T>(p: Promise<T>): Promise<T> => {
+    let settled = false;
+    const guarded = p.finally(() => {
+      settled = true;
+    });
+    for (let i = 0; i < 10_000 && !settled; i++) {
+      await new Promise<void>((r) => setImmediate(r));
+      if (!settled && vi.getTimerCount() > 0) await vi.advanceTimersByTimeAsync(500);
+    }
+    return guarded;
+  };
+
+  it('start returns without sleeping when the URL is available on the first parse', async () => {
+    // With setTimeout faked and never advanced, a sleep-before-parse
+    // regression hangs this test instead of silently costing 500ms per start.
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    const data = await (await post(POST, { action: 'start' })).json();
+    expect(data.status).toBe('waiting');
+    expect(data.auth_url).toBe(AUTH_URL);
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('start sleeps 500ms between parse retries until the URL appears', async () => {
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    (lib.parseLoginUrl as Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(AUTH_URL);
+    const data = await (await flushPolling(post(POST, { action: 'start' }))).json();
+    expect(data.status).toBe('waiting');
+    expect(data.auth_url).toBe(AUTH_URL);
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(2);
+  });
+
+  it('start gives up after the poll budget, kills the login and returns 500', async () => {
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    (lib.parseLoginUrl as Mock).mockResolvedValue(null);
+    const res = await flushPolling(post(POST, { action: 'start' }));
+    expect(res.status).toBe(500);
+    // 1 immediate parse + 20 post-sleep retries
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(21);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(7777, undefined);
+    await expect(fs.access(path.join(tmpDir, '.connect.json'))).rejects.toThrow();
   });
 
   it('relocates a cert delivered under $HOME/.cloudflared to the canonical path', async () => {

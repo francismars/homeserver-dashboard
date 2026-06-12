@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -63,5 +64,62 @@ describe('cloudflare-auto-setup zones route', () => {
     const data = await res.json();
     expect(res.status).toBe(401);
     expect(data.error).toContain('Cloudflare rejected the token');
+  });
+
+  it('maps a 400 with Cloudflare code 6003 (malformed header) to the token guidance', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      cfResponse(400, { success: false, errors: [{ code: 6003, message: 'Invalid request headers' }], result: null }),
+    );
+    const res = await post({ api_token: TOKEN });
+    const data = await res.json();
+    expect(res.status).toBe(401);
+    expect(data.error).toContain('Cloudflare rejected the token');
+  });
+
+  it('maps other Cloudflare API errors to a 502 with their message', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      cfResponse(500, { success: false, errors: [{ code: 1000, message: 'internal error' }], result: null }),
+    );
+    const res = await post({ api_token: TOKEN });
+    const data = await res.json();
+    expect(res.status).toBe(502);
+    expect(data.error).toBe('Cloudflare API error: internal error');
+  });
+
+  it('maps a network failure to a 502 unreachable message', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+    const res = await post({ api_token: TOKEN });
+    const data = await res.json();
+    expect(res.status).toBe(502);
+    expect(data.error).toBe('Could not reach the Cloudflare API');
+  });
+
+  it('rejects an invalid JSON payload with 400', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const { POST } = await import('./route');
+    const res = await POST(
+      new NextRequest('http://localhost:8080/api/cloudflare-auto-setup/zones', {
+        method: 'POST',
+        body: 'not json',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', {}],
+    ['non-string', { api_token: 42 }],
+    ['too short', { api_token: 'short' }],
+    ['too long', { api_token: 'x'.repeat(300) }],
+    ['whitespace inside', { api_token: 'aaaaaaaaaa bbbbbbbbbbbb' }],
+  ])('rejects a %s api_token with 400 before calling Cloudflare', async (_label, body) => {
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const res = await post(body);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe('Missing or malformed api_token');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

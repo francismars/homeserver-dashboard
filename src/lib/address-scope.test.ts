@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { classifyAddress, isPrivateIPv4, isPrivateIPv6 } from './address-scope';
 

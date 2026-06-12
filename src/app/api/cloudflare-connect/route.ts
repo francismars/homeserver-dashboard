@@ -180,8 +180,10 @@ export async function POST(request: NextRequest) {
           },
         );
         await writeState(CONNECT_STATE(), { ...child, started_at: new Date().toISOString() });
-        // The URL prints to stderr immediately (live-verified); give it a moment.
-        let url: string | null = null;
+        // The URL prints to stderr immediately (live-verified): try the parse
+        // first and only sleep between retries, so the common case returns
+        // without waiting. Worst case stays 20 polls over ~10 seconds.
+        let url: string | null = await parseLoginUrl();
         for (let i = 0; i < 20 && !url; i++) {
           await new Promise((r) => setTimeout(r, 500));
           url = await parseLoginUrl();
