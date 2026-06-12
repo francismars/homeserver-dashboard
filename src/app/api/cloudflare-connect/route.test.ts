@@ -94,6 +94,27 @@ describe('cloudflare-connect route', () => {
     );
   });
 
+  it('relocates a cert delivered under $HOME/.cloudflared to the canonical path', async () => {
+    const { GET } = await routes();
+    await fs.mkdir(path.join(tmpDir, '.cloudflared'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.cloudflared', 'cert.pem'), 'CERT', 'utf-8');
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('authorized');
+    const stat = await fs.stat(path.join(tmpDir, 'cert.pem'));
+    expect(stat.mode & 0o777).toBe(0o600);
+    await expect(fs.access(path.join(tmpDir, '.cloudflared'))).rejects.toThrow();
+  });
+
+  it('start aims the login child HOME at the config dir', async () => {
+    const { lib, POST } = await routes();
+    await post(POST, { action: 'start' });
+    expect(lib.spawnDetached as Mock).toHaveBeenCalledWith(
+      [expect.stringContaining('cloudflared'), 'tunnel', 'login'],
+      expect.stringContaining('.connect.log'),
+      expect.objectContaining({ HOME: tmpDir }),
+    );
+  });
+
   it('GET reports authorized once cert.pem lands', async () => {
     const { GET } = await routes();
     await writeCert();

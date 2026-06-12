@@ -178,6 +178,25 @@ export async function quickTunnelFailed(): Promise<boolean> {
   }
 }
 
+/**
+ * `cloudflared tunnel login` SAVES the cert to $HOME/.cloudflared/cert.pem
+ * regardless of TUNNEL_ORIGIN_CERT (live finding, 2026-06-12: the env var
+ * only controls where other commands READ it). The login child is therefore
+ * spawned with HOME pointed at the config dir; this helper relocates the
+ * delivered cert to CERT_PATH and removes the scratch directory.
+ */
+export async function relocateDeliveredCert(): Promise<void> {
+  const delivered = path.join(getConfigDir(), '.cloudflared', 'cert.pem');
+  try {
+    await fs.access(delivered);
+  } catch {
+    return;
+  }
+  await fs.rename(delivered, CERT_PATH());
+  await fs.chmod(CERT_PATH(), 0o600);
+  await fs.rm(path.join(getConfigDir(), '.cloudflared'), { recursive: true, force: true });
+}
+
 export async function parseLoginUrl(): Promise<string | null> {
   try {
     const log = await fs.readFile(CONNECT_LOG(), 'utf-8');

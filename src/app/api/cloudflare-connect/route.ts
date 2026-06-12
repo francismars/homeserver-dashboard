@@ -19,6 +19,7 @@ import {
   killPid,
   parseLoginUrl,
   readState,
+  relocateDeliveredCert,
   runCloudflared,
   spawnDetached,
   writeState,
@@ -64,6 +65,9 @@ async function currentStatus(): Promise<{
   auth_url?: string;
   hostname?: string;
 }> {
+  // The login child saves the cert under $HOME/.cloudflared (HOME points at
+  // the config dir); pick it up and move it to the canonical path first.
+  await relocateDeliveredCert();
   if ((await fileExists(LOCAL_CONFIG_PATH())) && (await fileExists(CREDENTIALS_PATH()))) {
     let hostname: string | undefined;
     try {
@@ -153,6 +157,8 @@ export async function POST(request: NextRequest) {
     }
     try {
       const pid = await spawnDetached([getCloudflaredBin(), 'tunnel', 'login'], CONNECT_LOG(), {
+        // login saves to $HOME/.cloudflared/cert.pem; aim HOME at our dir.
+        HOME: getConfigDir(),
         TUNNEL_ORIGIN_CERT: CERT_PATH(),
       });
       await writeState(CONNECT_STATE(), { pid, started_at: new Date().toISOString() });
