@@ -78,6 +78,11 @@ export async function proxyToUpstream(
     const response = await fetch(url.toString(), {
       method,
       cache: 'no-store',
+      // The origin pin above only constrains the initial request. Do not follow
+      // a redirect: a coerced cross-origin 3xx would otherwise carry the
+      // injected X-Admin-Password header to the redirect target (undici strips
+      // Authorization/Cookie cross-origin but not our custom header).
+      redirect: 'manual',
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: {
         ...extraHeaders,

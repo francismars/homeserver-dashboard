@@ -133,6 +133,8 @@ export async function proxyWebDavRequest(
         Authorization: getAuthHeader(adminToken),
       },
       body,
+      // A proxy must not silently follow an upstream redirect to another origin.
+      redirect: 'manual',
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 

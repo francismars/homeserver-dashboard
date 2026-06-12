@@ -66,6 +66,16 @@ describe('client proxy route', () => {
     expect(Array.from(new Uint8Array(init?.body as Buffer))).toEqual(Array.from(bytes));
   });
 
+  it('does not follow upstream redirects (a coerced 3xx must not carry headers cross-origin)', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
+    const request = new NextRequest('http://localhost:8080/api/client-proxy/events');
+
+    await GET(request, { params: Promise.resolve({ path: ['events'] }) });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.redirect).toBe('manual');
+  });
+
   it('rejects path segments that resolve to a different origin (SSRF) without fetching', async () => {
     // An encoded `%2F%2F<host>` arrives as a segment containing slashes, so
     // `'/' + join` becomes a protocol-relative `//<host>` that new URL() would
