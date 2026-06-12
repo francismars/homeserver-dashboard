@@ -76,6 +76,80 @@ describe('cloudflare-config route', () => {
     expect(payload.configured).toBe(false);
   });
 
+  describe('restart_pending', () => {
+    let hsDir: string;
+    const stampPath = () => path.join(hsDir, '.wrapper-boot-stamp');
+    const ageTo = async (p: string, secondsAgo: number) => {
+      const t = new Date(Date.now() - secondsAgo * 1000);
+      await fs.utimes(p, t, t);
+    };
+
+    beforeEach(async () => {
+      hsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-config-hs-test-'));
+      process.env.HOMESERVER_CONFIG_PATH = path.join(hsDir, 'config.toml');
+    });
+
+    afterEach(async () => {
+      await fs.rm(hsDir, { recursive: true, force: true });
+    });
+
+    it('no boot stamp (old wrapper, dev env): null, so the client falls back to in-session signals', async () => {
+      await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
+      const { GET } = await loadRoute();
+      const payload = await (await GET(getRequest())).json();
+      expect(payload.restart_pending).toBe(null);
+      expect(payload.restart_reason).toBe(null);
+    });
+
+    it('stamp newer than all state: false (the wrapper has run since the change)', async () => {
+      await fs.writeFile(path.join(tmpDir, 'domain'), 'pubky.example.com');
+      await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
+      await ageTo(path.join(tmpDir, 'domain'), 100);
+      await ageTo(path.join(tmpDir, 'token'), 100);
+      await ageTo(tmpDir, 100);
+      await fs.writeFile(stampPath(), String(Math.floor(Date.now() / 1000)));
+      const { GET } = await loadRoute();
+      const payload = await (await GET(getRequest())).json();
+      expect(payload.restart_pending).toBe(false);
+      expect(payload.restart_reason).toBe(null);
+    });
+
+    it('setup files newer than the stamp: true with setup_changed', async () => {
+      await fs.writeFile(stampPath(), 'stamp');
+      await ageTo(stampPath(), 100);
+      await fs.writeFile(path.join(tmpDir, 'domain'), 'pubky.example.com');
+      await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
+      const { GET } = await loadRoute();
+      const payload = await (await GET(getRequest())).json();
+      expect(payload.restart_pending).toBe(true);
+      expect(payload.restart_reason).toBe('setup_changed');
+    });
+
+    it('config.toml newer than the stamp: true with config_changed', async () => {
+      await fs.writeFile(stampPath(), 'stamp');
+      await ageTo(stampPath(), 100);
+      await ageTo(tmpDir, 200);
+      await fs.writeFile(path.join(hsDir, 'config.toml'), 'icann_domain = "x"');
+      const { GET } = await loadRoute();
+      const payload = await (await GET(getRequest())).json();
+      expect(payload.restart_pending).toBe(true);
+      expect(payload.restart_reason).toBe('config_changed');
+    });
+
+    it('deletion after the boot (teardown) is caught via the config dir mtime', async () => {
+      await fs.writeFile(path.join(tmpDir, 'testdrive.env'), 'TUNNEL_URL=x');
+      await ageTo(path.join(tmpDir, 'testdrive.env'), 200);
+      await ageTo(tmpDir, 200);
+      await fs.writeFile(stampPath(), 'stamp');
+      await ageTo(stampPath(), 100);
+      await fs.rm(path.join(tmpDir, 'testdrive.env'));
+      const { GET } = await loadRoute();
+      const payload = await (await GET(getRequest())).json();
+      expect(payload.restart_pending).toBe(true);
+      expect(payload.restart_reason).toBe('setup_changed');
+    });
+  });
+
   it('GET never leaks the cloudflare token in the response', async () => {
     await fs.writeFile(path.join(tmpDir, 'token'), 'extremely-secret-token-xyz');
     const { GET } = await loadRoute();

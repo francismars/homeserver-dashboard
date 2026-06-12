@@ -10,11 +10,13 @@ function mockBackend(initial: {
   cloudflareConfig: JsonResponse;
   connect?: Record<string, unknown>;
   preview?: Record<string, unknown>;
+  adminInfo?: Record<string, unknown>;
 }) {
   const backend = {
     cloudflareConfig: initial.cloudflareConfig,
     connect: initial.connect ?? { supported: true, status: 'idle' },
     preview: initial.preview ?? { enabled: false, instant: { status: 'stopped' }, supported: true },
+    adminInfo: initial.adminInfo ?? {},
     disconnect: { status: 200, json: { ok: true, message: 'Disconnected. Restart the app from Umbrel to finish.' } },
     disconnectCalls: 0,
   };
@@ -31,6 +33,7 @@ function mockBackend(initial: {
       backend.disconnectCalls++;
       return respond(backend.disconnect.json, backend.disconnect.status);
     }
+    if (url.startsWith('/api/admin/info')) return respond(backend.adminInfo);
     if (url.startsWith('/api/public-health')) return respond({ ok: true });
     if (url.startsWith('/api/server-config')) return respond({ error: 'not available' }, 404);
     return respond({});
@@ -146,6 +149,99 @@ describe('ConfigDialog Cloudflare status surface', () => {
     expect(screen.queryByText(/account connected/i)).toBeNull();
     const callout = screen.getByTestId('restart-callout');
     expect(callout.textContent).toContain('Disconnected');
+  });
+
+  it('restart_pending true: durable callout shows and persists across a remount (page reload)', async () => {
+    mockBackend({
+      cloudflareConfig: {
+        json: {
+          ...cfConfig('token', 'pubky.example.com').json,
+          restart_pending: true,
+          restart_reason: 'setup_changed',
+        },
+      },
+    });
+    const first = renderDialog();
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+    expect(screen.getByTestId('restart-callout').textContent).toContain('publish your domain to the Pubky network');
+    first.unmount();
+    // A fresh mount has no session state at all; the callout must come back
+    // purely from the server-derived signal.
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+  });
+
+  it('restart_pending true with config_changed names the config change', async () => {
+    mockBackend({
+      cloudflareConfig: {
+        json: {
+          ...cfConfig('token', 'pubky.example.com').json,
+          restart_pending: true,
+          restart_reason: 'config_changed',
+        },
+      },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+    expect(screen.getByTestId('restart-callout').textContent).toContain('configuration changes');
+  });
+
+  it('restart_pending false suppresses stale in-session callouts (the wrapper has run)', async () => {
+    const backend = mockBackend({
+      cloudflareConfig: {
+        json: { ...cfConfig('token', 'pubky.example.com').json, restart_pending: false, restart_reason: null },
+      },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-disconnect')).toBeTruthy());
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+    // Disconnect sets the in-session message, but the re-fetched server
+    // signal still says false: no stale "restart to finish" callout.
+    fireEvent.click(screen.getByTestId('cf-disconnect'));
+    backend.cloudflareConfig = { json: { ...cfConfig('off').json, restart_pending: false, restart_reason: null } };
+    fireEvent.click(screen.getByTestId('cf-disconnect'));
+    await waitFor(() => expect(screen.getByTestId('cf-mode-badge').textContent).toBe('Off'));
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+  });
+
+  it('restart_pending null (no boot stamp) falls back to the in-session behavior', async () => {
+    const backend = mockBackend({
+      cloudflareConfig: {
+        json: { ...cfConfig('token', 'pubky.example.com').json, restart_pending: null, restart_reason: null },
+      },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-disconnect')).toBeTruthy());
+    expect(screen.queryByTestId('restart-callout')).toBeNull();
+    fireEvent.click(screen.getByTestId('cf-disconnect'));
+    backend.cloudflareConfig = { json: { ...cfConfig('off').json, restart_pending: null, restart_reason: null } };
+    fireEvent.click(screen.getByTestId('cf-disconnect'));
+    await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
+    expect(screen.getByTestId('restart-callout').textContent).toContain('Disconnected');
+  });
+
+  it('published indicator: /info advertising the configured domain shows Published', async () => {
+    mockBackend({
+      cloudflareConfig: cfConfig('token', 'pubky.example.com'),
+      adminInfo: { pkarr_icann_domain: 'pubky.example.com:443' },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-status-published')).toBeTruthy());
+    expect(screen.getByTestId('cf-status-published').textContent).toBe('Published');
+    expect(screen.queryByTestId('cf-status-unpublished')).toBeNull();
+  });
+
+  it('published indicator: /info still on another domain shows Restart to publish', async () => {
+    mockBackend({
+      cloudflareConfig: cfConfig('connect', 'pubky.example.com'),
+      adminInfo: { pkarr_icann_domain: 'localhost:6286' },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-status-unpublished')).toBeTruthy());
+    expect(screen.getByTestId('cf-status-unpublished').textContent).toBe('Restart to publish');
+    expect(screen.queryByTestId('cf-status-published')).toBeNull();
+    // Reachability stays its own, separate chip.
+    await waitFor(() => expect(screen.getByTestId('cf-status-reachable')).toBeTruthy());
   });
 
   it('a 500 keeps the tab with a retry state instead of hiding it as unsupported', async () => {

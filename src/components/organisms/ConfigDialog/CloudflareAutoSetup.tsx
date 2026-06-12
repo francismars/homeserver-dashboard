@@ -49,8 +49,9 @@ const STEP_LABELS: Record<Step['key'], string> = {
 };
 
 interface CloudflareAutoSetupProps {
-  /** Called with the configured hostname after a successful run. */
-  onConfigured: (hostname: string) => void;
+  /** Called with the configured hostname (and the route's own restart
+   * message, when present) after a successful run. */
+  onConfigured: (hostname: string, message?: string) => void;
 }
 
 export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) {
@@ -128,7 +129,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
       // The API token was used server-side for this request only and is
       // discarded there; clear it from the form as well.
       setApiToken('');
-      onConfigured(data.hostname);
+      onConfigured(data.hostname, typeof data.message === 'string' ? data.message : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {

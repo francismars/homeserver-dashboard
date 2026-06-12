@@ -52,14 +52,16 @@ describe('CloudflareConnect subdomain picker', () => {
   it('composes subdomain + authorized domain for the complete call', async () => {
     const posts = mockFetch(
       () => authorized('example.com'),
-      () => ({ json: { ok: true, hostname: 'hs.example.com', steps: [] } }),
+      () => ({ json: { ok: true, hostname: 'hs.example.com', steps: [], message: 'Tunnel configured.' } }),
     );
     const onConfigured = vi.fn();
     render(<CloudflareConnect onConfigured={onConfigured} />);
     await waitFor(() => expect(screen.getByTestId('cf-connect-subdomain')).toBeTruthy());
     fireEvent.click(screen.getByTestId('cf-connect-chip-hs'));
     fireEvent.click(screen.getByTestId('cf-connect-complete'));
-    await waitFor(() => expect(onConfigured).toHaveBeenCalledWith('hs.example.com'));
+    // The route's own restart message rides along so the Status callout
+    // never claims more than the route did.
+    await waitFor(() => expect(onConfigured).toHaveBeenCalledWith('hs.example.com', 'Tunnel configured.'));
     expect(posts).toContainEqual({ action: 'complete', hostname: 'hs.example.com' });
   });
 

@@ -22,8 +22,9 @@ const SUBDOMAIN_SUGGESTIONS = ['pubky', 'hs', 'homeserver'] as const;
 const SUBDOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i;
 
 interface CloudflareConnectProps {
-  /** Called with the configured hostname after a successful completion. */
-  onConfigured: (hostname: string) => void;
+  /** Called with the configured hostname (and the route's own restart
+   * message, when present) after a successful completion. */
+  onConfigured: (hostname: string, message?: string) => void;
 }
 
 /**
@@ -140,7 +141,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       setSteps(data.steps ?? null);
       setStatus('completed');
       setDoneHostname(data.hostname);
-      onConfigured(data.hostname);
+      onConfigured(data.hostname, typeof data.message === 'string' ? data.message : undefined);
     } else if (httpStatus === 409) {
       // The authorization is gone (expired between polls, or another tab is
       // mid-setup); the idle card with the error shown is the only state

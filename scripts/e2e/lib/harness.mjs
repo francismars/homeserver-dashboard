@@ -261,6 +261,14 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
     nextLog,
     /** Read a file under the Cloudflare config dir ('' on absence). */
     readConfigFile: (name) => fs.readFile(path.join(configDir, name), 'utf-8').catch(() => null),
+    /** Simulates the init wrapper finishing an app boot: writes the boot
+     * stamp next to config.toml. Pass a Date to backdate it (e.g. "the
+     * wrapper last ran before this change"). */
+    writeBootStamp: async (when = new Date()) => {
+      const stamp = path.join(hsDir, '.wrapper-boot-stamp');
+      await fs.writeFile(stamp, String(Math.floor(when.getTime() / 1000)), 'utf-8');
+      await fs.utimes(stamp, when, when);
+    },
     fileExists: async (name) => {
       try {
         await fs.access(path.join(configDir, name));

@@ -11,6 +11,7 @@ import {
   atomicWrite,
   withFlowLock,
 } from '@/lib/server/cloudflared-process';
+import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
 import {
   CfApiError,
@@ -112,6 +113,13 @@ export async function POST(request: NextRequest) {
 
   // Everything below runs under the setup lock.
   async function runSetup(): Promise<NextResponse> {
+    // Captured BEFORE any mutation: with a working setup at entry, the
+    // running cloudflared keeps serving the OLD tunnel (it never re-reads
+    // the token file) while DNS moves to the new one, so the domain stays
+    // unreachable until the app restarts. From idle, the crash-looping
+    // cloudflared picks the new token up within a minute.
+    const { mode: priorMode } = await detectCloudflareMode();
+
     // --- 1. Resolve the zone server-side -------------------------------------
     let zoneName: string;
     let accountId: string;
@@ -298,12 +306,16 @@ export async function POST(request: NextRequest) {
       message: 'Automatic Cloudflare setup completed',
       meta: { hostnameLength: hostname.length, adopted: steps[0]?.detail === 'Reusing existing tunnel' },
     });
+    const message =
+      priorMode !== 'off'
+        ? 'Tunnel configured. Your domain will be unreachable until you restart the app from Umbrel: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. Restarting also publishes your domain to the Pubky network.'
+        : 'Tunnel configured. The tunnel connects within a minute; restart the app from Umbrel to publish your domain to the Pubky network.';
     return NextResponse.json(
       {
         ok: true,
         hostname,
         steps,
-        message: 'Tunnel configured. Restart the app from Umbrel to publish your domain to the Pubky network.',
+        message,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },

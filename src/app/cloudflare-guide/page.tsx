@@ -151,9 +151,9 @@ export default function CloudflareGuidePage() {
                   Restart the app from Umbrel: home screen → Pubky Homeserver tile → <strong>Restart</strong> (or the
                   three-dot menu → Restart). Wait 30 to 60 seconds.
                   <p className="mt-2 text-sm text-muted-foreground">
-                    The restart does two things: connects the tunnel, and updates your homeserver&apos;s published
-                    record so other Pubky tools find it at your domain (<Code>icann_domain</Code> in config.toml is set
-                    automatically; no manual edit needed).
+                    The tunnel itself usually connects within a minute of saving; the restart is what updates your
+                    homeserver&apos;s published record so other Pubky tools find it at your domain (
+                    <Code>icann_domain</Code> in config.toml is set automatically; no manual edit needed).
                   </p>
                 </li>
               </ol>

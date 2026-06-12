@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/libs/utils';
+import { useAdminInfo } from '@/hooks/admin';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
@@ -16,7 +17,16 @@ import { RestartCallout } from './RestartCallout';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
-type CloudflareConfig = { domain: string | null; mode: CloudflareMode; configured: boolean; supported: boolean };
+type RestartReason = 'setup_changed' | 'preview_changed' | 'config_changed';
+type CloudflareConfig = {
+  domain: string | null;
+  mode: CloudflareMode;
+  configured: boolean;
+  supported: boolean;
+  /** Server-derived (boot stamp vs state mtimes); null = unknown (no stamp). */
+  restart_pending?: boolean | null;
+  restart_reason?: RestartReason | null;
+};
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'fail';
 
 const MODE_LABELS: Record<CloudflareMode, string> = {
@@ -131,8 +141,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [showSetupMethods, setShowSetupMethods] = useState(false);
   const [setupNonce, setSetupNonce] = useState(0);
   // Which flow just completed in this session; drives the restart callout on
-  // the Status surface until the next dialog open.
+  // the Status surface until the next dialog open. recentMessage carries the
+  // completing route's own message (e.g. the re-setup-over-a-live-tunnel
+  // warning) so the callout never claims more than the route did.
   const [recentChange, setRecentChange] = useState<'connect' | 'token' | null>(null);
+  const [recentMessage, setRecentMessage] = useState<string | null>(null);
+  // Publication truth: the running homeserver's /info reports the domain its
+  // pkarr record actually advertises. Separate from HTTPS reachability - the
+  // tunnel reconnects without a restart, the pkarr record does not.
+  const { data: adminInfo, refetch: refetchAdminInfo } = useAdminInfo();
 
   const checkHealth = async (domain: string): Promise<boolean> => {
     setHealthStatus('checking');
@@ -198,6 +215,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setCfToken('');
       setHealthStatus('idle');
       setRecentChange(null);
+      setRecentMessage(null);
       setDisconnectMessage(data.message || 'Disconnected. Restart the app from Umbrel to finish.');
       // Re-read the server-derived mode and remount the setup cards so the
       // whole tab re-syncs from the single source of truth.
@@ -336,11 +354,14 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     if (!open) return;
     setDisconnectMessage(null);
     setRecentChange(null);
+    setRecentMessage(null);
     setHealthStatus('idle');
     setConfirmDisconnect(false);
     setCfMessage(null);
     setShowSetupMethods(false);
     void loadCloudflare();
+    // Fresh publication truth: the app may have been restarted since mount.
+    void refetchAdminInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -378,22 +399,21 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [showManualSetup, setShowManualSetup] = useState(false);
   const [showApiTokenSetup, setShowApiTokenSetup] = useState(false);
 
-  const handleAutoConfigured = (hostname: string, source: 'connect' | 'token') => {
+  const handleAutoConfigured = (hostname: string, source: 'connect' | 'token', message?: string) => {
     setCfDomain(hostname);
     setDisconnectMessage(null);
     setRecentChange(source);
+    setRecentMessage(message ?? null);
     // Keep the just-completed card's feedback visible even though the cards
     // now sit behind the "Switch setup method" disclosure.
     setShowSetupMethods(true);
     void fetchCloudflareConfig();
-    setHealthStatus('idle');
-    // The Connect flow's locally-managed tunnel only starts after an app
-    // restart, so probing now would just flash a guaranteed failure.
-    if (source === 'connect') return;
-    // The tunnel typically connects within seconds (cloudflared retries until
-    // the token file appears), but edge DNS + the first connection can take
-    // longer. Probe up to 4 times before surfacing a failure so the user is
-    // not flashed a red "Not reachable" right after the green success state.
+    // Both flows' tunnels connect WITHOUT an app restart: the crash-looping
+    // cloudflared containers pick up the new token/config within a minute
+    // (the restart only publishes the domain to the Pubky network). Edge DNS
+    // plus the first connection can still take a while, so probe up to 4
+    // times before surfacing a failure: the user must not be flashed a red
+    // "Not reachable" right after the green success state.
     setHealthStatus('checking');
     const probeHealth = async (attempt: number) => {
       const reachable = await checkHealth(hostname);
@@ -428,12 +448,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       }
       setCfMessage({
         type: 'success',
-        text: data.message || 'Saved. Restart the app from Umbrel for the tunnel to connect.',
+        text:
+          data.message ||
+          'Saved. The tunnel picks this up within a minute; restart the app from Umbrel to publish your domain to the Pubky network.',
       });
       setHealthStatus('idle'); // Reset health check after save
       const fresh = await fetchCloudflareConfig();
       if (fresh?.mode === 'token') {
         setRecentChange('token');
+        setRecentMessage(typeof data.message === 'string' ? data.message : null);
         setShowSetupMethods(true);
       }
     } catch {
@@ -449,13 +472,39 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   ];
 
   const cfMode: CloudflareMode = cfConfig?.mode ?? 'off';
+  // Server-derived restart signal; null means unknown (no boot stamp), in
+  // which case the in-session signals below carry today's behavior alone.
+  const restartPending = cfConfig?.restart_pending ?? null;
+  // Whether the running homeserver actually advertises the configured domain
+  // (pkarr publication), from /info. HTTPS reachability cannot answer this:
+  // the tunnel picks up changes without a restart, the pkarr record does not.
+  const publishedDomain = adminInfo?.pkarr_icann_domain?.split(':')[0].trim().toLowerCase() || null;
+  const publishState: 'published' | 'pending' | 'unknown' =
+    !adminInfo || !cfConfig?.domain
+      ? 'unknown'
+      : publishedDomain === cfConfig.domain.trim().toLowerCase()
+        ? 'published'
+        : 'pending';
   // The Status surface owns the one restart callout for the whole tab.
   const cfStatusCallout = (() => {
-    if (disconnectMessage) return disconnectMessage;
-    if (recentChange === 'connect')
-      return 'Restart the app from Umbrel to connect the tunnel and publish your domain to the Pubky network.';
-    if (recentChange === 'token')
-      return 'The tunnel connects within a few seconds. Restart the app from Umbrel to publish your domain to the Pubky network.';
+    // restart_pending false = the wrapper has demonstrably run since the
+    // newest change, so any in-session "restart to finish" message is stale.
+    if (restartPending !== false) {
+      if (disconnectMessage) return disconnectMessage;
+      if (recentChange)
+        return (
+          recentMessage ??
+          'The tunnel connects within a minute. Restart the app from Umbrel to publish your domain to the Pubky network.'
+        );
+      // Durable signal: survives page reloads, unlike the session state above.
+      if (restartPending === true) {
+        if (cfConfig?.restart_reason === 'config_changed')
+          return 'Restart the app from Umbrel to apply your configuration changes.';
+        if (cfMode === 'connect' || cfMode === 'token')
+          return 'Restart the app from Umbrel to publish your domain to the Pubky network.';
+        return 'Restart the app from Umbrel to apply your changes.';
+      }
+    }
     if ((cfMode === 'connect' || cfMode === 'token') && healthStatus === 'fail')
       return 'The domain is not reachable yet. If you just set this up or restarted, give it a minute and use Check; otherwise restart the app from Umbrel to reconnect the tunnel.';
     return null;
@@ -732,6 +781,16 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                           <div className="flex shrink-0 items-center gap-2">
                             {(cfMode === 'connect' || cfMode === 'token') && cfConfig?.domain && (
                               <>
+                                {publishState === 'published' && (
+                                  <span className="text-xs text-brand" data-testid="cf-status-published">
+                                    Published
+                                  </span>
+                                )}
+                                {publishState === 'pending' && (
+                                  <span className="text-xs text-amber-400" data-testid="cf-status-unpublished">
+                                    Restart to publish
+                                  </span>
+                                )}
                                 {healthStatus === 'ok' && (
                                   <span className="text-xs text-brand" data-testid="cf-status-reachable">
                                     Reachable
@@ -796,7 +855,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                     {(cfMode === 'off' || showSetupMethods) && (
                       <div key={setupNonce} className="flex flex-col gap-6">
                         {/* Option Z: browser-auth connect (primary path) */}
-                        <CloudflareConnect onConfigured={(h) => handleAutoConfigured(h, 'connect')} />
+                        <CloudflareConnect onConfigured={(h, m) => handleAutoConfigured(h, 'connect', m)} />
 
                         <div className="h-px bg-border/50" />
 
@@ -815,7 +874,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                           Set up with an API token instead
                         </button>
                         {showApiTokenSetup && (
-                          <CloudflareAutoSetup onConfigured={(h) => handleAutoConfigured(h, 'token')} />
+                          <CloudflareAutoSetup onConfigured={(h, m) => handleAutoConfigured(h, 'token', m)} />
                         )}
 
                         {/* Option W: no-account published preview */}
@@ -894,8 +953,8 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
 
                             <p className="text-xs text-muted-foreground/70">
                               Point the tunnel hostname to{' '}
-                              <code className="text-muted-foreground">http://homeserver:6286</code>. Restart the app
-                              after saving.{' '}
+                              <code className="text-muted-foreground">http://homeserver:6286</code>. The tunnel picks
+                              the token up by itself; restart the app after saving to publish your domain.{' '}
                               <a
                                 href="/cloudflare-guide"
                                 target="_blank"

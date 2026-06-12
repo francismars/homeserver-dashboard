@@ -422,7 +422,11 @@ export async function POST(request: NextRequest) {
         ok: true,
         hostname,
         steps,
-        message: 'Tunnel configured. Restart the app from Umbrel to connect it and publish your domain.',
+        // The crash-looping cloudflared-local container picks config.yml +
+        // credentials.json up without a restart; only the pkarr publication
+        // needs the restart.
+        message:
+          'Tunnel configured. The tunnel connects within a minute; restart the app from Umbrel to publish your domain to the Pubky network.',
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },

@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Info, CircleCheckBig, AlertCircle, RefreshCw } from 'lucide-react';
+import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
 const FALLBACK_HOMESERVER_PUBKEY = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o';
@@ -48,6 +49,28 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
     }
     void checkDomain(probeHostname);
   }, [probeHostname]);
+
+  // Durable restart-pending signal (boot stamp vs state mtimes, server
+  // derived): survives page reloads, unlike the Settings dialog's session
+  // state. Reachability cannot stand in for it - the tunnel reconnects
+  // without a restart, the pkarr publication does not.
+  const [restartPending, setRestartPending] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/cloudflare-config', { cache: 'no-store' });
+        const data = await res.json();
+        if (!cancelled) setRestartPending(data.restart_pending === true);
+      } catch {
+        // unknown: keep the callout hidden
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -285,6 +308,9 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare }: D
                 </div>
               </div>
             )}
+
+            {/* Durable restart signal next to the reachability/"Fix it" area */}
+            {restartPending && <RestartCallout>Restart the app from Umbrel to apply your changes.</RestartCallout>}
           </CardContent>
         </Card>
       </div>

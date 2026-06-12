@@ -5,14 +5,21 @@
 // pure actions. Then: two-click confirm, full on-disk reset (config.yml,
 // credentials, token/domain files, homeserver icann_domain), the cards
 // returning as direct actions, and the domain-only save rejection afterwards.
+//
+// Also the durable restart-pending signal and the published-vs-reachable
+// split: state newer than the wrapper boot stamp keeps the restart callout
+// up EVEN while HTTPS works (publication is /info truth, not reachability);
+// a simulated wrapper run (newer stamp + /info advertising the domain)
+// clears it; a disconnect re-arms it, surviving a full page reload.
 import { promises as fs } from 'fs';
 import path from 'path';
-import { runSpec, openCloudflareTab, check, step } from './lib/harness.mjs';
+import { runSpec, openCloudflareTab, gotoDashboard, check, step } from './lib/harness.mjs';
 
 await runSpec(
   'disconnect',
   async ({ env, browser }) => {
-    step('seed a completed Connect setup on disk');
+    step('wrapper booted 5 minutes ago; then a completed Connect setup landed on disk');
+    await env.writeBootStamp(new Date(Date.now() - 5 * 60_000));
     const configYml = [
       'tunnel: e2e-local-tunnel-id',
       'credentials-file: /etc/cloudflared-config/credentials.json',
@@ -34,7 +41,8 @@ await runSpec(
 
     const page = await (await browser.newContext({ viewport: { width: 1200, height: 1100 } })).newPage();
     // The Status surface probes the configured domain on open; answer
-    // "reachable" so no restart callout is warranted (field-feedback behavior).
+    // "reachable" - the point of the durable signal is that HTTPS working
+    // must NOT suppress the publication callout.
     await page.route('**/api/public-health*', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
     );
@@ -48,12 +56,36 @@ await runSpec(
     check(address === 'pubky.example.com', 'Status shows the domain', address);
     await page.waitForSelector('[data-testid="cf-status-reachable"]', { timeout: 20000 });
     check(true, 'one reachability chip, fed by the probe');
-    check(
-      (await page.locator('[data-testid="restart-callout"]').count()) === 0,
-      'reachable domain: no restart callout',
-    );
     check((await page.locator('[data-testid="cf-disconnect"]').count()) === 1, 'exactly one Disconnect button');
     check((await page.locator('[data-testid="cf-connect-success"]').count()) === 0, 'no per-card success state');
+
+    step('setup newer than the boot stamp: restart callout despite HTTPS reachability');
+    const preBoot = await env.api('/api/cloudflare-config');
+    check(preBoot.data.restart_pending === true, 'restart_pending true (state newer than the stamp)');
+    check(preBoot.data.restart_reason === 'setup_changed', 'reason is setup_changed', preBoot.data.restart_reason);
+    await page.waitForSelector('[role="dialog"] [data-testid="restart-callout"]', { timeout: 15000 });
+    const publishCallout = await page.locator('[role="dialog"] [data-testid="restart-callout"]').textContent();
+    check(
+      /publish your domain/i.test(publishCallout),
+      'callout asks for a restart to publish, not to reconnect',
+      publishCallout.slice(0, 80),
+    );
+    const unpublished = (await page.locator('[data-testid="cf-status-unpublished"]').textContent()).trim();
+    check(unpublished === 'Restart to publish', '/info still on localhost: Restart to publish', unpublished);
+
+    step('simulate the wrapper run: newer boot stamp + /info advertises the domain');
+    await env.writeBootStamp();
+    env.admin.info.pkarr_icann_domain = 'pubky.example.com:443';
+    await openCloudflareTab(page, env.baseUrl);
+    await page.waitForSelector('[data-testid="cf-status-published"]', { timeout: 20000 });
+    const published = (await page.locator('[data-testid="cf-status-published"]').textContent()).trim();
+    check(published === 'Published', '/info matches the configured domain: Published', published);
+    check(
+      (await page.locator('[data-testid="restart-callout"]').count()) === 0,
+      'restart callout gone everywhere (Overview included)',
+    );
+    const postBoot = await env.api('/api/cloudflare-config');
+    check(postBoot.data.restart_pending === false, 'restart_pending false once the stamp is newest');
 
     step('setup cards are demoted to pure actions behind the disclosure');
     check((await page.locator('[data-testid="cf-connect"]').count()) === 0, 'cards collapsed while a mode is active');
@@ -76,7 +108,7 @@ await runSpec(
       { timeout: 15000 },
     );
     check(true, 'mode badge back to Off');
-    const callout = await page.locator('[data-testid="restart-callout"]').first().textContent();
+    const callout = await page.locator('[role="dialog"] [data-testid="restart-callout"]').first().textContent();
     check(/Disconnected/.test(callout), 'post-disconnect restart callout on the Status surface', callout.slice(0, 60));
     check((await page.locator('[data-testid="cf-disconnect"]').count()) === 0, 'Disconnect button gone');
     check(
@@ -97,6 +129,29 @@ await runSpec(
     const hsConfig = await fs.readFile(env.hsConfigPath, 'utf-8');
     check(hsConfig.includes('icann_domain = "localhost"'), 'icann_domain reset to localhost');
     check(!hsConfig.includes('public_icann_http_port'), 'public_icann_http_port line removed');
+
+    step('disconnect re-arms the durable signal; it survives a full reload');
+    const postDisconnect = await env.api('/api/cloudflare-config');
+    check(postDisconnect.data.restart_pending === true, 'restart_pending true again after the disconnect');
+    await gotoDashboard(page, env.baseUrl);
+    await page.waitForSelector('[data-testid="restart-callout"]', { timeout: 30000 });
+    const overviewCallout = await page.locator('[data-testid="restart-callout"]').first().textContent();
+    check(
+      /Restart the app from Umbrel/.test(overviewCallout),
+      'Overview shows the restart callout after a reload',
+      overviewCallout.slice(0, 60),
+    );
+    await openCloudflareTab(page, env.baseUrl);
+    await page.waitForSelector('[role="dialog"] [data-testid="restart-callout"]', { timeout: 15000 });
+    const dialogCallout = await page
+      .locator('[role="dialog"] [data-testid="restart-callout"]')
+      .first()
+      .textContent();
+    check(
+      /Restart the app from Umbrel/.test(dialogCallout),
+      'Status callout persists across the reload (no session state)',
+      dialogCallout.slice(0, 60),
+    );
 
     step('domain-only save is rejected after disconnect (no token left)');
     const domainOnly = await env.api('/api/cloudflare-config', {

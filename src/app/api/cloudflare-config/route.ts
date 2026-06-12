@@ -5,6 +5,7 @@ import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import { atomicWrite, fileExists } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
+import { detectRestartPending } from '@/lib/server/restart-pending';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-config';
@@ -35,7 +36,10 @@ async function isCloudflareConfigSupported(): Promise<boolean> {
 
 /**
  * GET /api/cloudflare-config
- * Returns the server-derived setup mode plus the current domain (if set).
+ * Returns the server-derived setup mode plus the current domain (if set),
+ * and the durable restart-pending signal (state mtimes vs the wrapper boot
+ * stamp; null when no stamp exists and the client must fall back to its
+ * in-session signals).
  * Token is never returned. `supported: false` means only one thing: the
  * config dir is not accessible in this environment (the tab is pointless);
  * any other failure is an honest 500 so the client can retry instead of
@@ -47,12 +51,15 @@ export async function GET(request: NextRequest) {
   const supported = await isCloudflareConfigSupported();
   try {
     const { mode, domain } = await detectCloudflareMode();
+    const { restart_pending, restart_reason } = await detectRestartPending();
     const response = NextResponse.json(
       {
         domain,
         mode,
         configured: mode === 'connect' || mode === 'token',
         supported,
+        restart_pending,
+        restart_reason,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -224,7 +231,10 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({
       ok: true,
-      message: 'Saved. Restart the app from Umbrel for the tunnel to connect.',
+      // Two separate truths: the crash-looping cloudflared picks the token up
+      // by itself; only the pkarr publication needs the restart.
+      message:
+        'Saved. The tunnel picks this up within a minute; restart the app from Umbrel to publish your domain to the Pubky network.',
       requestId,
     });
   } catch (e) {
