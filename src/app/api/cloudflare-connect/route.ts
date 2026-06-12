@@ -16,6 +16,7 @@ import {
   LOCAL_CONFIG_PATH,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
+  atomicWrite,
   clearState,
   getCloudflaredBin,
   isBinaryAvailable,
@@ -29,6 +30,7 @@ import {
   withFlowLock,
   writeState,
 } from '@/lib/server/cloudflared-process';
+import { teardownPreview } from '@/lib/server/preview-teardown';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-connect';
@@ -103,7 +105,7 @@ async function currentStatus(): Promise<{
       return { status: 'waiting' };
     }
     // dead or stale: clean up so the user can start fresh
-    if (alive) killPid(state.pid, state.starttime);
+    if (alive) await killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
   }
   return { status: 'idle' };
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
   // ---- cancel -----------------------------------------------------------
   if (body.action === 'cancel') {
     const state = await readState(CONNECT_STATE());
-    if (state) killPid(state.pid, state.starttime);
+    if (state) await killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
     await fs.rm(CERT_PATH(), { force: true });
     return NextResponse.json({ status: 'idle', requestId }, { headers: { 'Cache-Control': 'no-store' } });
@@ -176,7 +178,7 @@ export async function POST(request: NextRequest) {
           url = await parseLoginUrl();
         }
         if (!url) {
-          killPid(child.pid, child.starttime);
+          await killPid(child.pid, child.starttime);
           await clearState(CONNECT_STATE());
           throw new Error('cloudflared did not produce a login URL');
         }
@@ -267,50 +269,71 @@ export async function POST(request: NextRequest) {
     };
     const certEnv = { TUNNEL_ORIGIN_CERT: CERT_PATH() };
 
-    // 1. tunnel create (idempotent-ish: fall back to a -local name if taken)
-    let tunnelName = TUNNEL_NAME;
-    let create = await runCloudflared(
-      ['tunnel', 'create', '--credentials-file', CREDENTIALS_PATH(), tunnelName],
-      certEnv,
-    );
-    if (!create.ok && /already exists/i.test(create.output)) {
-      tunnelName = FALLBACK_TUNNEL_NAME;
-      create = await runCloudflared(
+    // 1. tunnel create, unless a previous attempt left usable credentials:
+    // reusing their tunnel id keeps a retry from creating a second tunnel
+    // under the fallback name and orphaning the first one in the account.
+    // tunnelRef is whatever cloudflared commands should reference: the name
+    // when we created the tunnel in this run, the id when reusing.
+    let tunnelId: string | undefined;
+    let tunnelRef = '';
+    try {
+      const creds = JSON.parse(await fs.readFile(CREDENTIALS_PATH(), 'utf-8')) as { TunnelID?: string };
+      if (creds.TunnelID) {
+        tunnelId = creds.TunnelID;
+        tunnelRef = creds.TunnelID;
+        steps.push({ key: 'tunnel', status: 'done', detail: 'Reusing tunnel from a previous attempt' });
+      }
+    } catch {
+      // no usable credentials: create below
+    }
+    if (!tunnelId) {
+      let tunnelName = TUNNEL_NAME;
+      let create = await runCloudflared(
         ['tunnel', 'create', '--credentials-file', CREDENTIALS_PATH(), tunnelName],
         certEnv,
       );
-    }
-    if (!create.ok) {
-      steps.push({ key: 'tunnel', status: 'failed' });
-      return fail(
-        new RouteError(502, 'upstream_error', `Could not create the tunnel: ${lastLine(create.output)}`),
-        create.output.slice(-500),
-      );
-    }
-    steps.push({ key: 'tunnel', status: 'done', detail: tunnelName });
+      if (!create.ok && /already exists/i.test(create.output)) {
+        tunnelName = FALLBACK_TUNNEL_NAME;
+        create = await runCloudflared(
+          ['tunnel', 'create', '--credentials-file', CREDENTIALS_PATH(), tunnelName],
+          certEnv,
+        );
+      }
+      if (!create.ok) {
+        steps.push({ key: 'tunnel', status: 'failed' });
+        return fail(
+          new RouteError(502, 'upstream_error', `Could not create the tunnel: ${lastLine(create.output)}`),
+          create.output.slice(-500),
+        );
+      }
+      steps.push({ key: 'tunnel', status: 'done', detail: tunnelName });
+      tunnelRef = tunnelName;
 
-    // The credentials file carries the tunnel id; that is our config reference.
-    let tunnelId: string;
-    try {
-      const creds = JSON.parse(await fs.readFile(CREDENTIALS_PATH(), 'utf-8')) as { TunnelID?: string };
-      if (!creds.TunnelID) throw new Error('TunnelID missing from credentials file');
-      tunnelId = creds.TunnelID;
-    } catch (e) {
-      steps.push({ key: 'config', status: 'failed' });
-      return fail(
-        new RouteError(500, 'internal_error', 'Tunnel created but its credentials file is unreadable'),
-        e instanceof Error ? e.message : String(e),
-      );
+      // The credentials file carries the tunnel id; that is our config reference.
+      try {
+        const creds = JSON.parse(await fs.readFile(CREDENTIALS_PATH(), 'utf-8')) as { TunnelID?: string };
+        if (!creds.TunnelID) throw new Error('TunnelID missing from credentials file');
+        tunnelId = creds.TunnelID;
+      } catch (e) {
+        steps.push({ key: 'config', status: 'failed' });
+        return fail(
+          new RouteError(500, 'internal_error', 'Tunnel created but its credentials file is unreadable'),
+          e instanceof Error ? e.message : String(e),
+        );
+      }
     }
 
     // 2. route dns
-    const route = await runCloudflared(['tunnel', 'route', 'dns', tunnelName, hostname], certEnv);
+    const route = await runCloudflared(['tunnel', 'route', 'dns', tunnelRef, hostname], certEnv);
     if (!route.ok) {
       steps.push({ key: 'dns', status: 'failed' });
-      // Undo the tunnel we just created so a retry starts clean instead of
-      // exhausting names and orphaning tunnel objects in the account.
-      await runCloudflared(['tunnel', 'delete', '-f', tunnelName], certEnv);
-      await fs.rm(CREDENTIALS_PATH(), { force: true });
+      // Undo the tunnel so a retry starts clean instead of exhausting names
+      // and orphaning tunnel objects in the account. When the delete itself
+      // fails (network down, expired cert), the tunnel still exists at
+      // Cloudflare: keep credentials.json so the next attempt reuses it
+      // rather than burning one of the two fixed names.
+      const del = await runCloudflared(['tunnel', 'delete', '-f', tunnelRef], certEnv);
+      if (del.ok) await fs.rm(CREDENTIALS_PATH(), { force: true });
       const friendly = /already exists/i.test(route.output)
         ? `A DNS record already exists at ${hostname}. Pick a different subdomain (or use the API-token setup, which can replace records).`
         : /find.*zone|zone for|no zone/i.test(route.output)
@@ -320,7 +343,14 @@ export async function POST(request: NextRequest) {
     }
     steps.push({ key: 'dns', status: 'done' });
 
-    // 3. write runtime config + switch modes + delete the cert
+    // 3. switch modes + write runtime config + delete the cert.
+    // Write order pinned for crash safety: mode detection (here and in
+    // cloudflare-config GET) treats config.yml+credentials.json as
+    // "completed", and credentials.json already exists. So the token is
+    // truncated first (stops the token-mode container claiming the old
+    // hostname), the domain file is written next, and config.yml lands LAST:
+    // a crash at any earlier point can never leave the system reporting
+    // completed with a stale domain or two modes runnable at once.
     try {
       const configYml = [
         `tunnel: ${tunnelId}`,
@@ -332,21 +362,21 @@ export async function POST(request: NextRequest) {
         '  - service: http_status:404',
         '',
       ].join('\n');
-      await fs.writeFile(LOCAL_CONFIG_PATH(), configYml, 'utf-8');
+      await atomicWrite(path.join(getConfigDir(), 'token'), '');
+      await atomicWrite(path.join(getConfigDir(), 'domain'), hostname);
       // World-readable until the next app start hardens them to 640+group
       // 65532 (entrypoint) - required so the crash-looping cloudflared-local
       // container can pick them up without a restart, exactly like the token
       // file in token mode. The bind mount lives inside the app-data dir.
-      await fs.chmod(LOCAL_CONFIG_PATH(), 0o644);
       await fs.chmod(CREDENTIALS_PATH(), 0o644).catch(() => {});
-      await fs.writeFile(path.join(getConfigDir(), 'domain'), hostname, 'utf-8');
-      // Mode switch: an empty token keeps the token-mode container down so the
-      // local-config container (which needs config.yml) takes over.
-      await fs.writeFile(path.join(getConfigDir(), 'token'), '', 'utf-8');
+      await atomicWrite(LOCAL_CONFIG_PATH(), configYml, 0o644);
       // The cert's job is done; it must not linger (it can create tunnels and
       // edit DNS for the authorized zone).
       await fs.rm(CERT_PATH(), { force: true });
       await clearState(CONNECT_STATE());
+      // A real setup supersedes preview mode: stop publishing and serving
+      // the temporary URL.
+      await teardownPreview();
       steps.push({ key: 'config', status: 'done' });
     } catch (e) {
       steps.push({ key: 'config', status: 'failed' });
@@ -363,7 +393,7 @@ export async function POST(request: NextRequest) {
       statusCode: 200,
       durationMs: Date.now() - startedAt,
       message: 'Connect setup completed',
-      meta: { hostnameLength: hostname.length, tunnelName },
+      meta: { hostnameLength: hostname.length, tunnel: tunnelRef },
     });
     return NextResponse.json(
       {

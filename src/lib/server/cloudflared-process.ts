@@ -34,6 +34,9 @@ export const TESTDRIVE_LOG = () => path.join(getConfigDir(), '.testdrive.log');
 export const PREVIEW_ENV = () => path.join(getConfigDir(), 'testdrive.env');
 /** Logfile of the cloudflared-preview compose service (post-restart). */
 export const PREVIEW_SERVICE_LOG = () => path.join(getConfigDir(), 'preview', 'quick.log');
+/** Handshake written by the config wrapper: the preview URL it actually
+ * published into the homeserver config (removed when preview is off). */
+export const PREVIEW_PUBLISHED = () => path.join(getConfigDir(), 'preview', 'published');
 export const CONNECT_STATE = () => path.join(getConfigDir(), '.connect.json');
 export const CONNECT_LOG = () => path.join(getConfigDir(), '.connect.log');
 export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
@@ -100,13 +103,38 @@ export function isPidAlive(pid: number, starttime?: number): boolean {
   return isOurProcess(pid, starttime);
 }
 
-export function killPid(pid: number, starttime?: number): void {
-  if (!isOurProcess(pid, starttime)) return;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const KILL_POLL_INTERVAL_MS = 80;
+const SIGTERM_GRACE_MS = 2000;
+const SIGKILL_CONFIRM_MS = 1000;
+
+/**
+ * SIGTERM, poll ~2s for exit, escalate to SIGKILL, confirm. Returns whether
+ * the process is gone, so callers can report honestly instead of assuming a
+ * fire-and-forget signal worked while a stuck child keeps serving traffic.
+ */
+export async function killPid(pid: number, starttime?: number): Promise<boolean> {
+  if (!isOurProcess(pid, starttime)) return true;
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
-    // already gone
+    return true;
   }
+  for (let waited = 0; waited < SIGTERM_GRACE_MS; waited += KILL_POLL_INTERVAL_MS) {
+    await sleep(KILL_POLL_INTERVAL_MS);
+    if (!isPidAlive(pid, starttime)) return true;
+  }
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    return true;
+  }
+  for (let waited = 0; waited < SIGKILL_CONFIRM_MS; waited += KILL_POLL_INTERVAL_MS) {
+    await sleep(KILL_POLL_INTERVAL_MS);
+    if (!isPidAlive(pid, starttime)) return true;
+  }
+  return false;
 }
 
 export interface SpawnedChild {
@@ -185,9 +213,19 @@ export async function parseQuickTunnelUrl(): Promise<string | null> {
   }
 }
 
-/** Latest URL the post-restart preview service obtained (appending logfile,
- * api.trycloudflare.com noise excluded). */
+/** URL the post-restart preview service actually published. The wrapper
+ * handshake file is authoritative when present (the quick.log is append-only
+ * across boots, so its last match can be a previous boot's dead URL); the
+ * log parse is only a fallback for wrappers that predate the handshake. */
 export async function parsePreviewPublishedUrl(): Promise<string | null> {
+  let handshakeAbsent = false;
+  try {
+    const published = (await fs.readFile(PREVIEW_PUBLISHED(), 'utf-8')).trim();
+    if (published) return published;
+  } catch {
+    handshakeAbsent = true;
+  }
+  if (!handshakeAbsent) return null; // file exists but is empty: nothing published yet
   try {
     const log = await fs.readFile(PREVIEW_SERVICE_LOG(), 'utf-8');
     const matches = (log.match(QUICK_TUNNEL_URL_PATTERN) ?? []).filter((m) => !m.startsWith('https://api.'));
@@ -281,12 +319,24 @@ export async function readState(file: string): Promise<ProcessState | null> {
   }
 }
 
-/** Atomic write (tmp + rename) so a racing read never parses a torn file. */
+/**
+ * Atomic write (tmp in the same dir + rename) so a racing read never sees a
+ * torn file. Mandatory for token/domain/config.yml: the crash-looping
+ * cloudflared containers and the init wrapper poll them from another
+ * container, so a plain writeFile can hand them half a token.
+ */
+export async function atomicWrite(filePath: string, contents: string, mode?: number): Promise<void> {
+  const tmp = `${filePath}.tmp`;
+  await fs.writeFile(tmp, contents, 'utf-8');
+  // chmod the tmp file so the mode is in place before the rename publishes it
+  // (writeFile's own mode argument is umask-clipped).
+  if (mode !== undefined) await fs.chmod(tmp, mode);
+  await fs.rename(tmp, filePath);
+}
+
 export async function writeState(file: string, state: ProcessState): Promise<void> {
   await fs.mkdir(getConfigDir(), { recursive: true });
-  const tmp = `${file}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(state), 'utf-8');
-  await fs.rename(tmp, file);
+  await atomicWrite(file, JSON.stringify(state));
 }
 
 export async function clearState(file: string): Promise<void> {

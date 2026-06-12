@@ -120,7 +120,10 @@ export async function POST(request: NextRequest) {
 
   if (body.action === 'disable') {
     const state = await readState(TESTDRIVE_STATE());
-    if (state) killPid(state.pid, state.starttime);
+    // killPid escalates (SIGTERM, wait, SIGKILL) and reports whether the
+    // child is actually gone; state is cleared either way, but the response
+    // must not claim a dead tunnel while a stuck child still serves it.
+    const instantGone = state ? await killPid(state.pid, state.starttime) : true;
     await clearState(TESTDRIVE_STATE());
     await fs.rm(PREVIEW_ENV(), { force: true });
     logRouteInfo({
@@ -129,10 +132,17 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       statusCode: 200,
       durationMs: Date.now() - startedAt,
-      message: 'Preview disabled',
+      message: instantGone ? 'Preview disabled' : 'Preview disabled but the instant tunnel did not exit',
     });
     return NextResponse.json(
-      { enabled: false, instant: { status: 'stopped' }, requestId },
+      {
+        enabled: false,
+        instant: { status: 'stopped' },
+        message: instantGone
+          ? 'Preview disabled.'
+          : 'Preview disabled, but the temporary tunnel process did not exit. Its URL may stay reachable until the app restarts.',
+        requestId,
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -163,6 +173,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Captured outside the try so the catch can kill a child that was
+      // spawned before the failure.
+      let spawned: { pid: number; starttime?: number } | null = null;
       try {
         // The marker gates the cloudflared-preview compose service (env_file)
         // and tells the config wrapper to publish the URL on the next start.
@@ -181,11 +194,11 @@ export async function POST(request: NextRequest) {
         // the restart that actually publishes the address).
         const existing = await instantStatus();
         if (existing.status === 'stopped') {
-          const child = await spawnDetached(
+          spawned = await spawnDetached(
             [getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()],
             TESTDRIVE_LOG(),
           );
-          await writeState(TESTDRIVE_STATE(), { ...child, started_at: new Date().toISOString() });
+          await writeState(TESTDRIVE_STATE(), { ...spawned, started_at: new Date().toISOString() });
         }
         logRouteInfo({
           requestId,
@@ -200,7 +213,12 @@ export async function POST(request: NextRequest) {
           { headers: { 'Cache-Control': 'no-store' } },
         );
       } catch (e) {
+        // A failed enable must leave nothing behind: a surviving marker would
+        // make GET report enabled (and the next restart publish a preview
+        // URL), and an unkilled child would keep an orphan tunnel serving.
+        if (spawned) await killPid(spawned.pid, spawned.starttime);
         await clearState(TESTDRIVE_STATE());
+        await fs.rm(PREVIEW_ENV(), { force: true });
         const error = new RouteError(500, 'internal_error', 'Failed to enable preview mode');
         logRouteError({
           requestId,

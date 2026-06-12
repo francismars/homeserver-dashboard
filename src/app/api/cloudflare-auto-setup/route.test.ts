@@ -423,6 +423,45 @@ describe('cloudflare-auto-setup route', () => {
     await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
   });
 
+  it('success tears down preview mode: marker, child state and handshake gone, GET reports disabled', async () => {
+    installFetchMock(makeRules(), calls);
+    await fs.writeFile(path.join(tmpDir, 'testdrive.env'), 'TUNNEL_URL=x', 'utf-8');
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://x.trycloudflare.com', 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, '.testdrive.json'),
+      JSON.stringify({ pid: 999999999, started_at: new Date().toISOString() }),
+      'utf-8',
+    );
+    const res = await post(validBody);
+    expect(res.status).toBe(200);
+    for (const f of ['testdrive.env', path.join('preview', 'published'), '.testdrive.json']) {
+      await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
+    }
+    const { GET } = await import('../cloudflare-preview/route');
+    const preview = await (await GET(new NextRequest('http://localhost:8080/api/cloudflare-preview'))).json();
+    expect(preview.enabled).toBe(false);
+    expect(preview.published_url).toBeUndefined();
+  });
+
+  it('mode switch removes the locally-managed config before the token write can land', async () => {
+    installFetchMock(makeRules(), calls);
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: old', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{}', 'utf-8');
+    // A directory at the tmp path makes the atomic token write fail (EISDIR),
+    // freezing the state at the moment just before the token would land.
+    await fs.mkdir(path.join(tmpDir, 'token.tmp'));
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(500);
+    expect(data.steps.find((s: { key: string }) => s.key === 'credentials').status).toBe('failed');
+    // The other mode's files were already gone and the domain already written:
+    // a crash here leaves one incomplete mode, never two complete ones.
+    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, 'credentials.json'))).rejects.toThrow();
+    expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
+  });
+
   it('returns 500 when the credentials write fails, with the failed step marked', async () => {
     installFetchMock(makeRules(), calls);
     // A regular file in the way makes mkdir fail fast with ENOTDIR

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -54,6 +54,58 @@ describe('cloudflared-process log parsing', () => {
     );
   });
 
+  it('parsePreviewPublishedUrl prefers the wrapper handshake file over the append-only log', async () => {
+    const { parsePreviewPublishedUrl } = await import('./cloudflared-process');
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    // The log still carries a previous boot's URL as its last match.
+    await fs.writeFile(
+      path.join(tmpDir, 'preview', 'quick.log'),
+      'INF |  https://previous-boot.trycloudflare.com |\n',
+      'utf-8',
+    );
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://current.trycloudflare.com\n', 'utf-8');
+    expect(await parsePreviewPublishedUrl()).toBe('https://current.trycloudflare.com');
+  });
+
+  it('parsePreviewPublishedUrl returns null while the handshake file exists but is empty', async () => {
+    const { parsePreviewPublishedUrl } = await import('./cloudflared-process');
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(
+      path.join(tmpDir, 'preview', 'quick.log'),
+      'INF |  https://previous-boot.trycloudflare.com |\n',
+      'utf-8',
+    );
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), '', 'utf-8');
+    expect(await parsePreviewPublishedUrl()).toBeNull();
+  });
+
+  it('parsePreviewPublishedUrl falls back to the last non-api log match when the handshake is absent', async () => {
+    const { parsePreviewPublishedUrl } = await import('./cloudflared-process');
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(
+      path.join(tmpDir, 'preview', 'quick.log'),
+      [
+        'INF Requesting https://api.trycloudflare.com/tunnel',
+        'INF |  https://older.trycloudflare.com |',
+        'INF |  https://newest.trycloudflare.com |',
+      ].join('\n'),
+      'utf-8',
+    );
+    expect(await parsePreviewPublishedUrl()).toBe('https://newest.trycloudflare.com');
+  });
+
+  it('atomicWrite replaces the target without a torn intermediate and applies the mode', async () => {
+    const { atomicWrite } = await import('./cloudflared-process');
+    const file = path.join(tmpDir, 'token');
+    await atomicWrite(file, 'first');
+    expect(await fs.readFile(file, 'utf-8')).toBe('first');
+    await atomicWrite(file, 'second', 0o644);
+    expect(await fs.readFile(file, 'utf-8')).toBe('second');
+    expect((await fs.stat(file)).mode & 0o777).toBe(0o644);
+    // The tmp file must not survive the rename.
+    await expect(fs.access(`${file}.tmp`)).rejects.toThrow();
+  });
+
   it('writeState round-trips atomically; clearState removes the file', async () => {
     const { writeState, readState, clearState, TESTDRIVE_STATE } = await import('./cloudflared-process');
     await writeState(TESTDRIVE_STATE(), { pid: 1234, started_at: new Date().toISOString() });
@@ -76,37 +128,108 @@ describe('cloudflared-process log parsing', () => {
     const { isPidAlive, killPid } = await import('./cloudflared-process');
     // Our own pid is alive but is node, not cloudflared: must be treated as dead.
     expect(isPidAlive(process.pid)).toBe(false);
-    // And killPid must refuse to signal it (we would be killing ourselves).
-    killPid(process.pid);
-    expect(true).toBe(true); // still alive
+    // And killPid must refuse to signal it (we would be killing ourselves);
+    // it reports "gone" because the tracked child no longer owns the pid.
+    expect(await killPid(process.pid)).toBe(true);
   });
 
-  it('isPidAlive rejects a matching-comm pid whose starttime does not match (pid-reuse guard)', async () => {
-    const { isPidAlive, killPid, spawnDetached } = await import('./cloudflared-process');
-    // `timeout` is in the comm allowance, so a real child stands in for a
-    // wrapped cloudflared without needing the binary.
+  /** Spawns `timeout 30 sleep 30` (comm "timeout" is in the allowance, so a
+   * real child stands in for cloudflared) and waits for the execve so
+   * /proc/<pid>/comm reads "timeout". */
+  async function spawnStandIn() {
+    const { spawnDetached } = await import('./cloudflared-process');
     const child = await spawnDetached(['timeout', '30', 'sleep', '30'], path.join(tmpDir, 'child.log'));
+    for (let i = 0; i < 50; i++) {
+      try {
+        if (readFileSync(`/proc/${child.pid}/comm`, 'utf-8').trim() === 'timeout') break;
+      } catch {
+        // not yet
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return child;
+  }
+
+  it('isPidAlive rejects a matching-comm pid whose starttime does not match (pid-reuse guard)', async () => {
+    const { isPidAlive, killPid } = await import('./cloudflared-process');
+    const child = await spawnStandIn();
     try {
       expect(typeof child.starttime).toBe('number');
-      // Wait for the execve so /proc/<pid>/comm reads "timeout".
-      for (let i = 0; i < 50; i++) {
-        try {
-          if (readFileSync(`/proc/${child.pid}/comm`, 'utf-8').trim() === 'timeout') break;
-        } catch {
-          // not yet
-        }
-        await new Promise((r) => setTimeout(r, 20));
-      }
       expect(isPidAlive(child.pid, child.starttime)).toBe(true);
       expect(isPidAlive(child.pid, (child.starttime ?? 0) + 12345)).toBe(false);
-      // killPid must refuse the mismatched identity too...
-      killPid(child.pid, (child.starttime ?? 0) + 12345);
+      // killPid must refuse the mismatched identity too (reported gone, child untouched)...
+      expect(await killPid(child.pid, (child.starttime ?? 0) + 12345)).toBe(true);
       expect(isPidAlive(child.pid, child.starttime)).toBe(true);
-      // ...and honor the matching one.
-      killPid(child.pid, child.starttime);
+      // ...and honor the matching one: SIGTERM lands and the exit is confirmed.
+      expect(await killPid(child.pid, child.starttime)).toBe(true);
+      expect(isPidAlive(child.pid, child.starttime)).toBe(false);
     } finally {
       try {
         process.kill(child.pid, 'SIGKILL');
+      } catch {
+        // already gone
+      }
+    }
+  });
+
+  /** Wraps process.kill so signals to the child can be swallowed, simulating
+   * a stuck cloudflared. Liveness probes (signal 0) report ESRCH once the
+   * fake considers the child dead. */
+  function stubKill(childPid: number, opts: { termWorks: boolean; killWorks: boolean }) {
+    const realKill = process.kill.bind(process);
+    let dead = false;
+    const spy = vi.spyOn(process, 'kill').mockImplementation(((pid: number, sig?: string | number) => {
+      if (pid !== childPid) return realKill(pid, sig as NodeJS.Signals);
+      if (sig === 'SIGTERM') {
+        if (opts.termWorks) dead = true;
+        return true;
+      }
+      if (sig === 'SIGKILL') {
+        if (opts.killWorks) dead = true;
+        return true;
+      }
+      if (dead) throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+      return realKill(pid, sig as NodeJS.Signals);
+    }) as typeof process.kill);
+    return { spy, realKill };
+  }
+
+  it('killPid escalates to SIGKILL when SIGTERM is ignored and confirms the exit', async () => {
+    const { killPid } = await import('./cloudflared-process');
+    const child = await spawnStandIn();
+    const { spy, realKill } = stubKill(child.pid, { termWorks: false, killWorks: true });
+    vi.useFakeTimers();
+    try {
+      const pending = killPid(child.pid, child.starttime);
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(await pending).toBe(true);
+      expect(spy).toHaveBeenCalledWith(child.pid, 'SIGTERM');
+      expect(spy).toHaveBeenCalledWith(child.pid, 'SIGKILL');
+    } finally {
+      vi.useRealTimers();
+      spy.mockRestore();
+      try {
+        realKill(child.pid, 'SIGKILL');
+      } catch {
+        // already gone
+      }
+    }
+  });
+
+  it('killPid returns false when the process survives even SIGKILL', async () => {
+    const { killPid } = await import('./cloudflared-process');
+    const child = await spawnStandIn();
+    const { spy, realKill } = stubKill(child.pid, { termWorks: false, killWorks: false });
+    vi.useFakeTimers();
+    try {
+      const pending = killPid(child.pid, child.starttime);
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(await pending).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      spy.mockRestore();
+      try {
+        realKill(child.pid, 'SIGKILL');
       } catch {
         // already gone
       }

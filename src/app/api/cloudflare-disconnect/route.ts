@@ -7,14 +7,14 @@ import {
   CONNECT_STATE,
   CREDENTIALS_PATH,
   LOCAL_CONFIG_PATH,
-  PREVIEW_ENV,
-  TESTDRIVE_STATE,
+  atomicWrite,
   clearAllFlowLocks,
   clearState,
   getConfigDir,
   killPid,
   readState,
 } from '@/lib/server/cloudflared-process';
+import { teardownPreview } from '@/lib/server/preview-teardown';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-disconnect';
@@ -43,12 +43,13 @@ export async function POST(request: NextRequest) {
   const steps: Array<{ key: string; status: 'done' | 'skipped' }> = [];
 
   try {
-    // Stop any child processes (pending browser-auth login, instant preview tunnel)
-    for (const stateFile of [CONNECT_STATE(), TESTDRIVE_STATE()]) {
-      const state = await readState(stateFile);
-      if (state) killPid(state.pid, state.starttime);
-      await clearState(stateFile);
-    }
+    // Stop any child processes (pending browser-auth login via the state
+    // file; the instant preview tunnel plus its marker and the wrapper
+    // handshake via the shared teardown).
+    const state = await readState(CONNECT_STATE());
+    if (state) await killPid(state.pid, state.starttime);
+    await clearState(CONNECT_STATE());
+    await teardownPreview();
     // A lock orphaned by a crashed flow must not survive a "start over".
     await clearAllFlowLocks();
     steps.push({ key: 'processes', status: 'done' });
@@ -57,12 +58,11 @@ export async function POST(request: NextRequest) {
     await fs.rm(CERT_PATH(), { force: true });
     await fs.rm(LOCAL_CONFIG_PATH(), { force: true });
     await fs.rm(CREDENTIALS_PATH(), { force: true });
-    await fs.rm(PREVIEW_ENV(), { force: true });
     for (const f of ['token', 'domain']) {
       try {
-        await fs.writeFile(path.join(getConfigDir(), f), '', 'utf-8');
+        await atomicWrite(path.join(getConfigDir(), f), '');
       } catch {
-        // file may not exist in non-Umbrel environments
+        // config dir may not exist in non-Umbrel environments
       }
     }
     steps.push({ key: 'credentials', status: 'done' });

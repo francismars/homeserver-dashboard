@@ -14,6 +14,7 @@ vi.mock('@/lib/server/cloudflared-process', async (importOriginal) => {
     spawnDetached: vi.fn(),
     parseQuickTunnelUrl: vi.fn(),
     quickTunnelConnected: vi.fn(),
+    writeState: vi.fn(),
   };
 });
 
@@ -39,6 +40,9 @@ describe('cloudflare-preview route', () => {
 
   async function routes() {
     const lib = await import('@/lib/server/cloudflared-process');
+    const actual = await vi.importActual<typeof import('@/lib/server/cloudflared-process')>(
+      '@/lib/server/cloudflared-process',
+    );
     for (const fn of [
       lib.isBinaryAvailable,
       lib.isPidAlive,
@@ -46,14 +50,17 @@ describe('cloudflare-preview route', () => {
       lib.spawnDetached,
       lib.parseQuickTunnelUrl,
       lib.quickTunnelConnected,
+      lib.writeState,
     ]) {
       (fn as Mock).mockReset();
     }
     (lib.isBinaryAvailable as Mock).mockResolvedValue(true);
     (lib.isPidAlive as Mock).mockReturnValue(true);
+    (lib.killPid as Mock).mockResolvedValue(true);
     (lib.spawnDetached as Mock).mockResolvedValue({ pid: 4242 });
     (lib.parseQuickTunnelUrl as Mock).mockResolvedValue(null);
     (lib.quickTunnelConnected as Mock).mockResolvedValue(true);
+    (lib.writeState as Mock).mockImplementation(actual.writeState);
     const mod = await import('./route');
     return { lib, ...mod };
   }
@@ -141,11 +148,54 @@ describe('cloudflare-preview route', () => {
     const { lib, POST, GET } = await routes();
     await post(POST, { action: 'enable' });
     const res = await post(POST, { action: 'disable' });
-    expect((await res.json()).enabled).toBe(false);
+    const body = await res.json();
+    expect(body.enabled).toBe(false);
+    expect(body.message).toBe('Preview disabled.');
     expect(lib.killPid as Mock).toHaveBeenCalledWith(4242, undefined);
     await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
     const data = await (await get(GET)).json();
     expect(data.enabled).toBe(false);
+  });
+
+  it('disable is honest when the instant tunnel refuses to die', async () => {
+    const { lib, POST } = await routes();
+    await post(POST, { action: 'enable' });
+    (lib.killPid as Mock).mockResolvedValue(false);
+    const res = await post(POST, { action: 'disable' });
+    const body = await res.json();
+    // Marker and state are still cleared (nothing restarts the child), but
+    // the response must not pretend the URL is dead.
+    expect(body.enabled).toBe(false);
+    expect(body.message).toContain('did not exit');
+    await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.testdrive.json'))).rejects.toThrow();
+  });
+
+  it('a failed enable kills the spawned child and removes the marker', async () => {
+    const { lib, POST, GET } = await routes();
+    (lib.spawnDetached as Mock).mockResolvedValue({ pid: 4242, starttime: 77 });
+    (lib.writeState as Mock).mockRejectedValue(new Error('disk full'));
+    const res = await post(POST, { action: 'enable' });
+    expect(res.status).toBe(500);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(4242, 77);
+    await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
+    const data = await (await get(GET)).json();
+    expect(data.enabled).toBe(false);
+    expect(data.instant.status).toBe('stopped');
+  });
+
+  it('GET prefers the wrapper handshake file over the quick.log for the published URL', async () => {
+    const { GET, POST } = await routes();
+    await post(POST, { action: 'enable' });
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(
+      path.join(tmpDir, 'preview', 'quick.log'),
+      'INF |  https://previous-boot.trycloudflare.com |\n',
+      'utf-8',
+    );
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://published.trycloudflare.com\n', 'utf-8');
+    const data = await (await get(GET)).json();
+    expect(data.published_url).toBe('https://published.trycloudflare.com');
   });
 
   it('instant tunnel URL shows only after edge registration', async () => {

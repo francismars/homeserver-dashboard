@@ -52,6 +52,8 @@ describe('cloudflare-disconnect route', () => {
     ] as const) {
       await fs.writeFile(path.join(tmpDir, f), content, 'utf-8');
     }
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://x.trycloudflare.com', 'utf-8');
     await fs.writeFile(
       configPath,
       ['[pkdns]', 'icann_domain = "pubky2.example.com"', 'public_icann_http_port = 443', 'other = 1'].join('\n'),
@@ -64,7 +66,7 @@ describe('cloudflare-disconnect route', () => {
     expect(data.ok).toBe(true);
     expect(data.message).toContain('still exist in your Cloudflare account');
 
-    for (const f of ['cert.pem', 'config.yml', 'credentials.json', 'testdrive.env']) {
+    for (const f of ['cert.pem', 'config.yml', 'credentials.json', 'testdrive.env', 'preview/published']) {
       await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
     }
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('');

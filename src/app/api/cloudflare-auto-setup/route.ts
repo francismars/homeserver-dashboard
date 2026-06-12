@@ -7,8 +7,10 @@ import {
   AlreadyRunningError,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
+  atomicWrite,
   withFlowLock,
 } from '@/lib/server/cloudflared-process';
+import { teardownPreview } from '@/lib/server/preview-teardown';
 import {
   CfApiError,
   TUNNEL_NAME,
@@ -257,17 +259,26 @@ export async function POST(request: NextRequest) {
         runToken = await getTunnelToken(apiToken, accountId, tunnelId);
       }
       await fs.mkdir(CONFIG_DIR, { recursive: true });
+      // Mode switch FIRST (mirror of the Connect flow's token truncation): a
+      // stale locally-managed config would keep a second tunnel running
+      // against the old hostname and make the Connect card claim "completed".
+      // Deleting it before the token lands means a crash in between can never
+      // leave both modes validly configured with two tunnels running.
+      // config.yml goes first: completed-detection needs config.yml AND
+      // credentials.json, so removing it alone already kills that mode.
+      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
+      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
       // Same files the manual flow writes; the entrypoint re-asserts ownership
       // and modes at the next app start. cloudflared's restart-on-failure loop
       // picks the token up within seconds, so the tunnel connects without an
       // app restart; the restart is only needed to publish icann_domain.
-      await fs.writeFile(path.join(CONFIG_DIR, 'token'), runToken, 'utf-8');
-      await fs.writeFile(path.join(CONFIG_DIR, 'domain'), hostname, 'utf-8');
-      // Mode switch (mirror of the Connect flow's token truncation): a stale
-      // locally-managed config would keep a second tunnel running against the
-      // old hostname and make the Connect card claim "completed".
-      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
-      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+      // Domain before token: the token write is what makes status report
+      // "configured", so everything it implies must already be in place.
+      await atomicWrite(path.join(CONFIG_DIR, 'domain'), hostname);
+      await atomicWrite(path.join(CONFIG_DIR, 'token'), runToken);
+      // A real setup supersedes preview mode: stop publishing and serving
+      // the temporary URL.
+      await teardownPreview();
       steps.push({ key: 'credentials', status: 'done' });
     } catch (e) {
       steps.push({ key: 'credentials', status: 'failed' });
