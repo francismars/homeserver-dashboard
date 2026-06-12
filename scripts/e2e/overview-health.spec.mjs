@@ -22,7 +22,7 @@ await runSpec(
     check((await page1.locator('span[title="PKARR address"]').count()) === 1, '"Pubky address" label carries the technical term as a tooltip');
     check((await page1.locator('text=Pubky address').count()) >= 1, 'Pubky address label shown');
     check((await page1.locator('text=How Pubky apps find this server').count()) === 1, 'address helper line shown');
-    check((await page1.locator('text=Public domain').count()) >= 1, 'Public domain label shown');
+    check((await page1.locator('text=Public address').count()) >= 1, 'Public address label shown');
     check((await page1.locator('text=PKARR').count()) === 0, 'no visible PKARR jargon');
 
     step('get-started checklist: step states come from the admin signals');
@@ -143,7 +143,7 @@ await runSpec(
     check(yetLabel.includes('Not reachable yet'), 'pending restart reads "Not reachable yet"', yetLabel);
     check((await page4.locator('[data-testid="domain-health-fix"]').count()) === 0, 'no Fix it while a restart is pending');
     const hint = (await page4.locator('[data-testid="domain-health-restart-hint"]').textContent()).trim();
-    check(hint.includes('Restart the app from Umbrel to finish setup'), 'restart hint shown', hint);
+    check(hint.includes('Restart the Pubky Homeserver app from Umbrel'), 'restart hint shown', hint);
 
     step('recovery: homeserver comes up after the page loaded');
     const page5 = await ctx.newPage();

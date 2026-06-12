@@ -325,9 +325,9 @@ export async function gotoDashboard(page, baseUrl) {
 }
 
 async function openSettingsDialog(page) {
-  await page.waitForSelector('[aria-label="Homeserver Configuration"]', { timeout: 60_000 });
+  await page.waitForSelector('[aria-label="Settings"]', { timeout: 60_000 });
   for (let i = 0; i < 20; i++) {
-    await page.click('[aria-label="Homeserver Configuration"]', { timeout: 10_000 }).catch(() => {});
+    await page.click('[aria-label="Settings"]', { timeout: 10_000 }).catch(() => {});
     try {
       await page.waitForSelector('[role="dialog"]', { timeout: 3_000 });
       return;

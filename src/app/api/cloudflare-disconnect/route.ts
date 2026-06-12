@@ -16,6 +16,7 @@ import {
   readState,
 } from '@/lib/server/cloudflared-process';
 import { teardownPreview } from '@/lib/server/preview-teardown';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-disconnect';
@@ -101,8 +102,7 @@ export async function POST(request: NextRequest) {
       {
         ok: true,
         steps,
-        message:
-          'Disconnected. Restart the app from Umbrel to finish. Note: the tunnel and DNS record still exist in your Cloudflare account (we keep no credentials that could delete them) - remove them in the Cloudflare dashboard if you want to reuse the same hostname.',
+        message: `Disconnected. ${RESTART_APP_SENTENCE} The tunnel and DNS record still exist in your Cloudflare account (we keep no credentials that could delete them); remove them in the Cloudflare dashboard if you want to reuse the same public address.`,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },

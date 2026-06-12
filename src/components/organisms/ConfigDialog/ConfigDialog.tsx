@@ -14,6 +14,7 @@ import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
 import { RestartCallout } from './RestartCallout';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
@@ -162,7 +163,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
         return true;
       }
       setHealthStatus('fail');
-      setHealthError(data.error || `HTTP ${data.status ?? res.status}`);
+      // 530 is Cloudflare's "origin unreachable" (error 1033: tunnel has no
+      // connector). Raw status codes mean nothing to the operator; name the
+      // actual condition and the way out.
+      const upstreamStatus = data.status ?? res.status;
+      setHealthError(
+        upstreamStatus === 530 || upstreamStatus === 1033
+          ? 'Tunnel not connected. If you just set this up, restart the app from Umbrel.'
+          : data.error || `HTTP ${upstreamStatus}`,
+      );
       return false;
     } catch {
       setHealthStatus('fail');
@@ -216,7 +225,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setHealthStatus('idle');
       setRecentChange(null);
       setRecentMessage(null);
-      setDisconnectMessage(data.message || 'Disconnected. Restart the app from Umbrel to finish.');
+      setDisconnectMessage(data.message || `Disconnected. ${RESTART_APP_SENTENCE}`);
       // Re-read the server-derived mode and remount the setup cards so the
       // whole tab re-syncs from the single source of truth.
       await fetchCloudflareConfig();
@@ -307,8 +316,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setIsEditing(false);
       setSaveMessage({
         type: 'success',
-        text:
-          data.message || 'Config saved. Stop and start the Pubky Homeserver app in Umbrel for changes to take effect.',
+        text: data.message || `Config saved. ${RESTART_APP_SENTENCE}`,
       });
     } catch {
       setSaveMessage({ type: 'error', text: 'Request failed' });
@@ -450,7 +458,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
         type: 'success',
         text:
           data.message ||
-          'Saved. The tunnel picks this up within a minute; restart the app from Umbrel to publish your domain to the Pubky network.',
+          `Saved. The tunnel picks this up within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
       });
       setHealthStatus('idle'); // Reset health check after save
       const fresh = await fetchCloudflareConfig();
@@ -466,9 +474,11 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     }
   };
 
+  // Cloudflare first: it is the dialog's default tab and the Overview's
+  // "Fix it"/"Set up" target, so the rail order matches where users land.
   const tabs: { id: Tab; label: string }[] = [
-    ...(isConfigTabVisible ? [{ id: 'config' as Tab, label: 'Config' }] : []),
     ...(isCloudflareTabVisible ? [{ id: 'cloudflare' as Tab, label: 'Cloudflare' }] : []),
+    ...(isConfigTabVisible ? [{ id: 'config' as Tab, label: 'Config' }] : []),
   ];
 
   const cfMode: CloudflareMode = cfConfig?.mode ?? 'off';
@@ -494,19 +504,19 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       if (recentChange)
         return (
           recentMessage ??
-          'The tunnel connects within a minute. Restart the app from Umbrel to publish your domain to the Pubky network.'
+          `The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`
         );
       // Durable signal: survives page reloads, unlike the session state above.
       if (restartPending === true) {
         if (cfConfig?.restart_reason === 'config_changed')
-          return 'Restart the app from Umbrel to apply your configuration changes.';
+          return `${RESTART_APP_SENTENCE} The restart applies your configuration changes.`;
         if (cfMode === 'connect' || cfMode === 'token')
-          return 'Restart the app from Umbrel to publish your domain to the Pubky network.';
-        return 'Restart the app from Umbrel to apply your changes.';
+          return `${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
+        return `${RESTART_APP_SENTENCE} The restart applies your changes.`;
       }
     }
     if ((cfMode === 'connect' || cfMode === 'token') && healthStatus === 'fail')
-      return 'The domain is not reachable yet. If you just set this up or restarted, give it a minute and use Check; otherwise restart the app from Umbrel to reconnect the tunnel.';
+      return `Your public address is not reachable yet. If you just set this up or restarted, give it a minute and use Check. If it stays unreachable: ${RESTART_APP_SENTENCE}`;
     return null;
   })();
 
@@ -706,8 +716,8 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                 {writable ? (
                   <p className="text-xs text-muted-foreground/70">
                     Sensitive fields (passwords, database URL) are masked as <code>&quot;********&quot;</code> on
-                    display. Leave the placeholder untouched and the real value is preserved on save. Restart the Pubky
-                    Homeserver app from Umbrel to apply config changes.
+                    display. Leave the placeholder untouched and the real value is preserved on save. Config changes
+                    only take effect after a restart. {RESTART_APP_SENTENCE}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground/70">
@@ -836,6 +846,50 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                           </div>
                         </div>
                       )}
+
+                      {/* Consequences stated BEFORE the confirming click. */}
+                      {confirmDisconnect && (
+                        <div
+                          className="space-y-2 rounded border border-destructive/40 bg-destructive/5 p-3"
+                          data-testid="cf-disconnect-consequences"
+                        >
+                          <p className="text-xs text-foreground">
+                            Removes this dashboard&apos;s Cloudflare setup. The tunnel and DNS record stay in your
+                            Cloudflare account until you delete them there. Your public address stops working after the
+                            next restart.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setConfirmDisconnect(false)}
+                            data-testid="cf-disconnect-cancel"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Action feedback (e.g. a failed disconnect or a manual
+                          save) lives with the Status surface so it stays
+                          visible regardless of which disclosure is open. */}
+                      {cfMessage && (
+                        <div
+                          className={cn(
+                            'flex items-center gap-2 text-sm',
+                            cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
+                          )}
+                          data-testid="cf-message"
+                        >
+                          {cfMessage.type === 'error' ? (
+                            <AlertCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          )}
+                          <span>{cfMessage.text}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="h-px bg-border/50" />
@@ -906,28 +960,13 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
 
                         {showManualSetup && (
                           <>
-                            {/* Save feedback */}
-                            {cfMessage && (
-                              <div
-                                className={cn(
-                                  'flex items-center gap-2 text-sm',
-                                  cfMessage.type === 'error' ? 'text-destructive' : 'text-brand',
-                                )}
-                              >
-                                {cfMessage.type === 'error' ? (
-                                  <AlertCircle className="h-3.5 w-3.5" />
-                                ) : (
-                                  <CheckCircle className="h-3.5 w-3.5" />
-                                )}
-                                <span>{cfMessage.text}</span>
-                              </div>
-                            )}
-
-                            {/* Configuration form */}
+                            {/* Configuration form. Save feedback renders on the
+                                Status surface above so it survives this
+                                disclosure being closed. */}
                             <form onSubmit={handleCfSave} className="space-y-5">
                               <div className="space-y-1.5">
                                 <Label htmlFor="cf-domain" className="text-xs text-muted-foreground">
-                                  Domain
+                                  Public address
                                 </Label>
                                 <Input
                                   id="cf-domain"
@@ -961,7 +1000,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                             <p className="text-xs text-muted-foreground/70">
                               Point the tunnel hostname to{' '}
                               <code className="text-muted-foreground">http://homeserver:6286</code>. The tunnel picks
-                              the token up by itself; restart the app after saving to publish your domain.{' '}
+                              the token up by itself; after saving, a restart publishes your public address.{' '}
                               <a
                                 href="/cloudflare-guide"
                                 target="_blank"

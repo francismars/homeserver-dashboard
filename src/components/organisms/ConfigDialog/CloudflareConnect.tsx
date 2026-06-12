@@ -213,7 +213,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       {status === 'waiting' && authUrl && (
         <div className="space-y-3 rounded border border-border/60 bg-muted/20 p-3" data-testid="cf-connect-waiting">
           <p className="text-sm">
-            1. Open the link below (any device works), log in, pick your domain, click <strong>Authorize</strong>:
+            Open the link below (any device works), log in, pick your domain, click <strong>Authorize</strong>:
           </p>
           <a
             href={authUrl}
@@ -301,7 +301,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="cf-connect-hostname" className="text-xs text-muted-foreground">
-                Public hostname (under the domain you just authorized)
+                Public address (under the domain you just authorized)
               </Label>
               <Input
                 id="cf-connect-hostname"

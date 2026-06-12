@@ -11,13 +11,21 @@ function mockBackend(initial: {
   connect?: Record<string, unknown>;
   preview?: Record<string, unknown>;
   adminInfo?: Record<string, unknown>;
+  publicHealth?: Record<string, unknown>;
 }) {
   const backend = {
     cloudflareConfig: initial.cloudflareConfig,
     connect: initial.connect ?? { supported: true, status: 'idle' },
     preview: initial.preview ?? { enabled: false, instant: { status: 'stopped' }, supported: true },
     adminInfo: initial.adminInfo ?? {},
-    disconnect: { status: 200, json: { ok: true, message: 'Disconnected. Restart the app from Umbrel to finish.' } },
+    publicHealth: initial.publicHealth ?? { ok: true },
+    disconnect: {
+      status: 200,
+      json: {
+        ok: true,
+        message: "Disconnected. Restart the Pubky Homeserver app from Umbrel (open the app's tile, then Restart).",
+      },
+    },
     disconnectCalls: 0,
   };
   vi.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
@@ -34,7 +42,7 @@ function mockBackend(initial: {
       return respond(backend.disconnect.json, backend.disconnect.status);
     }
     if (url.startsWith('/api/admin/info')) return respond(backend.adminInfo);
-    if (url.startsWith('/api/public-health')) return respond({ ok: true });
+    if (url.startsWith('/api/public-health')) return respond(backend.publicHealth);
     if (url.startsWith('/api/server-config')) return respond({ error: 'not available' }, 404);
     return respond({});
   });
@@ -163,7 +171,9 @@ describe('ConfigDialog Cloudflare status surface', () => {
     });
     const first = renderDialog();
     await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
-    expect(screen.getByTestId('restart-callout').textContent).toContain('publish your domain to the Pubky network');
+    expect(screen.getByTestId('restart-callout').textContent).toContain(
+      'publishes your public address to the Pubky network',
+    );
     first.unmount();
     // A fresh mount has no session state at all; the callout must come back
     // purely from the server-derived signal.
@@ -250,7 +260,7 @@ describe('ConfigDialog Cloudflare status surface', () => {
     await waitFor(() => expect(screen.getByTestId('cf-manual-toggle')).toBeTruthy());
     expect(screen.queryByTestId('cf-next-step')).toBeNull();
     fireEvent.click(screen.getByTestId('cf-manual-toggle'));
-    fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'pubky.example.com' } });
+    fireEvent.change(screen.getByLabelText('Public address'), { target: { value: 'pubky.example.com' } });
     fireEvent.change(screen.getByLabelText('Tunnel token'), { target: { value: 'tunnel-token' } });
     backend.cloudflareConfig = cfConfig('token', 'pubky.example.com');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -279,6 +289,37 @@ describe('ConfigDialog Cloudflare status surface', () => {
     fireEvent.click(screen.getByTestId('cf-retry'));
     await waitFor(() => expect(screen.getByTestId('cf-mode-badge')).toBeTruthy());
     expect(screen.queryByTestId('cf-unavailable')).toBeNull();
+  });
+
+  it('maps a 530/1033 probe result to a tunnel-not-connected message instead of a raw status', async () => {
+    mockBackend({
+      cloudflareConfig: cfConfig('token', 'pubky.example.com'),
+      publicHealth: { ok: false, status: 530 },
+    });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-status-unreachable')).toBeTruthy());
+    const chip = screen.getByTestId('cf-status-unreachable').textContent ?? '';
+    expect(chip).toContain('Tunnel not connected. If you just set this up, restart the app from Umbrel.');
+    expect(chip).not.toContain('HTTP 530');
+  });
+
+  it('disconnect: consequences are stated after arming, and Cancel disarms without a call', async () => {
+    const backend = mockBackend({ cloudflareConfig: cfConfig('token', 'pubky.example.com') });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-disconnect')).toBeTruthy());
+    expect(screen.queryByTestId('cf-disconnect-consequences')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('cf-disconnect'));
+    expect(screen.getByTestId('cf-disconnect').textContent).toBe('Confirm?');
+    const consequences = screen.getByTestId('cf-disconnect-consequences').textContent ?? '';
+    expect(consequences).toContain("Removes this dashboard's Cloudflare setup");
+    expect(consequences).toContain('stay in your Cloudflare account');
+    expect(consequences).toContain('public address stops working after the next restart');
+
+    fireEvent.click(screen.getByTestId('cf-disconnect-cancel'));
+    expect(screen.queryByTestId('cf-disconnect-consequences')).toBeNull();
+    expect(screen.getByTestId('cf-disconnect').textContent).toBe('Disconnect');
+    expect(backend.disconnectCalls).toBe(0);
   });
 
   it('supported:false still hides the tab (genuine unsupported environment)', async () => {

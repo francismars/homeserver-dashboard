@@ -7,6 +7,7 @@ import { atomicWrite, fileExists } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { detectRestartPending } from '@/lib/server/restart-pending';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const ROUTE_NAME = '/api/cloudflare-config';
 const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
@@ -233,8 +234,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       // Two separate truths: the crash-looping cloudflared picks the token up
       // by itself; only the pkarr publication needs the restart.
-      message:
-        'Saved. The tunnel picks this up within a minute; restart the app from Umbrel to publish your domain to the Pubky network.',
+      message: `Saved. The tunnel picks this up within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
       requestId,
     });
   } catch (e) {

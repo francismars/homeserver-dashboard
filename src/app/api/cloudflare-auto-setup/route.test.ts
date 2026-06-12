@@ -146,7 +146,7 @@ describe('cloudflare-auto-setup route', () => {
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.message).toContain('The tunnel connects within a minute');
-    expect(data.message).toContain('publish your domain');
+    expect(data.message).toContain('publishes your public address');
     expect(data.message).not.toContain('unreachable');
   });
 
@@ -159,8 +159,16 @@ describe('cloudflare-auto-setup route', () => {
     const res = await post(validBody);
     const data = await res.json();
     expect(res.status).toBe(200);
-    expect(data.message).toContain('unreachable until you restart');
+    expect(data.message).toContain('unreachable until the app restarts');
     expect(data.message).not.toContain('connects within a minute');
+  });
+
+  it('maps a Cloudflare 429 to a friendly rate-limit message', async () => {
+    installFetchMock(makeRules({ getZone: () => cfErr(429, 971, 'rate limited') }), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(429);
+    expect(data.error).toBe('Cloudflare is rate limiting requests. Wait a minute and try again.');
   });
 
   it('apex: empty subdomain routes the zone itself', async () => {

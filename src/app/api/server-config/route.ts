@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'crypto';
 import { parse as parseToml } from 'smol-toml';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const CONFIG_PATH = process.env.HOMESERVER_CONFIG_PATH || '/app/homeserver-data/config.toml';
 const ROUTE_NAME = '/api/server-config';
@@ -397,7 +398,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     checksum: newChecksum,
     updated_at: stat.mtime.toISOString(),
-    message: 'Config saved. Stop and start the Pubky Homeserver app in Umbrel for changes to take effect.',
+    message: `Config saved. Changes take effect after a restart. ${RESTART_APP_SENTENCE}`,
     requestId,
   });
 }

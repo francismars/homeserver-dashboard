@@ -433,7 +433,11 @@ export function ApiExplorer({
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             API Explorer
-            <Badge variant="outline" className="border-dashed text-xs font-normal">
+            <Badge
+              variant="outline"
+              className="border-dashed text-xs font-normal"
+              title="This tab may be replaced by a full API reference."
+            >
               <Info className="mr-1 h-3 w-3" />
               Temporary
             </Badge>

@@ -66,7 +66,7 @@ await runSpec(
     await page.waitForSelector('[role="dialog"] [data-testid="restart-callout"]', { timeout: 15000 });
     const publishCallout = await page.locator('[role="dialog"] [data-testid="restart-callout"]').textContent();
     check(
-      /publish your domain/i.test(publishCallout),
+      /publishes your public address/i.test(publishCallout),
       'callout asks for a restart to publish, not to reconnect',
       publishCallout.slice(0, 80),
     );
@@ -137,7 +137,7 @@ await runSpec(
     await page.waitForSelector('[data-testid="restart-callout"]', { timeout: 30000 });
     const overviewCallout = await page.locator('[data-testid="restart-callout"]').first().textContent();
     check(
-      /Restart the app from Umbrel/.test(overviewCallout),
+      /Restart the Pubky Homeserver app from Umbrel/.test(overviewCallout),
       'Overview shows the restart callout after a reload',
       overviewCallout.slice(0, 60),
     );
@@ -148,7 +148,7 @@ await runSpec(
       .first()
       .textContent();
     check(
-      /Restart the app from Umbrel/.test(dialogCallout),
+      /Restart the Pubky Homeserver app from Umbrel/.test(dialogCallout),
       'Status callout persists across the reload (no session state)',
       dialogCallout.slice(0, 60),
     );

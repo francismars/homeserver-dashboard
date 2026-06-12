@@ -35,7 +35,7 @@ export function DashboardNavbar({ className, onSettingsClick, showSettingsButton
               variant="outline"
               size="icon"
               className="h-10 w-10 shrink-0 rounded-full border border-[#303034] bg-[#FFFFFF0B] p-2.5 text-foreground backdrop-blur-xl hover:bg-white/8"
-              aria-label="Homeserver Configuration"
+              aria-label="Settings"
               onClick={onSettingsClick}
             >
               <Settings className="size-6" />

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { cn, copyToClipboard } from '@/libs/utils';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
@@ -30,7 +31,7 @@ function ConnectionErrorAlert({ message, onRetry }: { message: string; onRetry?:
       <AlertTitle>Connection Error</AlertTitle>
       <AlertDescription className="text-xs">
         <p>Your homeserver may still be starting. Wait a minute - this page retries automatically.</p>
-        <p className="mt-1">If this persists, restart the Pubky Homeserver app from Umbrel.</p>
+        <p className="mt-1">If this persists: {RESTART_APP_SENTENCE}</p>
         {onRetry && (
           <Button
             type="button"
@@ -324,7 +325,7 @@ export function DashboardOverview({
                   the row should say (without leaking the localhost value). */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="shrink-0 text-xs text-muted-foreground sm:text-sm" title="PKARR ICANN domain">
-                  Public domain:
+                  Public address:
                 </span>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {probeHostname && info.pkarr_icann_domain && (
@@ -332,7 +333,7 @@ export function DashboardOverview({
                       <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
                         {info.pkarr_icann_domain}
                       </code>
-                      <CopyValueButton value={info.pkarr_icann_domain} label="Copy domain" />
+                      <CopyValueButton value={info.pkarr_icann_domain} label="Copy public address" />
                     </>
                   )}
                   {domainHealth === 'checking' && (
@@ -370,7 +371,7 @@ export function DashboardOverview({
                       size="sm"
                       className="h-6 shrink-0 px-1.5"
                       onClick={() => void checkDomain(probeHostname)}
-                      aria-label="Re-check domain reachability"
+                      aria-label="Re-check public address reachability"
                       data-testid="domain-health-recheck"
                     >
                       <RefreshCw className="h-3 w-3" />
@@ -393,7 +394,7 @@ export function DashboardOverview({
                     )}
                   {domainHealth === 'unreachable' && restartPending && (
                     <span className="w-full text-xs text-muted-foreground" data-testid="domain-health-restart-hint">
-                      Restart the app from Umbrel to finish setup
+                      To finish setup: {RESTART_APP_SENTENCE}
                     </span>
                   )}
                 </div>
@@ -401,7 +402,7 @@ export function DashboardOverview({
             </div>
 
             {/* Durable restart signal next to the reachability/"Fix it" area */}
-            {restartPending && <RestartCallout>Restart the app from Umbrel to apply your changes.</RestartCallout>}
+            {restartPending && <RestartCallout />}
           </CardContent>
         </Card>
       </div>

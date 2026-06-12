@@ -189,6 +189,11 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
             {zonesLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : 'Load domains'}
           </Button>
         </div>
+        {apiToken.trim().length < 20 && (
+          <p className="text-xs text-muted-foreground/70" data-testid="cf-auto-token-hint">
+            Paste your full API token to load domains.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground/70">
           <a
             href={TOKEN_TEMPLATE_URL}

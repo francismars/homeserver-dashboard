@@ -373,7 +373,9 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:gap-4">
               <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:gap-4 sm:text-left">
                 <span className="text-xs sm:text-sm">Dashboard</span>
-                <span className="text-xs">v{dashboardVersion}</span>
+                <span className="text-xs" title="App version in Umbrel = homeserver version + packaging suffix.">
+                  v{dashboardVersion}
+                </span>
               </div>
               <div className="flex flex-col items-center gap-2 text-center text-xs sm:flex-row sm:gap-4 sm:text-left">
                 <span>Synonym Software, S.A. DE C.V. ©{new Date().getFullYear()}. All rights reserved.</span>
@@ -420,7 +422,7 @@ export default function DashboardPage() {
                 <span>Cloudflare Tunnel guide</span>
               </Link>
               <Link
-                href="https://docs.pubky.org/issues"
+                href="https://github.com/pubky/umbrel-app-store/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 transition-colors hover:text-foreground"

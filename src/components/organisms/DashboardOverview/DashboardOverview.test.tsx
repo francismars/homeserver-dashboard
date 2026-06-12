@@ -76,8 +76,9 @@ describe('DashboardOverview domain health', () => {
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('domain-health-restart-hint')).toBeTruthy());
     expect(screen.getByTestId('domain-health-unreachable').textContent).toContain('Not reachable yet');
+    expect(screen.getByTestId('domain-health-restart-hint').textContent).toContain('To finish setup');
     expect(screen.getByTestId('domain-health-restart-hint').textContent).toContain(
-      'Restart the app from Umbrel to finish setup',
+      'Restart the Pubky Homeserver app from Umbrel',
     );
     expect(screen.queryByTestId('domain-health-fix')).toBeNull();
   });
@@ -112,7 +113,7 @@ describe('DashboardOverview domain health', () => {
       />,
     );
     await waitFor(() => expect(screen.getByTestId('domain-health-not-set-up')).toBeTruthy());
-    expect(screen.getByText('Public domain:')).toBeTruthy();
+    expect(screen.getByText('Public address:')).toBeTruthy();
     expect(screen.getByTestId('domain-health-fix').textContent).toBe('Set up');
     expect(healthCalls()).toHaveLength(0);
   });
@@ -135,7 +136,7 @@ describe('DashboardOverview domain health', () => {
     mockBackend({ healthOk: true, restartPending: true });
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
-    expect(screen.getByTestId('restart-callout').textContent).toContain('Restart the app from Umbrel');
+    expect(screen.getByTestId('restart-callout').textContent).toContain('Restart the Pubky Homeserver app from Umbrel');
     // Reachability is separate truth and must not suppress the callout.
     await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
   });
@@ -182,7 +183,7 @@ describe('DashboardOverview server identity', () => {
     const address = screen.getByText('Pubky address:');
     expect(address.getAttribute('title')).toBe('PKARR address');
     expect(screen.getByText('How Pubky apps find this server')).toBeTruthy();
-    const domain = screen.getByText('Public domain:');
+    const domain = screen.getByText('Public address:');
     expect(domain.getAttribute('title')).toBe('PKARR ICANN domain');
     expect(screen.queryByTestId('stale-info-label')).toBeNull();
   });
@@ -196,7 +197,7 @@ describe('DashboardOverview server identity', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.public_key));
     fireEvent.click(screen.getByLabelText('Copy address'));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_pubky_address));
-    fireEvent.click(screen.getByLabelText('Copy domain'));
+    fireEvent.click(screen.getByLabelText('Copy public address'));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_icann_domain));
   });
 });
@@ -335,7 +336,7 @@ describe('DashboardOverview connection error', () => {
 
     expect(screen.getByText(/Your homeserver may still be starting/)).toBeTruthy();
     expect(screen.getByText(/this page retries automatically/)).toBeTruthy();
-    expect(screen.getByText(/restart the Pubky Homeserver app from Umbrel/)).toBeTruthy();
+    expect(screen.getByText(/Restart the Pubky Homeserver app from Umbrel/)).toBeTruthy();
 
     const details = screen.getByTestId('connection-dev-details');
     expect(details.hasAttribute('open')).toBe(false);

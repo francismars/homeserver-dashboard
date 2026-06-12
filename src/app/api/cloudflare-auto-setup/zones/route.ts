@@ -65,9 +65,11 @@ export async function POST(request: NextRequest) {
           'unauthorized',
           'Cloudflare rejected the token. Check that it exists, has not expired, and includes Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit and Zone > Zone > Read.',
         )
-      : e instanceof CfApiError
-        ? new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || e.status}`)
-        : new RouteError(502, 'upstream_error', 'Could not reach the Cloudflare API');
+      : e instanceof CfApiError && e.status === 429
+        ? new RouteError(429, 'upstream_error', 'Cloudflare is rate limiting requests. Wait a minute and try again.')
+        : e instanceof CfApiError
+          ? new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || e.status}`)
+          : new RouteError(502, 'upstream_error', 'Could not reach the Cloudflare API');
     logRouteError({
       requestId,
       route: ROUTE_NAME,

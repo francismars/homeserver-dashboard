@@ -26,6 +26,7 @@ import {
   updateDnsRecord,
 } from '@/lib/server/cloudflare-api';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup';
 const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
@@ -308,8 +309,8 @@ export async function POST(request: NextRequest) {
     });
     const message =
       priorMode !== 'off'
-        ? 'Tunnel configured. Your domain will be unreachable until you restart the app from Umbrel: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. Restarting also publishes your domain to the Pubky network.'
-        : 'Tunnel configured. The tunnel connects within a minute; restart the app from Umbrel to publish your domain to the Pubky network.';
+        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${RESTART_APP_SENTENCE} The restart also publishes your public address to the Pubky network.`
+        : `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
     return NextResponse.json(
       {
         ok: true,
@@ -350,6 +351,9 @@ function mapCfError(e: unknown, area: 'zone' | 'tunnel' | 'dns'): RouteError {
   }
   if (e.status === 404 && area === 'zone') {
     return new RouteError(400, 'bad_request', 'Domain not found for this token. Reload the domain list.');
+  }
+  if (e.status === 429) {
+    return new RouteError(429, 'upstream_error', 'Cloudflare is rate limiting requests. Wait a minute and try again.');
   }
   return new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || `HTTP ${e.status}`}`);
 }

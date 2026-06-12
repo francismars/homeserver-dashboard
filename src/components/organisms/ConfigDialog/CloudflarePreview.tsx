@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Copy, ExternalLink, FlaskConical, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RestartCallout } from './RestartCallout';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 type InstantStatus = { status: 'stopped' | 'starting' | 'running'; url?: string; error?: string };
 type PreviewState = {
@@ -186,7 +187,7 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
           )}
 
           <RestartCallout>
-            Restart the app from Umbrel to publish this preview address to the Pubky network. The address shown now
+            {RESTART_APP_SENTENCE} The restart publishes the preview address to the Pubky network. The address shown now
             works immediately but is not yet published; it will change after the restart.
           </RestartCallout>
         </div>
