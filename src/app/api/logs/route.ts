@@ -3,7 +3,10 @@ import { promises as fs } from 'fs';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
-const LOG_PATH = process.env.HOMESERVER_LOG_PATH || '';
+// Env is read lazily (call time, not module load), following the convention
+// in cloudflared-process.ts, so tests and multi-env deployments are never
+// frozen to a stale value.
+const getLogPath = () => process.env.HOMESERVER_LOG_PATH || '';
 const ROUTE_NAME = '/api/logs';
 const DEFAULT_LINES = 500;
 const MAX_LINES = 5000;
@@ -143,7 +146,8 @@ export async function GET(request: NextRequest) {
   const requestId = getRequestId(request);
   const startedAt = Date.now();
 
-  if (!LOG_PATH) {
+  const logPath = getLogPath();
+  if (!logPath) {
     const error = new RouteError(503, 'config_error', 'Logs are not enabled (HOMESERVER_LOG_PATH not set)');
     logRouteError({
       requestId,
@@ -180,7 +184,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { text, partial, startedAtZero } = await tailFile(LOG_PATH, READ_WINDOW_BYTES);
+    const { text, partial, startedAtZero } = await tailFile(logPath, READ_WINDOW_BYTES);
     let items = parseLines(text, !startedAtZero);
     if (level) {
       items = items.filter((line) => line.level?.toLowerCase() === level);

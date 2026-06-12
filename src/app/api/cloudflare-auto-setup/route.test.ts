@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { POST as autoSetupPost } from './route';
+import { POST as zonesPost } from './zones/route';
+import { GET as previewGet } from '../cloudflare-preview/route';
 
 const TOKEN = 'cf-test-token-abcdefghijklmnop';
 const ZONE_ID = 'a'.repeat(32);
@@ -78,7 +81,6 @@ describe('cloudflare-auto-setup route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -93,9 +95,10 @@ describe('cloudflare-auto-setup route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
+  // The route reads CLOUDFLARE_CONFIG_DIR lazily (per request), so tests just
+  // set the env var; no module-registry tricks needed.
   async function post(body: unknown) {
-    const { POST } = await import('./route');
-    return POST(
+    return autoSetupPost(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -470,8 +473,7 @@ describe('cloudflare-auto-setup route', () => {
     for (const f of ['testdrive.env', path.join('preview', 'published'), '.testdrive.json']) {
       await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
     }
-    const { GET } = await import('../cloudflare-preview/route');
-    const preview = await (await GET(new NextRequest('http://localhost:8080/api/cloudflare-preview'))).json();
+    const preview = await (await previewGet(new NextRequest('http://localhost:8080/api/cloudflare-preview'))).json();
     expect(preview.enabled).toBe(false);
     expect(preview.published_url).toBeUndefined();
   });
@@ -512,7 +514,6 @@ describe('cloudflare-auto-setup zones route', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -524,8 +525,7 @@ describe('cloudflare-auto-setup zones route', () => {
   });
 
   async function post(body: unknown) {
-    const { POST } = await import('./zones/route');
-    return POST(
+    return zonesPost(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup/zones', {
         method: 'POST',
         body: JSON.stringify(body),

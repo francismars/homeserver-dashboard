@@ -9,6 +9,7 @@ import {
   SETUP_FLOW_LOCK_MAX_AGE_MS,
   TUNNEL_NAME,
   atomicWrite,
+  getConfigDir,
   withFlowLock,
 } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
@@ -29,7 +30,6 @@ import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup';
-const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
 
 /** Single DNS label: letters/digits/hyphens, no leading/trailing hyphen. */
 const SUBDOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -267,7 +267,10 @@ export async function POST(request: NextRequest) {
       if (!runToken) {
         runToken = await getTunnelToken(apiToken, accountId, tunnelId);
       }
-      await fs.mkdir(CONFIG_DIR, { recursive: true });
+      // Env is read lazily via getConfigDir() (call time, not module load),
+      // following the convention in cloudflared-process.ts.
+      const configDir = getConfigDir();
+      await fs.mkdir(configDir, { recursive: true });
       // Mode switch FIRST (mirror of the Connect flow's token truncation): a
       // stale locally-managed config would keep a second tunnel running
       // against the old hostname and make the Connect card claim "completed".
@@ -275,16 +278,16 @@ export async function POST(request: NextRequest) {
       // leave both modes validly configured with two tunnels running.
       // config.yml goes first: completed-detection needs config.yml AND
       // credentials.json, so removing it alone already kills that mode.
-      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
-      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+      await fs.rm(path.join(configDir, 'config.yml'), { force: true });
+      await fs.rm(path.join(configDir, 'credentials.json'), { force: true });
       // Same files the manual flow writes; the entrypoint re-asserts ownership
       // and modes at the next app start. cloudflared's restart-on-failure loop
       // picks the token up within seconds, so the tunnel connects without an
       // app restart; the restart is only needed to publish icann_domain.
       // Domain before token: the token write is what makes status report
       // "configured", so everything it implies must already be in place.
-      await atomicWrite(path.join(CONFIG_DIR, 'domain'), hostname);
-      await atomicWrite(path.join(CONFIG_DIR, 'token'), runToken);
+      await atomicWrite(path.join(configDir, 'domain'), hostname);
+      await atomicWrite(path.join(configDir, 'token'), runToken);
       // A real setup supersedes preview mode: stop publishing and serving
       // the temporary URL.
       await teardownPreview();

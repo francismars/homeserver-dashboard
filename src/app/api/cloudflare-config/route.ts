@@ -3,16 +3,17 @@ import { constants as fsConstants, promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
-import { atomicWrite, fileExists } from '@/lib/server/cloudflared-process';
+import { atomicWrite, fileExists, getConfigDir } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { detectRestartPending } from '@/lib/server/restart-pending';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const ROUTE_NAME = '/api/cloudflare-config';
-const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
-const TOKEN_FILE = path.join(CONFIG_DIR, 'token');
-const DOMAIN_FILE = path.join(CONFIG_DIR, 'domain');
+// Env is read lazily via getConfigDir() (call time, not module load),
+// following the convention in cloudflared-process.ts.
+const tokenFile = () => path.join(getConfigDir(), 'token');
+const domainFile = () => path.join(getConfigDir(), 'domain');
 
 // Cloudflare tunnel tokens are opaque strings but they're not arbitrary: they're long
 // (>=64 chars in current formats), URL-safe, and never contain whitespace. Reject
@@ -28,7 +29,7 @@ function isPlausibleCloudflareToken(token: string): boolean {
 
 async function isCloudflareConfigSupported(): Promise<boolean> {
   try {
-    await fs.access(CONFIG_DIR, fsConstants.R_OK | fsConstants.W_OK);
+    await fs.access(getConfigDir(), fsConstants.R_OK | fsConstants.W_OK);
     return true;
   } catch {
     return false;
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    await fs.mkdir(getConfigDir(), { recursive: true });
   } catch (e) {
     const error = new RouteError(503, 'upstream_error', 'Config directory unavailable');
     logRouteError({
@@ -166,9 +167,9 @@ export async function POST(request: NextRequest) {
 
   // A domain-only save must land in a setup that can actually serve it.
   if (body.domain !== undefined && body.token === undefined) {
-    const hasConnectConfig = await fileExists(path.join(CONFIG_DIR, 'config.yml'));
+    const hasConnectConfig = await fileExists(path.join(getConfigDir(), 'config.yml'));
     const hasToken = await fs
-      .readFile(TOKEN_FILE, 'utf-8')
+      .readFile(tokenFile(), 'utf-8')
       .then((s) => s.trim().length > 0)
       .catch(() => false);
     // While a Connect setup exists, its tunnel keeps serving the hostname
@@ -209,14 +210,14 @@ export async function POST(request: NextRequest) {
       // Switching to token mode: drop the locally-managed config BEFORE the
       // token lands, so a crash in between can never leave both modes
       // validly configured with two tunnels running.
-      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
-      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+      await fs.rm(path.join(getConfigDir(), 'config.yml'), { force: true });
+      await fs.rm(path.join(getConfigDir(), 'credentials.json'), { force: true });
     }
     if (body.domain !== undefined) {
-      await atomicWrite(DOMAIN_FILE, domain);
+      await atomicWrite(domainFile(), domain);
     }
     if (body.token !== undefined) {
-      await atomicWrite(TOKEN_FILE, token);
+      await atomicWrite(tokenFile(), token);
     }
     logRouteInfo({
       requestId,

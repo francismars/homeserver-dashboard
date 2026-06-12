@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import * as serverConfigRoute from './route';
 
 const VALID_CONFIG = [
   '[general]',
@@ -36,7 +37,6 @@ describe('server-config route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -50,10 +50,11 @@ describe('server-config route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  async function loadRoute() {
+  // The route reads HOMESERVER_CONFIG_PATH lazily (per request), so tests
+  // just set the env var; no module-registry tricks needed.
+  function loadRoute() {
     process.env.HOMESERVER_CONFIG_PATH = configPath;
-    const mod = await import('./route');
-    return mod;
+    return serverConfigRoute;
   }
 
   function postRequest(body: unknown): NextRequest {

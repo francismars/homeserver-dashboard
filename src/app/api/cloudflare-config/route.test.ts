@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { GET, POST } from './route';
 
 const VALID_TOKEN = 'eyJhbGciOi-test.token_with.various-chars.123456789ABCdef=';
 const ANOTHER_VALID_TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -14,7 +15,6 @@ describe('cloudflare-config route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -28,9 +28,10 @@ describe('cloudflare-config route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  async function loadRoute() {
-    const mod = await import('./route');
-    return { GET: mod.GET, POST: mod.POST };
+  // The route reads CLOUDFLARE_CONFIG_DIR lazily (per request), so tests just
+  // set the env var; no module-registry tricks needed.
+  function loadRoute() {
+    return { GET, POST };
   }
 
   const getRequest = () => new NextRequest('http://localhost:8080/api/cloudflare-config');
@@ -169,10 +170,15 @@ describe('cloudflare-config route', () => {
   });
 
   it('GET returns an honest 500 on an unexpected error instead of supported:false', async () => {
+    // detectCloudflareMode swallows fs errors by design, so the only way to
+    // reach the route's unexpected-error branch is a module mock. That needs
+    // a fresh module registry and a dynamic import; every other test uses
+    // the static import.
+    vi.resetModules();
     vi.doMock('@/lib/server/cloudflare-mode', () => ({
       detectCloudflareMode: vi.fn().mockRejectedValue(new Error('disk exploded')),
     }));
-    const { GET } = await loadRoute();
+    const { GET } = await import('./route');
     const response = await GET(getRequest());
     const payload = await response.json();
     expect(response.status).toBe(500);

@@ -6,7 +6,10 @@ import { RouteError, errorResponse } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
-const CONFIG_PATH = process.env.HOMESERVER_CONFIG_PATH || '/app/homeserver-data/config.toml';
+// Env is read lazily (call time, not module load), following the convention
+// in cloudflared-process.ts, so tests and multi-env deployments are never
+// frozen to a stale value.
+const getConfigPath = () => process.env.HOMESERVER_CONFIG_PATH || '/app/homeserver-data/config.toml';
 const ROUTE_NAME = '/api/server-config';
 const REDACTION_TOKEN = '********';
 
@@ -113,6 +116,7 @@ function validateTomlStructure(toml: string): RouteError | null {
 export async function GET() {
   const requestId = randomUUID();
   const startedAt = Date.now();
+  const configPath = getConfigPath();
   try {
     // Single fd for everything: stat, read, and writability probe all happen
     // against the same inode, so we cannot race with a concurrent rename or
@@ -123,13 +127,13 @@ export async function GET() {
     let writable = false;
     let writableError: string | undefined;
     try {
-      fh = await fs.open(CONFIG_PATH, 'r+');
+      fh = await fs.open(configPath, 'r+');
       writable = true;
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT') throw err; // bubble to the outer 404 branch
       writableError = code ?? 'UNKNOWN';
-      fh = await fs.open(CONFIG_PATH, 'r');
+      fh = await fs.open(configPath, 'r');
     }
 
     try {
@@ -148,7 +152,7 @@ export async function GET() {
           gid: typeof process.getgid === 'function' ? process.getgid() : null,
         },
         file: {
-          path: CONFIG_PATH,
+          path: configPath,
           uid: stat.uid,
           gid: stat.gid,
           mode: '0' + (stat.mode & 0o7777).toString(8),
@@ -225,6 +229,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
   const startedAt = Date.now();
+  const configPath = getConfigPath();
 
   let body: { config_toml?: unknown; checksum?: unknown };
   try {
@@ -259,7 +264,7 @@ export async function POST(request: NextRequest) {
 
   let existing: string;
   try {
-    existing = await fs.readFile(CONFIG_PATH, 'utf-8');
+    existing = await fs.readFile(configPath, 'utf-8');
   } catch (e) {
     const isNotFound = (e as NodeJS.ErrnoException).code === 'ENOENT';
     if (isNotFound) {
@@ -361,10 +366,10 @@ export async function POST(request: NextRequest) {
     return errorResponse(validationError, requestId);
   }
 
-  const tmpPath = CONFIG_PATH + '.tmp';
+  const tmpPath = configPath + '.tmp';
   try {
     await fs.writeFile(tmpPath, merged, 'utf-8');
-    await fs.rename(tmpPath, CONFIG_PATH);
+    await fs.rename(tmpPath, configPath);
   } catch (e) {
     try {
       await fs.rm(tmpPath);
@@ -385,7 +390,7 @@ export async function POST(request: NextRequest) {
   }
 
   const newChecksum = computeChecksum(merged);
-  const stat = await fs.stat(CONFIG_PATH);
+  const stat = await fs.stat(configPath);
   logRouteInfo({
     requestId,
     route: ROUTE_NAME,

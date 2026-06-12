@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { GET as getLogs } from './route';
 
 describe('logs route', () => {
   const originalEnv = { ...process.env };
@@ -11,7 +12,6 @@ describe('logs route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -24,11 +24,12 @@ describe('logs route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  async function loadRoute(logPath?: string | null) {
+  // The route reads HOMESERVER_LOG_PATH lazily (per request), so tests just
+  // set the env var; no module-registry tricks needed.
+  function loadRoute(logPath?: string | null) {
     if (logPath === null) delete process.env.HOMESERVER_LOG_PATH;
     else if (logPath !== undefined) process.env.HOMESERVER_LOG_PATH = logPath;
-    const mod = await import('./route');
-    return mod.GET;
+    return getLogs;
   }
 
   function makeRequest(query: Record<string, string> = {}) {

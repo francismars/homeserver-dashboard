@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST } from './route';
 
 const TOKEN = 'cf-test-token-abcdefghijklmnop';
 
@@ -11,7 +12,6 @@ function cfResponse(status: number, json: unknown) {
 describe('cloudflare-auto-setup zones route', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -22,7 +22,6 @@ describe('cloudflare-auto-setup zones route', () => {
   });
 
   async function post(body: unknown) {
-    const { POST } = await import('./route');
     return POST(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup/zones', {
         method: 'POST',
@@ -96,7 +95,6 @@ describe('cloudflare-auto-setup zones route', () => {
 
   it('rejects an invalid JSON payload with 400', async () => {
     const fetchSpy = vi.spyOn(global, 'fetch');
-    const { POST } = await import('./route');
     const res = await POST(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup/zones', {
         method: 'POST',

@@ -13,7 +13,10 @@
 
 import { INGRESS_SERVICE } from './cloudflared-process';
 
-const CF_API_BASE = process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4';
+// Env is read lazily (call time, not module load), following the convention
+// in cloudflared-process.ts, so tests and multi-env deployments are never
+// frozen to a stale value.
+const getCfApiBase = () => process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4';
 const CALL_TIMEOUT_MS = 15_000;
 
 export class CfApiError extends Error {
@@ -37,7 +40,7 @@ interface CfEnvelope<T> {
 }
 
 async function cfFetch<T>(apiToken: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${CF_API_BASE}${path}`, {
+  const response = await fetch(`${getCfApiBase()}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${apiToken}`,
