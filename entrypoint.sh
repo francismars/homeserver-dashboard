@@ -47,6 +47,26 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   # Flow locks are per-process and meaningless across a restart; a lock
   # orphaned by a crash must not wedge the setup flows forever.
   rm -f "$CLOUDFLARE_DIR"/.flow-*.lock "$CLOUDFLARE_DIR/.connect-complete.lock" 2>/dev/null || true
+  # The recursive chown above also grabs the preview subtree, but that one
+  # belongs to cloudflared-preview (distroless, UID 65532), which re-opens
+  # preview/quick.log by name on every restart. A nextjs-owned 0644 logfile
+  # makes that open fail ("Falling back to a default logger ... permission
+  # denied"), the preview URL never lands in the log, and the wrapper's
+  # publish wait times out. The dashboard only READS quick.log and
+  # preview/published, so hand the subtree back: world-readable modes keep
+  # the nextjs reads working.
+  if [ -d "$CLOUDFLARE_DIR/preview" ]; then
+    chown 65532:65532 "$CLOUDFLARE_DIR/preview" 2>/dev/null || true
+    if [ -f "$CLOUDFLARE_DIR/preview/quick.log" ]; then
+      chown 65532:65532 "$CLOUDFLARE_DIR/preview/quick.log" 2>/dev/null || true
+      chmod 664 "$CLOUDFLARE_DIR/preview/quick.log" 2>/dev/null || true
+    fi
+    # published is written by the wrapper (atomic tmp+mv as root) and only
+    # read here and by users of the status route; 644 is enough.
+    if [ -f "$CLOUDFLARE_DIR/preview/published" ]; then
+      chmod 644 "$CLOUDFLARE_DIR/preview/published" 2>/dev/null || true
+    fi
+  fi
 fi
 
 # Make the homeserver's config.toml editable by the dashboard process
