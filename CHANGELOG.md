@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.15]
+
+Technical-debt payoff: broken features fixed or removed, honest test gates, tighter permissions.
+
+### Added
+
+- The API explorer's Client and Metrics groups actually work now, via same-origin proxies (they previously fetched Docker-internal hostnames from the browser and could never succeed).
+- Published-address scope badge on the Overview: localhost-only, private-network, or public IP, each with a hover explanation of who can reach that address.
+
+### Fixed
+
+- WebDAV rename/copy through the proxy rewrites the Destination header (renames previously targeted a path outside the homeserver's namespace).
+- Binary content streams through the admin and WebDAV proxies without UTF-8 corruption.
+- Client polling no longer overlaps requests or lets a stale response overwrite newer state; post-setup probe timers stop on unmount.
+
+### Changed
+
+- Coverage gate measures all API/lib/hook/service code instead of a hand-maintained allowlist; thresholds raised to 80/70/80/80; API route suites run under node instead of jsdom; the connect flow parses before sleeping (faster route and tests).
+- Env vars are read lazily and every one of them is documented truthfully in README and .env.example; CI builds on the same Node 24 as the image, declared in engines; build context excludes tests/docs/CI files.
+- homeserver-data is no longer world-writable: shared group, dirs 2775, config.toml 0660, converged on boot for existing installs.
+
+### Removed
+
+- The unreachable mock ServerControlDialog, dead retry scaffolding in the proxies, vestigial service-constructor plumbing, and the stale status-report doc; `src/libs/` merged into `src/lib/`.
+
 ## [0.1.14]
 
 One source of truth in the UI, and a first-run experience that explains itself.
