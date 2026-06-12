@@ -5,7 +5,8 @@
 /**
  * Where an address can be reached from:
  * - 'loopback': only this machine (127.0.0.0/8, ::1, literal "localhost")
- * - 'private': only the local network (RFC1918, link-local, CGNAT, IPv6 ULA)
+ * - 'private': not publicly routable (RFC1918, link-local, CGNAT, IPv6 ULA,
+ *   plus 0.0.0.0/8, multicast/reserved/broadcast and the unspecified address)
  * - 'public': an IP literal outside every non-routable range
  * - 'hostname': a DNS name; scope depends on what it resolves to
  * - 'invalid': not an address (empty, URLs, garbage)
@@ -65,12 +66,19 @@ function classifyIPv4(parts: number[]): AddressScope {
   if (a === 192 && b === 168) return 'private'; // 192.168.0.0/16
   if (a === 169 && b === 254) return 'private'; // link-local 169.254.0.0/16
   if (a === 100 && b >= 64 && b <= 127) return 'private'; // CGNAT 100.64.0.0/10
+  // Non-routable bind/broadcast/multicast values an operator can plausibly
+  // publish by mistake; calling 0.0.0.0 a "Public IP" would invert the badge's
+  // guidance (and the SSRF guard already treats these as non-public).
+  if (a === 0) return 'private'; // "this network" 0.0.0.0/8 (incl. the 0.0.0.0 bind address)
+  if (a >= 224) return 'private'; // multicast 224/4 + reserved 240/4 + broadcast
   return 'public';
 }
 
 function classifyIPv6(groups: number[]): AddressScope {
   const leadingZeros = (n: number) => groups.slice(0, n).every((g) => g === 0);
   if (leadingZeros(7) && groups[7] === 1) return 'loopback'; // ::1
+  if (groups.every((g) => g === 0)) return 'private'; // :: unspecified
+  if ((groups[0] & 0xff00) === 0xff00) return 'private'; // multicast ff00::/8
   if ((groups[0] & 0xffc0) === 0xfe80) return 'private'; // link-local fe80::/10
   if ((groups[0] & 0xfe00) === 0xfc00) return 'private'; // unique-local fc00::/7
   if (leadingZeros(5) && groups[5] === 0xffff) {
@@ -133,25 +141,20 @@ export function classifyAddress(address: string): AddressScope {
 }
 
 // ---------------------------------------------------------------------------
-// Fail-closed predicates for the server-side SSRF guard (hostname.ts). These
-// deliberately differ from classifyAddress: anything unparseable or merely
-// non-routable (0.0.0.0/8, multicast, the unspecified address) counts as
-// private, because the guard must reject what it cannot prove public.
+// Fail-closed predicates for the server-side SSRF guard (hostname.ts). Same
+// range classification as classifyAddress (both must agree on what counts as
+// public), plus fail-closed parsing: the guard must reject what it cannot
+// prove public.
 // ---------------------------------------------------------------------------
 
 export function isPrivateIPv4(ip: string): boolean {
   const parts = parseIPv4(ip);
   if (!parts) return true; // unparseable: fail closed
-  const [a] = parts;
-  if (a === 0) return true; // current network
-  if (a >= 224) return true; // multicast + reserved
   return classifyIPv4(parts) !== 'public';
 }
 
 export function isPrivateIPv6(ip: string): boolean {
   const groups = parseIPv6(ip.toLowerCase());
   if (!groups) return true; // unparseable: fail closed
-  if (groups.every((g) => g === 0)) return true; // :: unspecified
-  if ((groups[0] & 0xff00) === 0xff00) return true; // multicast ff00::/8
   return classifyIPv6(groups) !== 'public';
 }

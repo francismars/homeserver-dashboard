@@ -34,6 +34,17 @@ describe('classifyAddress', () => {
     ['fd12:3456::1', 'unique-local fd prefix'],
     ['[fd00::1]:443', 'bracketed unique-local with port'],
     ['::ffff:10.0.0.1', 'IPv4-mapped private'],
+    // Non-routable values that must never read as "Public IP" on the badge
+    // (the SSRF guard already treated them as non-public).
+    ['0.0.0.0', 'unspecified / bind address'],
+    ['0.0.0.0:6287', 'bind address with port'],
+    ['0.255.255.255', 'end of 0.0.0.0/8'],
+    ['224.0.0.1', 'multicast 224.0.0.0/4'],
+    ['239.255.255.255', 'end of multicast'],
+    ['240.0.0.1', 'reserved 240.0.0.0/4'],
+    ['255.255.255.255', 'broadcast'],
+    ['::', 'IPv6 unspecified'],
+    ['ff02::1', 'IPv6 multicast ff00::/8'],
   ])('private: %s (%s)', (address) => {
     expect(classifyAddress(address)).toBe('private');
   });
