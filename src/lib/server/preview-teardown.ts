@@ -1,5 +1,12 @@
 import { promises as fs } from 'fs';
-import { PREVIEW_ENV, PREVIEW_PUBLISHED, PREVIEW_INSTANT_STATE, clearState, killPid, readState } from './cloudflared-process';
+import {
+  PREVIEW_ENV,
+  PREVIEW_PUBLISHED,
+  PREVIEW_INSTANT_STATE,
+  clearState,
+  killPid,
+  readState,
+} from './cloudflared-process';
 
 /**
  * Tears preview mode down when a real setup lands (connect complete,
