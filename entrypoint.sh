@@ -5,7 +5,13 @@ set -e
 # The token is sensitive; do not leave it world-readable on a shared bind mount.
 CLOUDFLARE_DIR="/app/cloudflare-config"
 if [ -d "$CLOUDFLARE_DIR" ]; then
-  touch "$CLOUDFLARE_DIR/token" "$CLOUDFLARE_DIR/domain" 2>/dev/null || true
+  # Create-only: an unconditional touch would bump the mtimes on every boot,
+  # AFTER the wrapper wrote its boot stamp, so the restart-pending probe
+  # (which compares these files against the stamp) would report a pending
+  # restart forever. Existence is all the perms block below needs.
+  for f in token domain; do
+    [ -f "$CLOUDFLARE_DIR/$f" ] || touch "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+  done
   chown -R nextjs:nodejs "$CLOUDFLARE_DIR" 2>/dev/null || true
   # token must be readable by cloudflared (distroless image, UID 65532) which
   # mounts this same bind mount and reads TUNNEL_TOKEN_FILE. Owner=nextjs can
