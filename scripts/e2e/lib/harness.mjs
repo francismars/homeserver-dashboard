@@ -22,6 +22,11 @@ const CHROME = process.env.E2E_CHROME || '/usr/bin/google-chrome';
 const DEV_BOOT_TIMEOUT_MS = 120_000;
 
 export const FIXTURE_CERT = path.join(REPO_ROOT, 'src', 'lib', 'server', '__fixtures__', 'origincert-example.pem');
+/** Modern login layout (cloudflared >= 2025.2.1): one ARGO TUNNEL TOKEN block
+ * whose embedded zoneID/apiToken match the mock CF server's ZONE_ID and
+ * VALID_TOKEN, so the dashboard resolves the zone name (example.com) over
+ * CF_API_BASE. */
+export const FIXTURE_CERT_TOKEN = path.join(REPO_ROOT, 'src', 'lib', 'server', '__fixtures__', 'cert-token-only.pem');
 
 // ---------------------------------------------------------------------------
 // tiny assertion + reporting helpers (throw on failure; specs exit non-zero)
@@ -154,6 +159,31 @@ function startMockAdmin(info) {
   });
 }
 
+/** Minimal text-serving upstream (mock client / metrics servers) so the API
+ * explorer proxies have something to round-trip against. `routes` maps
+ * "METHOD /path" to { type, body }. */
+function startMockTextServer(routes) {
+  const server = http.createServer((req, res) => {
+    const p = new URL(req.url, 'http://localhost').pathname;
+    const hit = routes[`${req.method} ${p}`];
+    if (!hit) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('not found');
+    }
+    res.writeHead(200, { 'Content-Type': hit.type });
+    res.end(hit.body);
+  });
+  return new Promise((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      resolve({
+        url: `http://127.0.0.1:${server.address().port}`,
+        close: () => new Promise((r) => server.close(r)),
+      });
+    });
+  });
+}
+
 const HOMESERVER_CONFIG_TEMPLATE = (icannDomain, withPort) =>
   [
     '[general]',
@@ -198,6 +228,12 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
 
   const cf = await startMockCf(0, { quiet: true });
   const admin = await startMockAdmin({ ...MOCK_INFO_DEFAULTS, pkarr_icann_domain: infoDomain });
+  const client = await startMockTextServer({
+    'GET /': { type: 'text/plain', body: 'pubky homeserver e2e client' },
+  });
+  const metrics = await startMockTextServer({
+    'GET /metrics': { type: 'text/plain; version=0.0.4', body: '# TYPE e2e_up gauge\ne2e_up 1\n' },
+  });
 
   const port = await freePort();
   const nextLog = path.join(root, 'next-dev.log');
@@ -215,6 +251,8 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       HOMESERVER_LOG_PATH: hsLogPath,
       ADMIN_BASE_URL: admin.url,
       ADMIN_TOKEN: 'e2e-admin-token',
+      CLIENT_BASE_URL: client.url,
+      METRICS_BASE_URL: metrics.url,
       CF_API_BASE: cf.url,
     },
   });
@@ -261,6 +299,14 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
     nextLog,
     /** Read a file under the Cloudflare config dir ('' on absence). */
     readConfigFile: (name) => fs.readFile(path.join(configDir, name), 'utf-8').catch(() => null),
+    /** Simulates the init wrapper finishing an app boot: writes the boot
+     * stamp next to config.toml. Pass a Date to backdate it (e.g. "the
+     * wrapper last ran before this change"). */
+    writeBootStamp: async (when = new Date()) => {
+      const stamp = path.join(hsDir, '.wrapper-boot-stamp');
+      await fs.writeFile(stamp, String(Math.floor(when.getTime() / 1000)), 'utf-8');
+      await fs.utimes(stamp, when, when);
+    },
     fileExists: async (name) => {
       try {
         await fs.access(path.join(configDir, name));
@@ -294,6 +340,8 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       });
       await cf.close();
       await admin.close();
+      await client.close();
+      await metrics.close();
       await fs.rm(root, { recursive: true, force: true });
     },
   };
@@ -317,9 +365,9 @@ export async function gotoDashboard(page, baseUrl) {
 }
 
 async function openSettingsDialog(page) {
-  await page.waitForSelector('[aria-label="Homeserver Configuration"]', { timeout: 60_000 });
+  await page.waitForSelector('[aria-label="Settings"]', { timeout: 60_000 });
   for (let i = 0; i < 20; i++) {
-    await page.click('[aria-label="Homeserver Configuration"]', { timeout: 10_000 }).catch(() => {});
+    await page.click('[aria-label="Settings"]', { timeout: 10_000 }).catch(() => {});
     try {
       await page.waitForSelector('[role="dialog"]', { timeout: 3_000 });
       return;

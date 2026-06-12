@@ -6,21 +6,20 @@ The UI lives under a single route: **`/dashboard`** (the home page redirects the
 
 ## Current UI
 
-The dashboard has 5 tabs:
+The dashboard has 6 tabs:
 
 - **Overview**: Shows homeserver stats from `GET /info` including connection status, public key, addresses, version, and user/storage statistics
 - **Users**: Disable / enable a user by pubkey via `POST /users/{pubkey}/disable` and `POST /users/{pubkey}/enable`. The disabled-users list is fetched live from the `/users/disabled` admin endpoint.
 - **Invites**: Generate signup tokens via `GET /generate_signup_token` with QR code display for easy mobile app signup; view invite statistics (total generated, used, unused)
 - **Files**: Full WebDAV file browser (list/read/write/delete/move/create directories) using the `/dav/*` endpoint (Basic Auth). Includes admin "Delete from path" for removing entries by path
+- **Logs**: Tails the homeserver's JSON-line log file (level filter, line count). Requires `HOMESERVER_LOG_PATH`; the tab shows as unavailable when it is not set
 - **API**: API Explorer for admin/client/metrics endpoints (manual requests)
 
-> A real-time **Logs** tab will be added once the homeserver exposes a logs admin endpoint; see `docs/AUDIT-2026-05-19.md` for the v1.0 punch list.
-
-The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config** (read-only view of the real `config.toml` with sensitive fields redacted) and **Cloudflare** (configure Cloudflare Tunnel token and domain for public access without port forwarding).
+The navbar **Settings** (gear) button opens **Settings** with two tabs: **Config** (view AND edit the real `config.toml`, with sensitive fields redacted, optimistic-concurrency checks, and atomic writes; falls back to read-only when the file is not writable) and **Cloudflare** (expose the homeserver publicly without port forwarding: a guided **Connect Cloudflare account** flow, an **API token** flow, a manual token/domain form, and a temporary **Preview** tunnel).
 
 ## Prerequisites
 
-- Node.js 20.9+ and npm (Next.js 16.0.10 requires Node 20.9+)
+- Node.js 24+ and npm (matches the `engines` field, CI, and the Docker base image)
 - A running Pubky homeserver - every UI section above is wired to live admin endpoints
 
 ## Quick Start
@@ -106,11 +105,23 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 
 ### Environment Variables
 
-| Variable                 | Description                      | Required | Default                            | Notes                               |
-| ------------------------ | -------------------------------- | -------- | ---------------------------------- | ----------------------------------- |
-| `ADMIN_BASE_URL`         | Homeserver admin API base URL    | Yes\*    | -                                  | Server-only (not exposed to client) |
-| `ADMIN_TOKEN`            | Admin password/token             | Yes\*    | -                                  | Server-only (not exposed to client) |
-| `HOMESERVER_CONFIG_PATH` | Path to homeserver `config.toml` | No       | `/app/homeserver-data/config.toml` | For non-Docker setups               |
+All variables are server-only (no `NEXT_PUBLIC_*` prefix) and read lazily at request time.
+
+| Variable                  | Description                                                  | Required | Default                                | What breaks without it                                                             |
+| ------------------------- | ------------------------------------------------------------ | -------- | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `ADMIN_BASE_URL`          | Homeserver admin API base URL                                | Yes\*    | -                                      | Admin proxy, invites, users, file browser all fail                                 |
+| `ADMIN_TOKEN`             | Admin password/token                                         | Yes\*    | -                                      | Same as above, plus the password reveal in Settings                                |
+| `CLIENT_BASE_URL`         | Homeserver client API base URL                               | No       | `http://homeserver:6286`               | API explorer's client group proxies to the wrong host                              |
+| `METRICS_BASE_URL`        | Homeserver metrics base URL                                  | No       | `http://homeserver:6289`               | API explorer's metrics group proxies to the wrong host                             |
+| `HOMESERVER_CONFIG_PATH`  | Path to homeserver `config.toml`                             | No       | `/app/homeserver-data/config.toml`     | Settings config editor, Cloudflare disconnect reset, restart-pending detection     |
+| `HOMESERVER_LOG_PATH`     | Path to homeserver JSON-line log file                        | No       | unset (logs disabled)                  | `/api/logs` answers 503; the Logs tab shows as unavailable                         |
+| `CLOUDFLARE_CONFIG_DIR`   | Cloudflare state dir (token, domain, ...)                    | No       | `/app/cloudflare-config`               | Cloudflare tab reports the feature as unsupported                                  |
+| `CLOUDFLARED_BIN`         | cloudflared binary path                                      | No       | `/usr/local/bin/cloudflared`           | Connect (browser-auth) and Preview (quick tunnel) flows cannot spawn cloudflared   |
+| `CLOUDFLARED_RUNTIME_DIR` | Config dir path as seen by the runtime cloudflared container | No       | `/etc/cloudflared-config`              | Generated `config.yml` points at the wrong `credentials-file` path                 |
+| `PREVIEW_INSTANT_ORIGIN`  | Origin the instant preview tunnel forwards to                | No       | `http://homeserver:6286`               | Preview's instant tunnel forwards to the wrong origin                              |
+| `CF_API_BASE`             | Cloudflare API base URL                                      | No       | `https://api.cloudflare.com/client/v4` | Tests/e2e override only; leave unset in production                                 |
+| `ADMIN_PASSWORD_MANAGED`  | Set `true` on managed platforms (Umbrel)                     | No       | unset                                  | When unset, `admin_password` stays editable; Umbrel sets it to protect the pairing |
+| `PORT` / `HOSTNAME`       | Next.js standalone server binding                            | No       | `8080` / `0.0.0.0` (Dockerfile)        | Server binds elsewhere                                                             |
 
 \* Required to use the real homeserver APIs
 
@@ -142,6 +153,9 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 - `npm run format:check` - Check formatting (CI-friendly)
 - `npm run knip` - Check for unused files/deps/exports (see `knip.json`)
 - `npm test` - Run Vitest
+- `npm run test:watch` - Run Vitest in watch mode
+- `npm run test:coverage` - Run Vitest with coverage thresholds (CI gate)
+- `npm run e2e` - Run the end-to-end suite (`scripts/e2e/`); builds and boots the real server
 
 ## Contributing
 

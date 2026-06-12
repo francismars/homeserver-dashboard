@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
-import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import {
@@ -14,11 +13,16 @@ import {
   CONNECT_START_FLOW_LOCK,
   CONNECT_START_FLOW_LOCK_MAX_AGE_MS,
   CREDENTIALS_PATH,
+  DOMAIN_PATH,
+  INGRESS_SERVICE,
   LOCAL_CONFIG_PATH,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
+  TOKEN_PATH,
+  TUNNEL_NAME,
   atomicWrite,
   clearState,
+  fileExists,
   getCloudflaredBin,
   isBinaryAvailable,
   isPidAlive,
@@ -32,26 +36,17 @@ import {
   withFlowLock,
   writeState,
 } from '@/lib/server/cloudflared-process';
+import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-connect';
-const TUNNEL_NAME = 'pubky-homeserver';
 const FALLBACK_TUNNEL_NAME = 'pubky-homeserver-local';
 /** Where the cloudflared runtime container sees the shared config dir. */
 const getRuntimeDir = () => process.env.CLOUDFLARED_RUNTIME_DIR || '/etc/cloudflared-config';
-const INGRESS_SERVICE = 'http://homeserver:6286';
 
 type Step = { key: 'tunnel' | 'dns' | 'config'; status: 'done' | 'failed'; detail?: string };
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await fs.access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * "Connect Cloudflare account": browser-auth via `cloudflared tunnel login`.
@@ -83,15 +78,9 @@ async function currentStatus(): Promise<{
   // The login child saves the cert under $HOME/.cloudflared (HOME points at
   // the config dir); pick it up and move it to the canonical path first.
   await relocateDeliveredCert();
-  if ((await fileExists(LOCAL_CONFIG_PATH())) && (await fileExists(CREDENTIALS_PATH()))) {
-    let hostname: string | undefined;
-    try {
-      const domain = (await fs.readFile(path.join(getConfigDir(), 'domain'), 'utf-8')).trim();
-      hostname = domain || undefined;
-    } catch {
-      // domain file absent
-    }
-    return { status: 'completed', hostname };
+  const { mode, domain } = await detectCloudflareMode();
+  if (mode === 'connect') {
+    return { status: 'completed', hostname: domain ?? undefined };
   }
   if (await fileExists(CERT_PATH())) {
     // An unused authorization is a zone-admin credential; expire it instead
@@ -191,8 +180,10 @@ export async function POST(request: NextRequest) {
           },
         );
         await writeState(CONNECT_STATE(), { ...child, started_at: new Date().toISOString() });
-        // The URL prints to stderr immediately (live-verified); give it a moment.
-        let url: string | null = null;
+        // The URL prints to stderr immediately (live-verified): try the parse
+        // first and only sleep between retries, so the common case returns
+        // without waiting. Worst case stays 20 polls over ~10 seconds.
+        let url: string | null = await parseLoginUrl();
         for (let i = 0; i < 20 && !url; i++) {
           await new Promise((r) => setTimeout(r, 500));
           url = await parseLoginUrl();
@@ -396,8 +387,8 @@ export async function POST(request: NextRequest) {
         '  - service: http_status:404',
         '',
       ].join('\n');
-      await atomicWrite(path.join(getConfigDir(), 'token'), '');
-      await atomicWrite(path.join(getConfigDir(), 'domain'), hostname);
+      await atomicWrite(TOKEN_PATH(), '');
+      await atomicWrite(DOMAIN_PATH(), hostname);
       // World-readable until the next app start hardens them to 640+group
       // 65532 (entrypoint) - required so the crash-looping cloudflared-local
       // container can pick them up without a restart, exactly like the token
@@ -434,7 +425,10 @@ export async function POST(request: NextRequest) {
         ok: true,
         hostname,
         steps,
-        message: 'Tunnel configured. Restart the app from Umbrel to connect it and publish your domain.',
+        // The crash-looping cloudflared-local container picks config.yml +
+        // credentials.json up without a restart; only the pkarr publication
+        // needs the restart.
+        message: `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },

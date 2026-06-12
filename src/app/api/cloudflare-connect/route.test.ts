@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
@@ -40,6 +41,7 @@ describe('cloudflare-connect route', () => {
 
   afterEach(async () => {
     process.env = { ...originalEnv };
+    vi.useRealTimers();
     vi.restoreAllMocks();
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
@@ -83,12 +85,31 @@ describe('cloudflare-connect route', () => {
     );
 
   const writeCert = () => fs.writeFile(path.join(tmpDir, 'cert.pem'), 'CERT', 'utf-8');
-  /** Realistic cert: key + certificate (SAN example.com, *.example.com) + token block. */
+  /** Realistic legacy cert: key + certificate (SAN example.com, *.example.com) + token block. */
   const writeRealCert = async () =>
     fs.writeFile(
       path.join(tmpDir, 'cert.pem'),
       await fs.readFile(path.join(FIXTURES, 'origincert-example.pem'), 'utf-8'),
       'utf-8',
+    );
+  /** Modern cert layout (cloudflared >= 2025.2.1): a single ARGO TUNNEL TOKEN
+   * block; the zone name only exists behind the Cloudflare API. */
+  const writeTokenCert = async () =>
+    fs.writeFile(
+      path.join(tmpDir, 'cert.pem'),
+      await fs.readFile(path.join(FIXTURES, 'cert-token-only.pem'), 'utf-8'),
+      'utf-8',
+    );
+  const mockZoneFetch = (name: string) =>
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          errors: [],
+          result: { id: 'a'.repeat(32), name, status: 'active', account: { id: 'acc-1' } },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     );
   const writeCreds = (id = 'tunnel-uuid-1') =>
     fs.writeFile(path.join(tmpDir, 'credentials.json'), JSON.stringify({ TunnelID: id }), 'utf-8');
@@ -126,6 +147,56 @@ describe('cloudflare-connect route', () => {
       expect.stringContaining('.connect.log'),
       expect.objectContaining({ TUNNEL_ORIGIN_CERT: expect.stringContaining('cert.pem') }),
     );
+  });
+
+  // Fake only setTimeout so the route's real fs I/O still completes on the
+  // live event loop while its 500ms polling sleeps run on fake time.
+  const usePollFakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  /** Drains real I/O (setImmediate stays real) and hops 500ms of fake time
+   * whenever the route is parked on its polling sleep, until `p` settles. */
+  const flushPolling = async <T>(p: Promise<T>): Promise<T> => {
+    let settled = false;
+    const guarded = p.finally(() => {
+      settled = true;
+    });
+    for (let i = 0; i < 10_000 && !settled; i++) {
+      await new Promise<void>((r) => setImmediate(r));
+      if (!settled && vi.getTimerCount() > 0) await vi.advanceTimersByTimeAsync(500);
+    }
+    return guarded;
+  };
+
+  it('start returns without sleeping when the URL is available on the first parse', async () => {
+    // With setTimeout faked and never advanced, a sleep-before-parse
+    // regression hangs this test instead of silently costing 500ms per start.
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    const data = await (await post(POST, { action: 'start' })).json();
+    expect(data.status).toBe('waiting');
+    expect(data.auth_url).toBe(AUTH_URL);
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('start sleeps 500ms between parse retries until the URL appears', async () => {
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    (lib.parseLoginUrl as Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(AUTH_URL);
+    const data = await (await flushPolling(post(POST, { action: 'start' }))).json();
+    expect(data.status).toBe('waiting');
+    expect(data.auth_url).toBe(AUTH_URL);
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(2);
+  });
+
+  it('start gives up after the poll budget, kills the login and returns 500', async () => {
+    usePollFakeTimers();
+    const { lib, POST } = await routes();
+    (lib.parseLoginUrl as Mock).mockResolvedValue(null);
+    const res = await flushPolling(post(POST, { action: 'start' }));
+    expect(res.status).toBe(500);
+    // 1 immediate parse + 20 post-sleep retries
+    expect(lib.parseLoginUrl as Mock).toHaveBeenCalledTimes(21);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(7777, undefined);
+    await expect(fs.access(path.join(tmpDir, '.connect.json'))).rejects.toThrow();
   });
 
   it('relocates a cert delivered under $HOME/.cloudflared to the canonical path', async () => {
@@ -340,6 +411,56 @@ describe('cloudflare-connect route', () => {
     const data = await (await get(GET)).json();
     expect(data.status).toBe('authorized');
     expect(data.authorized_domain).toBeNull();
+  });
+
+  it('GET authorized resolves authorized_domain from a token-only cert via the Cloudflare API', async () => {
+    const { GET } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('authorized');
+    expect(data.authorized_domain).toBe('example.com');
+  });
+
+  it('complete rejects an out-of-zone hostname against the API-resolved zone of a token-only cert', async () => {
+    const { lib, POST } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.other.net' });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toContain('example.com');
+    expect(lib.runCloudflared as Mock).not.toHaveBeenCalled();
+  });
+
+  it('complete accepts an in-zone hostname under the API-resolved zone of a token-only cert', async () => {
+    const { lib, POST } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    primeCloudflared(lib.runCloudflared as Mock, [{ ok: true }]);
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+  });
+
+  it('complete skips the zone belt when the token cannot be resolved (API 403)', async () => {
+    const { lib, POST } = await routes();
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ success: false, errors: [{ code: 9109, message: 'Unauthorized' }], result: null }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+    await writeTokenCert();
+    primeCloudflared(lib.runCloudflared as Mock, [{ ok: true }]);
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.anywhere.net' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
   });
 
   it('complete rejects an out-of-zone hostname with a clear 400 when the cert parses', async () => {

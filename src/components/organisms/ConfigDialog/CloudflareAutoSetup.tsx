@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RestartCallout } from './RestartCallout';
 import { StepList } from './StepList';
 
 /**
@@ -50,8 +49,9 @@ const STEP_LABELS: Record<Step['key'], string> = {
 };
 
 interface CloudflareAutoSetupProps {
-  /** Called with the configured hostname after a successful run. */
-  onConfigured: (hostname: string) => void;
+  /** Called with the configured hostname (and the route's own restart
+   * message, when present) after a successful run. */
+  onConfigured: (hostname: string, message?: string) => void;
 }
 
 export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) {
@@ -129,7 +129,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
       // The API token was used server-side for this request only and is
       // discarded there; clear it from the form as well.
       setApiToken('');
-      onConfigured(data.hostname);
+      onConfigured(data.hostname, typeof data.message === 'string' ? data.message : undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
@@ -137,6 +137,8 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
     }
   };
 
+  // In-session completion feedback only; the persistent state (and the
+  // restart callout) lives on the dialog's Status surface.
   if (doneHostname) {
     return (
       <div className="space-y-3" data-testid="cf-auto-success">
@@ -145,10 +147,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           <span>Tunnel configured for {doneHostname}</span>
         </div>
         {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-auto-steps" />}
-        <RestartCallout>
-          The tunnel connects within a few seconds. Restart the app from Umbrel to publish your domain to the Pubky
-          network.
-        </RestartCallout>
+        <p className="text-xs text-muted-foreground">The Status section above tracks this setup from here on.</p>
       </div>
     );
   }
@@ -190,6 +189,11 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
             {zonesLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : 'Load domains'}
           </Button>
         </div>
+        {apiToken.trim().length < 20 && (
+          <p className="text-xs text-muted-foreground/70" data-testid="cf-auto-token-hint">
+            Paste your full API token to load domains.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground/70">
           <a
             href={TOKEN_TEMPLATE_URL}

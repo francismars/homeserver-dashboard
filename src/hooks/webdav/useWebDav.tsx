@@ -8,14 +8,8 @@ export function useWebDav() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<WebDavError | null>(null);
 
-  const getService = useCallback((): WebDavService => {
-    // WebDAV service now uses API routes, so credentials are handled server-side
-    return new WebDavService({
-      baseUrl: '/api/webdav', // API route handles /dav prefix
-      username: 'admin', // Not used anymore, but kept for compatibility
-      password: '', // Not used anymore, but kept for compatibility
-    });
-  }, []);
+  // The service talks to the dashboard's API routes; credentials are server-side.
+  const getService = useCallback((): WebDavService => new WebDavService(), []);
 
   const listDirectory = useCallback(
     async (path: string): Promise<{ directory: WebDavDirectory } | { error: WebDavError }> => {

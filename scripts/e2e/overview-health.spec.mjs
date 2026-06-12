@@ -18,6 +18,136 @@ await runSpec(
     check(true, 'reachable state shown for the published domain');
     check((await page1.locator('[data-testid="domain-health-fix"]').count()) === 0, 'no Fix it button while reachable');
 
+    step('api explorer proxies: one client and one metrics request round-trip');
+    const clientRes = await fetch(`${env.baseUrl}/api/client-proxy/`);
+    const clientBody = await clientRes.text();
+    check(
+      clientRes.status === 200 && clientBody.includes('pubky homeserver e2e client'),
+      'client proxy round-trips to the client upstream',
+      `status=${clientRes.status}`,
+    );
+    const metricsRes = await fetch(`${env.baseUrl}/api/metrics-proxy/metrics`);
+    const metricsBody = await metricsRes.text();
+    check(
+      metricsRes.status === 200 && metricsBody.includes('e2e_up 1'),
+      'metrics proxy round-trips to the metrics upstream',
+      `status=${metricsRes.status}`,
+    );
+
+    step('plain labels: jargon demoted to tooltips');
+    check(
+      (await page1.locator('span[title="PKARR address"]').count()) === 1,
+      '"Pubky address" label carries the technical term as a tooltip',
+    );
+    check((await page1.locator('text=Pubky address').count()) >= 1, 'Pubky address label shown');
+    check((await page1.locator('text=How Pubky apps find this server').count()) === 1, 'address helper line shown');
+    check((await page1.locator('text=Public address').count()) >= 1, 'Public address label shown');
+    check((await page1.locator('text=PKARR').count()) === 0, 'no visible PKARR jargon');
+    check(
+      (await page1.locator('[data-testid="address-scope-badge"]').count()) === 0,
+      'no address-scope badge for a non-IP Pubky address',
+    );
+
+    step('address scope: a 10.x Pubky address gets the Private network badge');
+    const pageScope = await ctx.newPage();
+    await pageScope.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
+    );
+    await pageScope.route('**/api/admin/info', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.pkarr_pubky_address = '10.21.0.23:6287';
+      await route.fulfill({ response: res, json });
+    });
+    await pageScope.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageScope.waitForSelector('[data-testid="address-scope-badge"]', { timeout: 30000 });
+    const scopeBadge = pageScope.locator('[data-testid="address-scope-badge"]');
+    const scopeLabel = (await scopeBadge.textContent()).trim();
+    check(scopeLabel === 'Private network', 'private 10.x address shows the Private network badge', scopeLabel);
+    const scopeTitle = (await scopeBadge.getAttribute('title')) || '';
+    check(
+      scopeTitle.includes('Devices on the internet cannot reach your server through it'),
+      'badge tooltip explains the address is unreachable from the internet',
+    );
+    check(
+      (await pageScope.locator('text=10.21.0.23:6287').count()) >= 1,
+      'the 10.x address value is shown next to the badge',
+    );
+    await pageScope.close();
+
+    step('get-started checklist: step states come from the admin signals');
+    // Mock admin defaults: 5 signup codes, 3 users; no Cloudflare files, so
+    // the server-derived mode is off and the reachable step stays pending
+    // even though the domain probe answered ok.
+    await page1.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
+    const stepState = (page, id) => page.getAttribute(`[data-testid="${id}"]`, 'data-state');
+    check((await stepState(page1, 'setup-step-reachable')) === 'pending', 'reachable step pending while mode is off');
+    check((await stepState(page1, 'setup-step-invite')) === 'done', 'invite step done (num_signup_codes > 0)');
+    check((await stepState(page1, 'setup-step-signup')) === 'done', 'signup step done (num_users > 0)');
+
+    step('get-started checklist: fresh install has every step pending');
+    const pageFresh = await ctx.newPage();
+    await pageFresh.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false }) }),
+    );
+    await pageFresh.route('**/api/admin/info', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.num_users = 0;
+      json.num_signup_codes = 0;
+      await route.fulfill({ response: res, json });
+    });
+    await pageFresh.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageFresh.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
+    check((await stepState(pageFresh, 'setup-step-reachable')) === 'pending', 'fresh install: reachable pending');
+    check((await stepState(pageFresh, 'setup-step-invite')) === 'pending', 'fresh install: invite pending');
+    check((await stepState(pageFresh, 'setup-step-signup')) === 'pending', 'fresh install: signup pending');
+    check(
+      (await pageFresh.locator('text=Your first invite is for your own account').count()) === 1,
+      'first-invite copy shown',
+    );
+
+    step('get-started checklist: all steps done collapses to the all-set state');
+    const pageDone = await ctx.newPage();
+    await pageDone.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
+    );
+    await pageDone.route('**/api/cloudflare-config', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          supported: true,
+          mode: 'token',
+          domain: 'pubky.example.com',
+          configured: true,
+          restart_pending: false,
+        }),
+      }),
+    );
+    await pageDone.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { timeout: 30000 });
+    check(true, 'all-set state shown when reachable, invite and signup are all done');
+    check((await pageDone.locator('[data-testid="setup-guide"]').count()) === 0, 'full checklist collapsed');
+
+    step('get-started checklist: dismissal sticks across reload, footer link restores');
+    await pageDone.click('[data-testid="setup-guide-dismiss"]');
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { state: 'detached', timeout: 15000 });
+    await pageDone.waitForSelector('[data-testid="setup-guide-link"]', { timeout: 15000 });
+    check(true, 'dismissed: card gone, footer "Setup guide" link appeared');
+    await pageDone.reload({ waitUntil: 'domcontentloaded' });
+    await pageDone.waitForSelector('[data-testid="setup-guide-link"]', { timeout: 30000 });
+    check(
+      (await pageDone.locator('[data-testid="setup-guide"], [data-testid="setup-guide-allset"]').count()) === 0,
+      'checklist stays dismissed after a reload',
+    );
+    await pageDone.click('[data-testid="setup-guide-link"]');
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { timeout: 15000 });
+    check(true, 'footer link brings the checklist back');
+    // The restore click also cleared the stored flag, so the later pages in
+    // this shared context see the card again.
+    await pageDone.close();
+
     step('unreachable: probe fails, Fix it opens the Cloudflare tab');
     const page2 = await ctx.newPage();
     await page2.route('**/api/public-health*', (route) =>
@@ -43,6 +173,64 @@ await runSpec(
     await page3.waitForSelector('[data-testid="domain-health-not-set-up"]', { timeout: 30000 });
     const setupLabel = (await page3.locator('[data-testid="domain-health-fix"]').textContent()).trim();
     check(setupLabel === 'Set up', 'not-set-up state offers "Set up"', setupLabel);
+    check((await page3.locator('text=localhost:6286').count()) === 0, 'localhost value not leaked into the row');
+
+    step('unreachable with a pending restart: "Not reachable yet", no Fix it');
+    const page4 = await ctx.newPage();
+    await page4.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false }) }),
+    );
+    await page4.route('**/api/cloudflare-config', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ supported: true, restart_pending: true }),
+      }),
+    );
+    await page4.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page4.waitForSelector('[data-testid="domain-health-restart-hint"]', { timeout: 30000 });
+    const yetLabel = (await page4.locator('[data-testid="domain-health-unreachable"]').textContent()).trim();
+    check(yetLabel.includes('Not reachable yet'), 'pending restart reads "Not reachable yet"', yetLabel);
+    check(
+      (await page4.locator('[data-testid="domain-health-fix"]').count()) === 0,
+      'no Fix it while a restart is pending',
+    );
+    const hint = (await page4.locator('[data-testid="domain-health-restart-hint"]').textContent()).trim();
+    check(hint.includes('Restart the Pubky Homeserver app from Umbrel'), 'restart hint shown', hint);
+
+    step('recovery: homeserver comes up after the page loaded');
+    const page5 = await ctx.newPage();
+    let adminDown = true;
+    await page5.route('**/api/admin/**', (route) => {
+      if (adminDown) {
+        return route.fulfill({
+          status: 502,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'homeserver starting' }),
+        });
+      }
+      return route.continue();
+    });
+    await page5.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page5.waitForSelector('[data-testid="connection-error"]', { timeout: 30000 });
+    check(true, 'connection error shown while the homeserver is down');
+    check(
+      (await page5.locator('text=Your homeserver may still be starting').count()) === 1,
+      'error copy leads with the boot explanation',
+    );
+    const devDetails = page5.locator('[data-testid="connection-dev-details"]');
+    check((await devDetails.count()) === 1, 'developer details present');
+    check((await devDetails.getAttribute('open')) === null, 'developer details collapsed by default');
+    check(
+      (await page5.locator('[data-testid="tab-users"]').count()) === 0,
+      'Users tab hidden while the homeserver is down',
+    );
+
+    adminDown = false; // the homeserver "finishes booting"
+    await page5.waitForSelector('[data-testid="connection-error"]', { state: 'detached', timeout: 30000 });
+    check(true, 'connection recovered without a reload (background retry)');
+    await page5.waitForSelector('[data-testid="tab-users"]', { timeout: 30000 });
+    check(true, 'Users tab appeared after recovery without a reload');
   },
   { infoDomain: 'pubky.example.com:443' },
 );

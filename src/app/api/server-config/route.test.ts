@@ -1,9 +1,11 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import * as serverConfigRoute from './route';
 
 const VALID_CONFIG = [
   '[general]',
@@ -35,7 +37,6 @@ describe('server-config route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -49,10 +50,11 @@ describe('server-config route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  async function loadRoute() {
+  // The route reads HOMESERVER_CONFIG_PATH lazily (per request), so tests
+  // just set the env var; no module-registry tricks needed.
+  function loadRoute() {
     process.env.HOMESERVER_CONFIG_PATH = configPath;
-    const mod = await import('./route');
-    return mod;
+    return serverConfigRoute;
   }
 
   function postRequest(body: unknown): NextRequest {
@@ -217,6 +219,17 @@ describe('server-config route', () => {
       expect(payload.ok).toBe(true);
       expect(payload.checksum).toBe(sha256(updated));
       expect(await fs.readFile(configPath, 'utf-8')).toBe(updated);
+    });
+
+    it('preserves the file mode across a save (config.toml holds admin_password)', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      await fs.chmod(configPath, 0o660);
+      const updated = VALID_CONFIG.replace('token_required', 'open');
+      const { POST } = await loadRoute();
+      const response = await POST(postRequest({ config_toml: updated, checksum: sha256(VALID_CONFIG) }));
+      expect(response.status).toBe(200);
+      const stat = await fs.stat(configPath);
+      expect(stat.mode & 0o777).toBe(0o660);
     });
 
     it('redaction roundtrip: "********" in payload preserves the real on-disk secret', async () => {

@@ -1,24 +1,17 @@
 import {
-  AdminConfig,
   DisabledUsersResponse,
   AdminInfo,
-  AdminServiceDeps,
   DeleteUrlRequest,
   DisableUserRequest,
   GenerateInviteResponse,
-  UsageResponse,
 } from './admin.types';
 
+/**
+ * All requests go through the dashboard's same-origin proxy; the admin token
+ * is attached server-side by the API route.
+ */
 export class AdminService {
-  private baseUrl: string;
-  private token?: string;
-
-  constructor({ baseUrl: _baseUrl, token: _token }: AdminServiceDeps) {
-    // Use API route instead of direct homeserver URL
-    // Token is handled server-side, not sent from client
-    this.baseUrl = '/api/admin';
-    this.token = ''; // Not needed, handled by API route
-  }
+  private baseUrl = '/api/admin';
 
   private createHttpError(message: string, status: number): Error & { status: number } {
     const error = new Error(message) as Error & { status: number };
@@ -93,26 +86,6 @@ export class AdminService {
     }
     const data = await res.json();
     return { token: data.token };
-  }
-
-  async getUsage(): Promise<UsageResponse> {
-    // No dedicated endpoint yet; reuse /info if available
-    const info = await this.getInfo();
-    return {
-      usersTotal: info.num_users,
-      numUnusedSignupCodes: info.num_unused_signup_codes,
-      totalDiskUsedMB: info.total_disk_used_mb,
-    };
-  }
-
-  async getConfig(): Promise<AdminConfig> {
-    // Placeholder until backend provides config endpoint
-    throw new Error('Config endpoint not available yet');
-  }
-
-  async saveConfig(_payload: AdminConfig): Promise<AdminConfig> {
-    // Placeholder until backend provides config endpoint
-    throw new Error('Config endpoint not available yet');
   }
 
   async disableUser(payload: DisableUserRequest): Promise<void> {

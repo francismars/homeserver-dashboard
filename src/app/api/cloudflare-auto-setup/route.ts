@@ -7,13 +7,15 @@ import {
   AlreadyRunningError,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
+  TUNNEL_NAME,
   atomicWrite,
+  getConfigDir,
   withFlowLock,
 } from '@/lib/server/cloudflared-process';
+import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
 import {
   CfApiError,
-  TUNNEL_NAME,
   createDnsRecord,
   createTunnel,
   deleteDnsRecord,
@@ -25,9 +27,9 @@ import {
   updateDnsRecord,
 } from '@/lib/server/cloudflare-api';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup';
-const CONFIG_DIR = process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
 
 /** Single DNS label: letters/digits/hyphens, no leading/trailing hyphen. */
 const SUBDOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -112,6 +114,13 @@ export async function POST(request: NextRequest) {
 
   // Everything below runs under the setup lock.
   async function runSetup(): Promise<NextResponse> {
+    // Captured BEFORE any mutation: with a working setup at entry, the
+    // running cloudflared keeps serving the OLD tunnel (it never re-reads
+    // the token file) while DNS moves to the new one, so the domain stays
+    // unreachable until the app restarts. From idle, the crash-looping
+    // cloudflared picks the new token up within a minute.
+    const { mode: priorMode } = await detectCloudflareMode();
+
     // --- 1. Resolve the zone server-side -------------------------------------
     let zoneName: string;
     let accountId: string;
@@ -195,7 +204,7 @@ export async function POST(request: NextRequest) {
     let runToken: string | undefined;
     try {
       const existing = await findTunnelByName(apiToken, accountId, TUNNEL_NAME);
-      if (existing && existing.remote_config === false) {
+      if (existing && (existing.remote_config === false || existing.config_src === 'local')) {
         // A locally-managed tunnel ignores remote ingress config; "adopting" it
         // would report success while routing nothing.
         steps.push({ key: 'tunnel', status: 'failed', detail: 'Locally-managed tunnel with the same name' });
@@ -258,7 +267,10 @@ export async function POST(request: NextRequest) {
       if (!runToken) {
         runToken = await getTunnelToken(apiToken, accountId, tunnelId);
       }
-      await fs.mkdir(CONFIG_DIR, { recursive: true });
+      // Env is read lazily via getConfigDir() (call time, not module load),
+      // following the convention in cloudflared-process.ts.
+      const configDir = getConfigDir();
+      await fs.mkdir(configDir, { recursive: true });
       // Mode switch FIRST (mirror of the Connect flow's token truncation): a
       // stale locally-managed config would keep a second tunnel running
       // against the old hostname and make the Connect card claim "completed".
@@ -266,16 +278,16 @@ export async function POST(request: NextRequest) {
       // leave both modes validly configured with two tunnels running.
       // config.yml goes first: completed-detection needs config.yml AND
       // credentials.json, so removing it alone already kills that mode.
-      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
-      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+      await fs.rm(path.join(configDir, 'config.yml'), { force: true });
+      await fs.rm(path.join(configDir, 'credentials.json'), { force: true });
       // Same files the manual flow writes; the entrypoint re-asserts ownership
       // and modes at the next app start. cloudflared's restart-on-failure loop
       // picks the token up within seconds, so the tunnel connects without an
       // app restart; the restart is only needed to publish icann_domain.
       // Domain before token: the token write is what makes status report
       // "configured", so everything it implies must already be in place.
-      await atomicWrite(path.join(CONFIG_DIR, 'domain'), hostname);
-      await atomicWrite(path.join(CONFIG_DIR, 'token'), runToken);
+      await atomicWrite(path.join(configDir, 'domain'), hostname);
+      await atomicWrite(path.join(configDir, 'token'), runToken);
       // A real setup supersedes preview mode: stop publishing and serving
       // the temporary URL.
       await teardownPreview();
@@ -298,12 +310,16 @@ export async function POST(request: NextRequest) {
       message: 'Automatic Cloudflare setup completed',
       meta: { hostnameLength: hostname.length, adopted: steps[0]?.detail === 'Reusing existing tunnel' },
     });
+    const message =
+      priorMode !== 'off'
+        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${RESTART_APP_SENTENCE} The restart also publishes your public address to the Pubky network.`
+        : `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
     return NextResponse.json(
       {
         ok: true,
         hostname,
         steps,
-        message: 'Tunnel configured. Restart the app from Umbrel to publish your domain to the Pubky network.',
+        message,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -338,6 +354,9 @@ function mapCfError(e: unknown, area: 'zone' | 'tunnel' | 'dns'): RouteError {
   }
   if (e.status === 404 && area === 'zone') {
     return new RouteError(400, 'bad_request', 'Domain not found for this token. Reload the domain list.');
+  }
+  if (e.status === 429) {
+    return new RouteError(429, 'upstream_error', 'Cloudflare is rate limiting requests. Wait a minute and try again.');
   }
   return new RouteError(502, 'upstream_error', `Cloudflare API error: ${e.messages.join('; ') || `HTTP ${e.status}`}`);
 }

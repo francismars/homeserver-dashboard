@@ -3,8 +3,10 @@ import { RouteError, errorResponse, isAbortError } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const UPSTREAM_TIMEOUT_MS = 60000;
-const MAX_RETRIES = 0;
 const SUPPORTED_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PROPFIND', 'MKCOL', 'MOVE', 'COPY']);
+
+/** Statuses that must not carry a body (Response throws otherwise). */
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 
 function getActualMethod(request: NextRequest, fallbackMethod: string): string {
   const overrideMethod = request.headers.get('X-HTTP-Method-Override');
@@ -18,10 +20,6 @@ function getActualMethod(request: NextRequest, fallbackMethod: string): string {
 function getAuthHeader(adminToken: string): string {
   const value = Buffer.from(`admin:${adminToken}`).toString('base64');
   return `Basic ${value}`;
-}
-
-function isRetryableMethod(method: string): boolean {
-  return method === 'GET' || method === 'HEAD' || method === 'PROPFIND';
 }
 
 function ensureSafePathSegments(segments: string[]): void {
@@ -44,22 +42,29 @@ function buildDavPath(pathSegments: string, actualMethod: string): string {
   return `/dav${normalizedSuffix}`;
 }
 
-async function fetchWithRetry(url: string, init: RequestInit, retryable: boolean): Promise<Response> {
-  let lastError: unknown;
-  const attempts = retryable ? MAX_RETRIES + 1 : 1;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await fetch(url, init);
-    } catch (error) {
-      lastError = error;
-      if (!retryable || !isAbortError(error) || attempt === attempts) {
-        throw error;
-      }
-    }
+/**
+ * Rewrite a MOVE/COPY Destination header for the upstream. The browser-side
+ * service addresses destinations as dashboard proxy paths (/api/webdav/<dest>);
+ * the upstream expects an absolute URL inside its own /dav tree, on the same
+ * base the source path uses. Forwarding the proxy path verbatim made renames
+ * fail or target the wrong tree.
+ */
+function rewriteDestination(destination: string, adminBaseUrl: string): string {
+  let pathname: string;
+  try {
+    // Accepts both path-only and absolute-URL destinations; URL parsing also
+    // resolves any "." / ".." segments so they cannot escape /dav.
+    pathname = new URL(destination, 'http://destination.invalid').pathname;
+  } catch {
+    throw new RouteError(400, 'bad_request', 'Invalid Destination header');
   }
-
-  throw lastError;
+  if (pathname.startsWith('/api/webdav')) {
+    pathname = pathname.slice('/api/webdav'.length);
+  }
+  if (pathname !== '/dav' && !pathname.startsWith('/dav/')) {
+    pathname = `/dav${pathname.startsWith('/') ? '' : '/'}${pathname}`;
+  }
+  return new URL(pathname, adminBaseUrl).toString();
 }
 
 // Handle PROPFIND and other WebDAV methods via POST with X-HTTP-Method-Override header
@@ -98,9 +103,10 @@ export async function proxyWebDavRequest(
     const pathSegments = path.join('/');
     actualMethod = getActualMethod(request, method);
     const allowedBodyMethods = new Set(['POST', 'PUT']);
-    let body: string | undefined;
+    let body: Uint8Array<ArrayBuffer> | undefined;
     if (allowedBodyMethods.has(method.toUpperCase())) {
-      body = await request.text();
+      // Raw bytes, not text: text round-tripping corrupts binary uploads.
+      body = new Uint8Array(await request.arrayBuffer());
     }
     const commonHeaders: HeadersInit = {};
     const depth = request.headers.get('Depth');
@@ -110,7 +116,7 @@ export async function proxyWebDavRequest(
     if (contentType) commonHeaders['Content-Type'] = contentType;
 
     const destination = request.headers.get('Destination');
-    if (destination) commonHeaders['Destination'] = destination;
+    if (destination) commonHeaders['Destination'] = rewriteDestination(destination, adminBaseUrl);
 
     webdavPath = buildDavPath(pathSegments, actualMethod);
     const url = new URL(webdavPath, adminBaseUrl);
@@ -118,38 +124,20 @@ export async function proxyWebDavRequest(
       url.searchParams.append(key, value);
     });
 
-    const response = await fetchWithRetry(
-      url.toString(),
-      {
-        method: actualMethod,
-        headers: {
-          ...commonHeaders,
-          Authorization: getAuthHeader(adminToken),
-        },
-        body,
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    // No retry: a timed-out AbortSignal is already spent, so retrying with it
+    // could never succeed, and connection errors should surface at once.
+    const response = await fetch(url.toString(), {
+      method: actualMethod,
+      headers: {
+        ...commonHeaders,
+        Authorization: getAuthHeader(adminToken),
       },
-      isRetryableMethod(actualMethod),
-    );
+      body,
+      // A proxy must not silently follow an upstream redirect to another origin.
+      redirect: 'manual',
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
 
-    if (response.status === 204) {
-      logRouteInfo({
-        requestId,
-        route: routeName,
-        method: actualMethod,
-        statusCode: response.status,
-        durationMs: Date.now() - startedAt,
-        message: 'WebDAV proxy request completed',
-        meta: { path: webdavPath },
-      });
-      return new NextResponse(null, {
-        status: 204,
-        headers: { 'X-Request-Id': requestId },
-      });
-    }
-
-    const responseText = await response.text();
-    const responseContentType = response.headers.get('Content-Type') || 'application/xml';
     logRouteInfo({
       requestId,
       route: routeName,
@@ -160,7 +148,16 @@ export async function proxyWebDavRequest(
       meta: { path: webdavPath },
     });
 
-    return new NextResponse(responseText, {
+    if (NULL_BODY_STATUSES.has(response.status)) {
+      return new NextResponse(null, {
+        status: response.status,
+        headers: { 'X-Request-Id': requestId },
+      });
+    }
+
+    // Stream the upstream body through untouched so binary downloads survive.
+    const responseContentType = response.headers.get('Content-Type') || 'application/xml';
+    return new NextResponse(response.body, {
       status: response.status,
       headers: {
         'Content-Type': responseContentType,

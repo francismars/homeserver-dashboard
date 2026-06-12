@@ -11,13 +11,13 @@
  * - CF_API_BASE is overridable for tests/e2e only; defaults to the real API.
  */
 
-const CF_API_BASE = process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4';
-const CALL_TIMEOUT_MS = 15_000;
+import { INGRESS_SERVICE } from './cloudflared-process';
 
-/** The fixed tunnel name the app owns. Re-runs adopt it (idempotency). */
-export const TUNNEL_NAME = 'pubky-homeserver';
-/** Where the tunnel forwards traffic inside the Umbrel network. */
-export const INGRESS_SERVICE = 'http://homeserver:6286';
+// Env is read lazily (call time, not module load), following the convention
+// in cloudflared-process.ts, so tests and multi-env deployments are never
+// frozen to a stale value.
+const getCfApiBase = () => process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4';
+const CALL_TIMEOUT_MS = 15_000;
 
 export class CfApiError extends Error {
   status: number;
@@ -40,7 +40,7 @@ interface CfEnvelope<T> {
 }
 
 async function cfFetch<T>(apiToken: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${CF_API_BASE}${path}`, {
+  const response = await fetch(`${getCfApiBase()}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${apiToken}`,
@@ -106,6 +106,9 @@ export interface CfTunnel {
   /** False for locally-managed tunnels (config file + credentials.json); our
    * remote ingress PUT would be ignored by those. */
   remote_config?: boolean;
+  /** 'cloudflare' for remotely-managed tunnels, 'local' for locally-managed
+   * ones; some responses carry this instead of (or alongside) remote_config. */
+  config_src?: string;
 }
 
 export async function findTunnelByName(apiToken: string, accountId: string, name: string): Promise<CfTunnel | null> {
@@ -158,11 +161,13 @@ export interface CfDnsRecord {
   proxied?: boolean;
 }
 
-/** All records at this exact name, any type - A/AAAA conflicts matter too. */
+/** All records at this exact name, any type - A/AAAA conflicts matter too.
+ * `name.exact` is the documented exact-match filter (bare `name` is the
+ * legacy fuzzy form). */
 export function listDnsRecordsAtName(apiToken: string, zoneId: string, hostname: string): Promise<CfDnsRecord[]> {
   return cfFetch<CfDnsRecord[]>(
     apiToken,
-    `/zones/${encodeURIComponent(zoneId)}/dns_records?name=${encodeURIComponent(hostname)}`,
+    `/zones/${encodeURIComponent(zoneId)}/dns_records?name.exact=${encodeURIComponent(hostname)}`,
   );
 }
 

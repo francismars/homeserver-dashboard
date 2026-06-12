@@ -85,12 +85,20 @@ await runSpec('cf-auto', async ({ env, browser }) => {
   await page.click('[data-testid="cf-auto-create"]');
   await page.waitForSelector('[data-testid="cf-auto-success"]', { timeout: 20000 });
   const successText = await page.locator('[data-testid="cf-auto-success"]').textContent();
-  check(successText.includes('pubky.example.com'), 'success card shows the hostname', successText.slice(0, 80));
+  check(successText.includes('pubky.example.com'), 'success feedback shows the hostname', successText.slice(0, 80));
   check((await env.readConfigFile('domain'))?.trim() === 'pubky.example.com', 'domain file written');
   check(((await env.readConfigFile('token')) ?? '').length > 10, 'run token file written');
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="cf-mode-badge"]')?.textContent?.trim() === 'API token',
+    { timeout: 15000 },
+  );
+  check(true, 'Status badge flips to API token');
 
   step('overwrite flow end to end at taken.example.com (fresh page)');
   await openCloudflareTab(page, env.baseUrl);
+  // A mode is active now, so the setup cards sit behind the disclosure.
+  await page.click('[data-testid="cf-switch-method-toggle"]');
+  await page.waitForSelector('[data-testid="cf-api-token-toggle"]', { timeout: 10000 });
   await page.click('[data-testid="cf-api-token-toggle"]');
   await page.waitForSelector('[data-testid="cf-auto-token"]', { timeout: 15000 });
   await page.fill('[data-testid="cf-auto-token"]', VALID_TOKEN);

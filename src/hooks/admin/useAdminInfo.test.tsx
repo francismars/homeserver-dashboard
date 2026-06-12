@@ -1,6 +1,17 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAdminInfo } from './useAdminInfo';
+
+const okBody = JSON.stringify({
+  version: '1.0.0',
+  pubkey: 'pubkey',
+  num_users: 1,
+  num_disabled_users: 0,
+  num_signup_codes: 1,
+  num_unused_signup_codes: 1,
+  total_disk_used_mb: 10,
+});
+const jsonHeaders = { 'Content-Type': 'application/json' };
 
 describe('useAdminInfo', () => {
   afterEach(() => {
@@ -47,5 +58,81 @@ describe('useAdminInfo', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toBeNull();
     expect(result.current.error?.message).toContain('Boom');
+  });
+
+  it('retries in the background while errored and stops once recovered', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: 'starting' }), { status: 502, headers: jsonHeaders }),
+        )
+        .mockResolvedValue(new Response(okBody, { status: 200, headers: jsonHeaders }));
+
+      const { result } = renderHook(() => useAdminInfo());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.error?.message).toContain('starting');
+      expect(result.current.isLoading).toBe(false);
+
+      // first background retry recovers, without flipping isLoading
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(result.current.error).toBeNull();
+      expect(result.current.data?.version).toBe('1.0.0');
+      expect(result.current.isLoading).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // recovered: back to one-shot semantics, no further polling
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps showing the error (no skeleton flash) while retries keep failing', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(JSON.stringify({ error: 'down' }), { status: 500, headers: jsonHeaders }));
+
+      const { result } = renderHook(() => useAdminInfo());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.error).toBeTruthy();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.error).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never stacks requests: a hanging fetch suppresses further retries', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}));
+
+      renderHook(() => useAdminInfo());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

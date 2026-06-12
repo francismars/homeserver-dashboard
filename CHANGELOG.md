@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.15]
+
+Technical-debt payoff: broken features fixed or removed, honest test gates, tighter permissions.
+
+### Added
+
+- The API explorer's Client and Metrics groups actually work now, via same-origin proxies (they previously fetched Docker-internal hostnames from the browser and could never succeed).
+- Published-address scope badge on the Overview: localhost-only, private-network, or public IP, each with a hover explanation of who can reach that address.
+
+### Fixed
+
+- WebDAV rename/copy through the proxy rewrites the Destination header (renames previously targeted a path outside the homeserver's namespace).
+- Binary content streams through the admin and WebDAV proxies without UTF-8 corruption.
+- Client polling no longer overlaps requests or lets a stale response overwrite newer state; post-setup probe timers stop on unmount.
+
+### Changed
+
+- Coverage gate measures all API/lib/hook/service code instead of a hand-maintained allowlist; thresholds raised to 80/70/80/80; API route suites run under node instead of jsdom; the connect flow parses before sleeping (faster route and tests).
+- Env vars are read lazily and every one of them is documented truthfully in README and .env.example; CI builds on the same Node 24 as the image, declared in engines; build context excludes tests/docs/CI files.
+- homeserver-data is no longer world-writable: shared group, dirs 2775, config.toml 0660, converged on boot for existing installs.
+
+### Removed
+
+- The unreachable mock ServerControlDialog, dead retry scaffolding in the proxies, vestigial service-constructor plumbing, and the stale status-report doc; `src/libs/` merged into `src/lib/`.
+
+## [0.1.14]
+
+One source of truth in the UI, and a first-run experience that explains itself.
+
+### Added
+
+- The Status section is the single surface asserting Cloudflare state: server-derived mode badge (Connected account / API token / Preview / Off), one reachability chip, a published indicator, and the one Disconnect button with consequences stated before confirming. Setup cards are pure actions that collapse under "Switch setup method" once anything is configured; contradictory states (Status "Off" above a card claiming connected) are impossible by construction.
+- Durable "restart pending" signal: the server compares state-file changes against the last boot, so the restart callout survives reloads and disappears only when a restart actually happened. The Overview shows it too.
+- "Published" and "reachable" are separate truths: published means the running homeserver actually advertises your address to the Pubky network; reachable means HTTPS answers. The UI no longer suppresses the restart hint just because the tunnel responds.
+- Get-started checklist on the Overview (make it reachable, create your first invite, sign up from Pubky Ring), dismissible with a footer link to bring it back, plus a short backup note.
+- Invite generation failures are surfaced inline; the invite list is honestly labeled as session-only; Pubky Ring is linked where it is mentioned.
+
+### Changed
+
+- Overview: placeholder pubkey/version replaced by an explicit "Not available" state; auto-recovers while the homeserver starts (poll + Retry) instead of requiring a page reload; copy buttons on identity fields; plain-language labels with the technical terms in tooltips; "Not reachable yet" wording with a restart hint when a restart is known to be pending.
+- One canonical restart sentence everywhere, and a consistent user-facing glossary: "public address" vs "domain", "invite code", "public key (pubkey)".
+- Friendlier errors: tunnel 530/1033 mapped to "Tunnel not connected", Cloudflare API rate limits explained instead of a generic upstream error; re-running a setup over a live tunnel warns that the address stays down until the restart.
+- FileBrowser dialogs gained Cancel buttons; delete-by-path requires an explicit click and shows the resolved target first.
+- Logs: download errors surfaced, the download respects the level filter, and a triage caption notes that startup warnings are normal.
+- A transient server error no longer hides the entire Cloudflare tab (it shows a retry state instead) or permanently hides the Logs/Users tabs.
+
 ## [0.1.13]
 
 Setup-flow correctness: every Cloudflare state transition is now crash-safe, serialized, and cleans up after itself.

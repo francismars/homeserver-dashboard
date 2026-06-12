@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
@@ -62,6 +63,7 @@ describe('cloudflare-disconnect route', () => {
       ['[pkdns]', 'icann_domain = "pubky2.example.com"', 'public_icann_http_port = 443', 'other = 1'].join('\n'),
       'utf-8',
     );
+    await fs.chmod(configPath, 0o660);
 
     const { res } = await post();
     const data = await res.json();
@@ -80,6 +82,8 @@ describe('cloudflare-disconnect route', () => {
     expect(config).toContain('icann_domain = "localhost"');
     expect(config).not.toContain('public_icann_http_port');
     expect(config).toContain('other = 1');
+    // Mode is preserved across the rewrite (config.toml holds admin_password).
+    expect((await fs.stat(configPath)).mode & 0o777).toBe(0o660);
   });
 
   it('kills pending login and instant-tunnel processes', async () => {

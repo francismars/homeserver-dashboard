@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 export const metadata = {
   title: 'Cloudflare Tunnel Setup - Pubky Homeserver',
@@ -136,7 +137,7 @@ export default function CloudflareGuidePage() {
                   Fill in:
                   <ul className="mt-2 ml-5 list-disc space-y-1">
                     <li>
-                      <strong>Domain</strong>: the full hostname, e.g. <Code>pubky.example.com</Code> (no{' '}
+                      <strong>Public address</strong>: the full hostname, e.g. <Code>pubky.example.com</Code> (no{' '}
                       <Code>https://</Code>, no path, no port)
                     </li>
                     <li>
@@ -148,12 +149,11 @@ export default function CloudflareGuidePage() {
                   Click <strong>Save</strong>.
                 </li>
                 <li>
-                  Restart the app from Umbrel: home screen → Pubky Homeserver tile → <strong>Restart</strong> (or the
-                  three-dot menu → Restart). Wait 30 to 60 seconds.
+                  {RESTART_APP_SENTENCE} Wait 30 to 60 seconds.
                   <p className="mt-2 text-sm text-muted-foreground">
-                    The restart does two things: connects the tunnel, and updates your homeserver&apos;s published
-                    record so other Pubky tools find it at your domain (<Code>icann_domain</Code> in config.toml is set
-                    automatically; no manual edit needed).
+                    The tunnel itself usually connects within a minute of saving; the restart is what updates your
+                    homeserver&apos;s published record so other Pubky tools find it at your public address (
+                    <Code>icann_domain</Code> in config.toml is set automatically; no manual edit needed).
                   </p>
                 </li>
               </ol>
@@ -167,7 +167,7 @@ export default function CloudflareGuidePage() {
                 </li>
                 <li>
                   In the dashboard&apos;s Cloudflare tab, click the <strong>Check</strong> button next to the saved
-                  domain. Success means the tunnel is forwarding correctly.
+                  public address. Success means the tunnel is forwarding correctly.
                 </li>
                 <li>
                   From any device, <Code>curl https://pubky.example.com/</Code> should return a response from your
@@ -176,7 +176,7 @@ export default function CloudflareGuidePage() {
                 <li>
                   Optional: paste your homeserver&apos;s public key (shown on the dashboard Overview) into{' '}
                   <ExternalLink href="https://pkdns.net/">pkdns.net</ExternalLink>. The published record should point at
-                  your tunnel domain, confirming other Pubky tools can discover your homeserver.
+                  your public address, confirming other Pubky tools can discover your homeserver.
                 </li>
               </ol>
             </Section>
@@ -187,7 +187,7 @@ export default function CloudflareGuidePage() {
                   If the domain&apos;s nameservers point elsewhere, this will not work. Add the site on Cloudflare and
                   switch nameservers at your registrar first.
                 </Gotcha>
-                <Gotcha title="The Service URL is homeserver:6286, not your domain">
+                <Gotcha title="The Service URL is homeserver:6286, not your public address">
                   That field tells cloudflared <em>where inside the Umbrel network to send traffic</em>, not where
                   it&apos;s coming from. Easy to paste your own domain there by mistake.
                 </Gotcha>
@@ -203,9 +203,10 @@ export default function CloudflareGuidePage() {
                   e.g. <Code>pubky.internal.example.com</Code> (two levels before the apex) is not covered by
                   Cloudflare&apos;s free wildcard cert. Stick to a single level like <Code>pubky.example.com</Code>.
                 </Gotcha>
-                <Gotcha title="Restart, not just stop+start in the dashboard">
-                  The cloudflared container only reads the token at container start. Restart from Umbrel&apos;s app tile
-                  to ensure both containers come back up cleanly.
+                <Gotcha title="Use Umbrel's app restart, not a stop and start from inside the dashboard">
+                  The cloudflared container only reads the token at container start, and stopping and starting the
+                  homeserver from inside this dashboard does not touch that container. {RESTART_APP_SENTENCE} That
+                  brings both containers back up cleanly.
                 </Gotcha>
                 <Gotcha title="Do not change admin_password in config.toml">
                   On Umbrel the dashboard authenticates to the homeserver with a platform-generated password. Changing{' '}

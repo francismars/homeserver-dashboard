@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Copy, ExternalLink, FlaskConical, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { usePolling } from '@/hooks/usePolling';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from './RestartCallout';
+import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
 type InstantStatus = { status: 'stopped' | 'starting' | 'running'; url?: string; error?: string };
 type PreviewState = {
@@ -21,18 +24,26 @@ const LIMITATIONS = [
   'Some corporate networks block trycloudflare.com',
 ];
 
+interface CloudflarePreviewProps {
+  /** Called after a successful enable so the dialog re-reads the mode. */
+  onEnabled: () => void;
+}
+
 /**
  * Preview mode: a temporary public address published to the Pubky network.
  * No Cloudflare account, no domain - and none of the guarantees either.
  * For a permanent address, the real setups live right above this card.
+ *
+ * Pure setup action: a preview enabled in an earlier session shows on the
+ * dialog's Status surface (which also owns turning it off via Disconnect);
+ * the enabled rendering here is in-session feedback only.
  */
-export function CloudflarePreview() {
+export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
   const [state, setState] = useState<PreviewState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [justChanged, setJustChanged] = useState<'enabled' | 'disabled' | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { copiedKey, copy } = useCopyFeedback();
+  const [justEnabled, setJustEnabled] = useState(false);
 
   const refresh = async () => {
     try {
@@ -46,49 +57,32 @@ export function CloudflarePreview() {
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Poll fast while the instant tunnel is coming up, slow while running.
-  useEffect(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = null;
-    if (!state?.enabled) return;
-    const interval = state.instant.status === 'starting' ? 3000 : 20000;
-    pollRef.current = setInterval(() => void refresh(), interval);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.enabled, state?.instant.status]);
+  // Only the in-session feedback needs it; the Status surface polls its own.
+  usePolling(refresh, state?.instant.status === 'starting' ? 3000 : 20000, {
+    enabled: justEnabled && Boolean(state?.enabled),
+  });
 
-  const act = async (action: 'enable' | 'disable') => {
+  const enable = async () => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch('/api/cloudflare-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action: 'enable' }),
       });
       const data = await res.json().catch(() => ({}) as Record<string, never>);
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       setState((s) => ({ ...(s as PreviewState), ...data }));
-      setJustChanged(action === 'enable' ? 'enabled' : 'disabled');
+      setJustEnabled(true);
+      onEnabled();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const copyUrl = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable
     }
   };
 
@@ -124,14 +118,20 @@ export function CloudflarePreview() {
           variant="outline"
           size="sm"
           disabled={busy || !state}
-          onClick={() => void act('enable')}
+          onClick={() => void enable()}
           data-testid="cf-preview-enable"
         >
           {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : 'Enable preview'}
         </Button>
       )}
 
-      {state?.enabled && (
+      {state?.enabled && !justEnabled && (
+        <p className="text-xs text-muted-foreground" data-testid="cf-preview-already-on">
+          Preview is already on. Use Disconnect in the Status section above to turn it off.
+        </p>
+      )}
+
+      {state?.enabled && justEnabled && (
         <div className="space-y-2" data-testid="cf-preview-enabled">
           {state.instant.status === 'starting' && (
             <p
@@ -153,10 +153,10 @@ export function CloudflarePreview() {
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2"
-                onClick={() => void copyUrl(activeUrl)}
+                onClick={() => void copy(activeUrl)}
                 aria-label="Copy URL"
               >
-                {copied ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3.5 w-3.5" />}
+                {copiedKey ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3.5 w-3.5" />}
               </Button>
               <a
                 href={activeUrl}
@@ -170,36 +170,11 @@ export function CloudflarePreview() {
             </div>
           )}
 
-          {justChanged === 'enabled' && (
-            <RestartCallout>
-              Restart the app from Umbrel to publish this preview address to the Pubky network. The address shown now
-              works immediately but is not yet published; it will change after the restart.
-            </RestartCallout>
-          )}
-          {state.published_url && !justChanged && (
-            <p className="text-xs text-muted-foreground">
-              Published to the Pubky network. The Overview shows whether it is reachable right now.
-            </p>
-          )}
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            disabled={busy}
-            onClick={() => void act('disable')}
-            data-testid="cf-preview-disable"
-          >
-            Turn off preview
-          </Button>
+          <RestartCallout>
+            {RESTART_APP_SENTENCE} The restart publishes the preview address to the Pubky network. The address shown now
+            works immediately but is not yet published; it will change after the restart.
+          </RestartCallout>
         </div>
-      )}
-
-      {justChanged === 'disabled' && (
-        <RestartCallout>
-          Restart the app from Umbrel to fully turn the preview off and unpublish the address.
-        </RestartCallout>
       )}
 
       {(error || state?.instant.error) && (

@@ -1,8 +1,12 @@
+// @vitest-environment node
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { POST as autoSetupPost } from './route';
+import { POST as zonesPost } from './zones/route';
+import { GET as previewGet } from '../cloudflare-preview/route';
 
 const TOKEN = 'cf-test-token-abcdefghijklmnop';
 const ZONE_ID = 'a'.repeat(32);
@@ -77,7 +81,6 @@ describe('cloudflare-auto-setup route', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -92,9 +95,10 @@ describe('cloudflare-auto-setup route', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
+  // The route reads CLOUDFLARE_CONFIG_DIR lazily (per request), so tests just
+  // set the env var; no module-registry tricks needed.
   async function post(body: unknown) {
-    const { POST } = await import('./route');
-    return POST(
+    return autoSetupPost(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -138,6 +142,37 @@ describe('cloudflare-auto-setup route', () => {
       content: `${TUNNEL_ID}.cfargotunnel.com`,
     });
     expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('fresh setup (mode off at entry): message says the tunnel connects on its own', async () => {
+    installFetchMock(makeRules(), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.message).toContain('The tunnel connects within a minute');
+    expect(data.message).toContain('publishes your public address');
+    expect(data.message).not.toContain('unreachable');
+  });
+
+  it('re-setup over a working setup: message warns the domain stays unreachable until restart', async () => {
+    // A live token setup at entry: the running cloudflared never re-reads
+    // the token file, so DNS now points at a tunnel with no connector.
+    await fs.writeFile(path.join(tmpDir, 'token'), 'previous-run-token-aaaaaaaaaaaaaaaaaaaa', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'domain'), 'old.example.com', 'utf-8');
+    installFetchMock(makeRules(), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.message).toContain('unreachable until the app restarts');
+    expect(data.message).not.toContain('connects within a minute');
+  });
+
+  it('maps a Cloudflare 429 to a friendly rate-limit message', async () => {
+    installFetchMock(makeRules({ getZone: () => cfErr(429, 971, 'rate limited') }), calls);
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(429);
+    expect(data.error).toBe('Cloudflare is rate limiting requests. Wait a minute and try again.');
   });
 
   it('apex: empty subdomain routes the zone itself', async () => {
@@ -230,6 +265,20 @@ describe('cloudflare-auto-setup route', () => {
     expect(res.status).toBe(409);
     expect(data.error).toContain('locally-managed');
     // No ingress rewrite of a tunnel we do not manage
+    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
+  });
+
+  it('refuses to adopt a tunnel reporting config_src "local" even without remote_config', async () => {
+    installFetchMock(
+      makeRules({
+        listTunnels: () => cfOk([{ id: TUNNEL_ID, name: 'pubky-homeserver', config_src: 'local' }]),
+      }),
+      calls,
+    );
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(409);
+    expect(data.error).toContain('locally-managed');
     expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
   });
 
@@ -438,8 +487,7 @@ describe('cloudflare-auto-setup route', () => {
     for (const f of ['testdrive.env', path.join('preview', 'published'), '.testdrive.json']) {
       await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
     }
-    const { GET } = await import('../cloudflare-preview/route');
-    const preview = await (await GET(new NextRequest('http://localhost:8080/api/cloudflare-preview'))).json();
+    const preview = await (await previewGet(new NextRequest('http://localhost:8080/api/cloudflare-preview'))).json();
     expect(preview.enabled).toBe(false);
     expect(preview.published_url).toBeUndefined();
   });
@@ -480,7 +528,6 @@ describe('cloudflare-auto-setup zones route', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.resetModules();
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -492,8 +539,7 @@ describe('cloudflare-auto-setup zones route', () => {
   });
 
   async function post(body: unknown) {
-    const { POST } = await import('./zones/route');
-    return POST(
+    return zonesPost(
       new NextRequest('http://localhost:8080/api/cloudflare-auto-setup/zones', {
         method: 'POST',
         body: JSON.stringify(body),

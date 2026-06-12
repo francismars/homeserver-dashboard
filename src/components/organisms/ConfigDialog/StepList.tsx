@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertCircle, Check } from 'lucide-react';
-import { cn } from '@/libs/utils';
+import { cn } from '@/lib/utils';
 
 /**
  * Step rows of a multi-step setup run (done/failed per step). Shared by the
