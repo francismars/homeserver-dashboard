@@ -38,6 +38,11 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [doneHostname, setDoneHostname] = useState<string | null>(null);
+  // null = not probed yet, true/false = live reachability of the published
+  // hostname. Decides whether the restart callout is still warranted.
+  const [tunnelLive, setTunnelLive] = useState<boolean | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [disconnected, setDisconnected] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = async () => {
@@ -59,6 +64,51 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Once completed, check whether the tunnel is actually up: if the
+  // published hostname is reachable the restart clearly already happened
+  // and nagging about it would be wrong (field feedback).
+  useEffect(() => {
+    const hostname = doneHostname?.split(':')[0];
+    if (!hostname) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/public-health?domain=${encodeURIComponent(hostname)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (!cancelled) setTunnelLive(Boolean(data.ok));
+      } catch {
+        if (!cancelled) setTunnelLive(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [doneHostname]);
+
+  const handleDisconnect = async () => {
+    if (!confirmDisconnect) {
+      setConfirmDisconnect(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/cloudflare-disconnect', { method: 'POST' });
+      const data = await res.json().catch(() => ({}) as Record<string, never>);
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setDoneHostname(null);
+      setSteps(null);
+      setStatus('idle');
+      setTunnelLive(null);
+      setConfirmDisconnect(false);
+      setDisconnected(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Request failed');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Poll while waiting for the user to authorize on cloudflare.com.
   useEffect(() => {
@@ -133,15 +183,44 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
           <span>Cloudflare account connected{doneHostname ? ` - ${doneHostname}` : ''}</span>
         </div>
         {steps && <StepList steps={steps} />}
-        <RestartCallout>
-          Restart the app from Umbrel to connect the tunnel and publish your domain to the Pubky network.
-        </RestartCallout>
+        {tunnelLive === true ? (
+          <p className="text-xs text-muted-foreground" data-testid="cf-connect-live">
+            Tunnel connected and your domain is published. The Overview tracks its reachability.
+          </p>
+        ) : (
+          <RestartCallout>
+            Restart the app from Umbrel to connect the tunnel and publish your domain to the Pubky network.
+          </RestartCallout>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+          disabled={busy}
+          onClick={() => void handleDisconnect()}
+          data-testid="cf-connect-disconnect"
+        >
+          {confirmDisconnect ? 'Click again to confirm disconnect' : 'Disconnect and start over'}
+        </Button>
+        {error && (
+          <div className="flex items-start gap-2 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-3" data-testid="cf-connect">
+      {disconnected && (
+        <RestartCallout>
+          Disconnected. Restart the app from Umbrel to finish. The old tunnel and DNS record still exist in your
+          Cloudflare account; remove them there if you want to reuse the same hostname.
+        </RestartCallout>
+      )}
       <div>
         <p className="text-sm font-medium">Connect Cloudflare account (recommended)</p>
         <p className="text-xs text-muted-foreground">
