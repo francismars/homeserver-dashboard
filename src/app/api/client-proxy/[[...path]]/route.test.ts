@@ -66,6 +66,21 @@ describe('client proxy route', () => {
     expect(Array.from(new Uint8Array(init?.body as Buffer))).toEqual(Array.from(bytes));
   });
 
+  it('rejects path segments that resolve to a different origin (SSRF) without fetching', async () => {
+    // An encoded `%2F%2F<host>` arrives as a segment containing slashes, so
+    // `'/' + join` becomes a protocol-relative `//<host>` that new URL() would
+    // resolve to an attacker origin. The proxy must refuse before fetching.
+    const fetchMock = vi.spyOn(global, 'fetch');
+    const request = new NextRequest('http://localhost:8080/api/client-proxy');
+
+    const response = await GET(request, { params: Promise.resolve({ path: ['//evil.example.com', 'x'] }) });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.type).toBe('bad_request');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('maps abort failures to timeout errors without retrying', async () => {
     const fetchMock = vi.spyOn(global, 'fetch').mockRejectedValue(new DOMException('Timed out', 'AbortError'));
     const request = new NextRequest('http://localhost:8080/api/client-proxy/events/');

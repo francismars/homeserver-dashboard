@@ -49,6 +49,25 @@ export async function proxyToUpstream(
   const path = '/' + pathSegments.join('/');
   const url = new URL(path, baseUrl);
 
+  // A path that resolves to a different origin (protocol-relative `//host` from
+  // an encoded `%2F%2F`, a backslash, etc.) would make us fetch an attacker
+  // host - and, for the admin proxy, send X-Admin-Password there. Pin the
+  // request to the upstream origin before forwarding anything.
+  if (url.origin !== new URL(baseUrl).origin) {
+    const mapped = new RouteError(400, 'bad_request', 'Invalid proxy path');
+    logRouteError({
+      requestId,
+      route: routeName,
+      method,
+      statusCode: mapped.status,
+      durationMs: Date.now() - startedAt,
+      errorType: mapped.type,
+      message: mapped.message,
+      meta: { path },
+    });
+    return errorResponse(mapped, requestId);
+  }
+
   // Forward query parameters
   request.nextUrl.searchParams.forEach((value, key) => {
     url.searchParams.append(key, value);
