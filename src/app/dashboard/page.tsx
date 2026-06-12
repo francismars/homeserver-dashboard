@@ -10,7 +10,6 @@ import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersManagement';
 import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
-import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
 import {
   Github,
@@ -91,7 +90,6 @@ export default function DashboardPage() {
   }, []);
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
   const [canOpenSettings, setCanOpenSettings] = useState(true);
   const [logsTab, setLogsTab] = useState<TabAvailability>('unknown');
   const [usersTab, setUsersTab] = useState<TabAvailability>('unknown');
@@ -349,12 +347,7 @@ export default function DashboardPage() {
             )}
 
             <TabsContent value="api" className="space-y-4">
-              <ApiExplorer
-                adminBaseUrl="/api/admin"
-                clientBaseUrl="http://homeserver:6286"
-                metricsBaseUrl="http://homeserver:6289"
-                adminToken=""
-              />
+              <ApiExplorer />
             </TabsContent>
           </Tabs>
 
@@ -367,13 +360,6 @@ export default function DashboardPage() {
               focusCloudflare={cloudflareFocusNonce}
             />
           )}
-
-          {/* Server Control Dialog */}
-          <ServerControlDialog
-            open={!!serverControlAction}
-            onOpenChange={(open) => !open && setServerControlAction(null)}
-            action={serverControlAction}
-          />
         </div>
 
         {/* Footer */}

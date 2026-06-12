@@ -18,6 +18,22 @@ await runSpec(
     check(true, 'reachable state shown for the published domain');
     check((await page1.locator('[data-testid="domain-health-fix"]').count()) === 0, 'no Fix it button while reachable');
 
+    step('api explorer proxies: one client and one metrics request round-trip');
+    const clientRes = await fetch(`${env.baseUrl}/api/client-proxy/`);
+    const clientBody = await clientRes.text();
+    check(
+      clientRes.status === 200 && clientBody.includes('pubky homeserver e2e client'),
+      'client proxy round-trips to the client upstream',
+      `status=${clientRes.status}`,
+    );
+    const metricsRes = await fetch(`${env.baseUrl}/api/metrics-proxy/metrics`);
+    const metricsBody = await metricsRes.text();
+    check(
+      metricsRes.status === 200 && metricsBody.includes('e2e_up 1'),
+      'metrics proxy round-trips to the metrics upstream',
+      `status=${metricsRes.status}`,
+    );
+
     step('plain labels: jargon demoted to tooltips');
     check((await page1.locator('span[title="PKARR address"]').count()) === 1, '"Pubky address" label carries the technical term as a tooltip');
     check((await page1.locator('text=Pubky address').count()) >= 1, 'Pubky address label shown');

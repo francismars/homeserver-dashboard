@@ -9,8 +9,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: [
-        'src/app/api/admin/[...path]/route.ts',
+        'src/app/api/admin/[[...path]]/route.ts',
         'src/app/api/admin/generate_signup_token/route.ts',
+        'src/app/api/client-proxy/[[...path]]/route.ts',
+        'src/app/api/metrics-proxy/[[...path]]/route.ts',
+        'src/lib/server/upstream-proxy.ts',
         'src/app/api/cloudflare-config/route.ts',
         'src/app/api/health/route.ts',
         'src/app/api/logs/route.ts',

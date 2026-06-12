@@ -106,11 +106,13 @@ The Dockerfile uses Next.js standalone output for optimal image size and include
 
 ### Environment Variables
 
-| Variable                 | Description                      | Required | Default                            | Notes                               |
-| ------------------------ | -------------------------------- | -------- | ---------------------------------- | ----------------------------------- |
-| `ADMIN_BASE_URL`         | Homeserver admin API base URL    | Yes\*    | -                                  | Server-only (not exposed to client) |
-| `ADMIN_TOKEN`            | Admin password/token             | Yes\*    | -                                  | Server-only (not exposed to client) |
-| `HOMESERVER_CONFIG_PATH` | Path to homeserver `config.toml` | No       | `/app/homeserver-data/config.toml` | For non-Docker setups               |
+| Variable                 | Description                      | Required | Default                            | Notes                                       |
+| ------------------------ | -------------------------------- | -------- | ---------------------------------- | ------------------------------------------- |
+| `ADMIN_BASE_URL`         | Homeserver admin API base URL    | Yes\*    | -                                  | Server-only (not exposed to client)         |
+| `ADMIN_TOKEN`            | Admin password/token             | Yes\*    | -                                  | Server-only (not exposed to client)         |
+| `CLIENT_BASE_URL`        | Homeserver client API base URL   | No       | `http://homeserver:6286`           | Server-only; used by the API explorer proxy |
+| `METRICS_BASE_URL`       | Homeserver metrics base URL      | No       | `http://homeserver:6289`           | Server-only; used by the API explorer proxy |
+| `HOMESERVER_CONFIG_PATH` | Path to homeserver `config.toml` | No       | `/app/homeserver-data/config.toml` | For non-Docker setups                       |
 
 \* Required to use the real homeserver APIs
 

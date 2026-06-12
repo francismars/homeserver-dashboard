@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
 import type { DisabledUser } from '@/services/admin/admin.types';
 
-const getService = () => new AdminService({ baseUrl: '', token: '' });
+const getService = () => new AdminService();
 const PAGE_SIZE = 20;
 
 export function useDisabledUsers() {

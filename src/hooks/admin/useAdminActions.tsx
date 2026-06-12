@@ -1,10 +1,7 @@
 import { useCallback, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
 
-const getService = () => {
-  // AdminService now uses API routes, no need for baseUrl/token
-  return new AdminService({ baseUrl: '', token: '' });
-};
+const getService = () => new AdminService();
 
 export function useAdminActions() {
   const [isDeletingUrl, setIsDeletingUrl] = useState(false);

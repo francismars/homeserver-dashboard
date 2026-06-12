@@ -6,7 +6,7 @@ describe('WebDavService error envelope', () => {
   let service: WebDavService;
 
   beforeEach(() => {
-    service = new WebDavService({ baseUrl: '/api/webdav', username: '', password: '' });
+    service = new WebDavService();
   });
 
   afterEach(() => {
@@ -86,5 +86,19 @@ describe('WebDavService error envelope', () => {
     const directory = await service.listDirectory('/somepubkey/pub/');
     expect(directory.files).toEqual([]);
     expect(directory.path).toBe('/somepubkey/pub/');
+  });
+
+  it('sends MOVE via POST with a method override and a proxy-relative Destination', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await service.move('/pk1/pub/old.txt', '/pk1/pub/new.txt');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('/api/webdav/pk1/pub/old.txt');
+    expect(init?.method).toBe('POST');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('X-HTTP-Method-Override')).toBe('MOVE');
+    expect(headers.get('Destination')).toBe('/api/webdav/pk1/pub/new.txt');
   });
 });

@@ -13,12 +13,6 @@ export type WebDavDirectory = {
   files: WebDavFile[];
 };
 
-export type WebDavServiceDeps = {
-  baseUrl: string;
-  username: string;
-  password: string;
-};
-
 export type WebDavError = {
   message: string;
   status: number;

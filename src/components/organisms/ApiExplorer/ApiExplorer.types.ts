@@ -1,10 +1,3 @@
-export type ApiExplorerProps = {
-  adminBaseUrl: string;
-  clientBaseUrl?: string;
-  metricsBaseUrl?: string;
-  adminToken?: string;
-};
-
 export type ApiEndpoint = {
   method: 'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD' | 'PROPFIND' | 'MKCOL' | 'MOVE' | 'COPY';
   path: string;

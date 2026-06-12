@@ -1,27 +1,14 @@
-import type { WebDavFile, WebDavDirectory, WebDavServiceDeps, WebDavError } from './webdav.types';
+import type { WebDavFile, WebDavDirectory, WebDavError } from './webdav.types';
 
 /**
  * WebDAV service for interacting with the homeserver's WebDAV endpoint.
  * Handles PROPFIND (list), GET (read), PUT (write), DELETE, MKCOL (create directory).
+ *
+ * All requests go through the dashboard's same-origin proxy; credentials and
+ * the upstream /dav base are handled server-side by the API route.
  */
 export class WebDavService {
-  private baseUrl: string;
-
-  constructor({ baseUrl, username: _username, password: _password }: WebDavServiceDeps) {
-    // Use API route instead of direct homeserver URL
-    // Remove /dav from baseUrl if present, as the API route will add it
-    let apiBaseUrl = '/api/webdav';
-    if (baseUrl.includes('/dav')) {
-      // Extract the path after /dav if any
-      const davIndex = baseUrl.indexOf('/dav');
-      const afterDav = baseUrl.substring(davIndex + 4);
-      if (afterDav) {
-        apiBaseUrl = `/api/webdav${afterDav}`;
-      }
-    }
-    this.baseUrl = apiBaseUrl;
-    // Username and password are now handled server-side by the API route
-  }
+  private baseUrl = '/api/webdav';
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
     // Normalize path - remove /dav prefix if present since API route handles it
@@ -175,7 +162,8 @@ export class WebDavService {
    * @param destinationPath Destination WebDAV path
    */
   async move(sourcePath: string, destinationPath: string): Promise<void> {
-    // Normalize destination path for API route
+    // Normalize destination path for API route; the proxy rewrites this
+    // same-origin path into the absolute upstream /dav URL.
     let normalizedDest = destinationPath;
     if (normalizedDest.startsWith('/dav')) {
       normalizedDest = normalizedDest.substring(4);
@@ -183,36 +171,10 @@ export class WebDavService {
     if (!normalizedDest.startsWith('/')) {
       normalizedDest = '/' + normalizedDest;
     }
-    // Use relative path for destination header
     const destUrl = `${this.baseUrl}${normalizedDest}`;
 
     await this.request(sourcePath, {
       method: 'MOVE',
-      headers: {
-        Destination: destUrl,
-      },
-    });
-  }
-
-  /**
-   * Copy a file or directory.
-   * @param sourcePath Source WebDAV path
-   * @param destinationPath Destination WebDAV path
-   */
-  async copy(sourcePath: string, destinationPath: string): Promise<void> {
-    // Normalize destination path for API route
-    let normalizedDest = destinationPath;
-    if (normalizedDest.startsWith('/dav')) {
-      normalizedDest = normalizedDest.substring(4);
-    }
-    if (!normalizedDest.startsWith('/')) {
-      normalizedDest = '/' + normalizedDest;
-    }
-    // Use relative path for destination header
-    const destUrl = `${this.baseUrl}${normalizedDest}`;
-
-    await this.request(sourcePath, {
-      method: 'COPY',
       headers: {
         Destination: destUrl,
       },

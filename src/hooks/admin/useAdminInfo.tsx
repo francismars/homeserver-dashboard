@@ -2,10 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
 import type { AdminInfoResponse } from '@/services/admin/admin.types';
 
-const getService = () => {
-  // AdminService now uses API routes, no need for baseUrl/token
-  return new AdminService({ baseUrl: '', token: '' });
-};
+const getService = () => new AdminService();
 
 /** Retry cadence while the homeserver is unreachable (it can take up to a
  * couple of minutes to come up after an app start or restart). */

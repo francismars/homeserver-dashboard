@@ -12,7 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Play, Copy, Check, Server, Globe, BarChart3, Info } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import { copyToClipboard } from '@/libs/utils';
-import type { ApiExplorerProps, ApiEndpoint, EndpointGroup } from './ApiExplorer.types';
+import type { ApiEndpoint, EndpointGroup } from './ApiExplorer.types';
+
+// All three homeserver ports are reached through same-origin dashboard proxies
+// (the browser cannot resolve compose-internal hostnames like "homeserver").
+const ADMIN_PROXY_BASE = '/api/admin';
+const WEBDAV_PROXY_BASE = '/api/webdav';
+const CLIENT_PROXY_BASE = '/api/client-proxy';
+const METRICS_PROXY_BASE = '/api/metrics-proxy';
 
 const ADMIN_ENDPOINTS: ApiEndpoint[] = [
   {
@@ -186,12 +193,53 @@ const METRICS_ENDPOINTS: ApiEndpoint[] = [
   },
 ];
 
-export function ApiExplorer({
-  adminBaseUrl,
-  clientBaseUrl,
-  metricsBaseUrl,
-  adminToken: _adminToken,
-}: ApiExplorerProps) {
+const ENDPOINT_GROUPS: EndpointGroup[] = [
+  {
+    server: 'admin',
+    name: 'Admin Server',
+    description: 'Administrative operations (Port 6288)',
+    baseUrl: ADMIN_PROXY_BASE,
+    endpoints: ADMIN_ENDPOINTS,
+  },
+  {
+    server: 'client',
+    name: 'Client Server',
+    description: 'User-facing API (Port 6286/6287)',
+    baseUrl: CLIENT_PROXY_BASE,
+    endpoints: CLIENT_ENDPOINTS,
+  },
+  {
+    server: 'metrics',
+    name: 'Metrics Server',
+    description: 'Prometheus metrics (Port 6289)',
+    baseUrl: METRICS_PROXY_BASE,
+    endpoints: METRICS_ENDPOINTS,
+  },
+];
+
+/**
+ * Maps a server group plus an endpoint path to the same-origin proxy URL.
+ * Plain string concatenation on a normalized path: the previous regex-based
+ * slash collapsing turned "http://" into "http:/" and broke absolute URLs.
+ */
+export function resolveRequestUrl(server: 'admin' | 'client' | 'metrics', path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+
+  if (server === 'admin') {
+    // WebDAV endpoints go through the WebDAV proxy, which adds the /dav prefix.
+    if (normalized === '/dav' || normalized.startsWith('/dav/')) {
+      const rest = normalized.slice('/dav'.length);
+      return `${WEBDAV_PROXY_BASE}${rest || '/'}`;
+    }
+    return `${ADMIN_PROXY_BASE}${normalized}`;
+  }
+  if (server === 'client') {
+    return `${CLIENT_PROXY_BASE}${normalized}`;
+  }
+  return `${METRICS_PROXY_BASE}${normalized}`;
+}
+
+export function ApiExplorer() {
   const [selectedServer, setSelectedServer] = useState<'admin' | 'client' | 'metrics'>('admin');
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>('');
   const [customMethod, setCustomMethod] = useState<
@@ -209,31 +257,7 @@ export function ApiExplorer({
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const endpointGroups: EndpointGroup[] = [
-    {
-      server: 'admin',
-      name: 'Admin Server',
-      description: 'Administrative operations (Port 6288)',
-      baseUrl: adminBaseUrl,
-      endpoints: ADMIN_ENDPOINTS,
-    },
-    {
-      server: 'client',
-      name: 'Client Server',
-      description: 'User-facing API (Port 6286/6287)',
-      baseUrl: clientBaseUrl || adminBaseUrl.replace(':6288', ':6286'),
-      endpoints: CLIENT_ENDPOINTS,
-    },
-    {
-      server: 'metrics',
-      name: 'Metrics Server',
-      description: 'Prometheus metrics (Port 6289)',
-      baseUrl: metricsBaseUrl || adminBaseUrl.replace(':6288', ':6289'),
-      endpoints: METRICS_ENDPOINTS,
-    },
-  ];
-
-  const currentGroup = endpointGroups.find((g) => g.server === selectedServer) || endpointGroups[0];
+  const currentGroup = ENDPOINT_GROUPS.find((g) => g.server === selectedServer) || ENDPOINT_GROUPS[0];
   const currentEndpoints = currentGroup.endpoints;
 
   const handleServerChange = (server: 'admin' | 'client' | 'metrics') => {
@@ -272,28 +296,8 @@ export function ApiExplorer({
         (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
       );
 
-      // For admin endpoints, use API route proxy; for others, use direct URL
-      let baseUrl = currentGroup.baseUrl;
-      let actualPath = path;
-
-      if (selectedServer === 'admin') {
-        // WebDAV endpoints use the WebDAV API route
-        if (path.startsWith('/dav')) {
-          baseUrl = '/api/webdav';
-          // Remove /dav prefix since API route handles it
-          actualPath = path.substring(4) || '/';
-        } else {
-          // Regular admin endpoints use the admin API route (handles auth server-side)
-          baseUrl = '/api/admin';
-          // Remove leading slash from path, API route will add it
-          actualPath = path.startsWith('/') ? path.substring(1) : path;
-        }
-      }
-
-      // Construct URL - ensure there's a / between baseUrl and actualPath
-      const url = actualPath
-        ? `${baseUrl}/${actualPath}`.replace(/\/+/g, '/') // Remove duplicate slashes
-        : baseUrl;
+      // Every group goes through a same-origin proxy route.
+      const url = resolveRequestUrl(selectedServer, path);
       const headers: Record<string, string> = {};
 
       // Set content type only if there's a body
@@ -306,11 +310,9 @@ export function ApiExplorer({
         }
       }
 
-      // Admin auth is now handled server-side by API routes, so no need to add headers
-      // For client/metrics endpoints, they would need their own auth (not implemented yet)
-
-      // Note: Client server endpoints would need session cookies for authenticated requests
-      // This is a limitation of the API Explorer - it can't easily test authenticated client endpoints
+      // Admin auth is handled server-side by the proxy routes. Authenticated
+      // client endpoints need session cookies the explorer cannot mint; those
+      // requests go through but the homeserver will answer 401.
 
       // WebDAV methods that may need XML bodies
       const webdavMethods = ['PROPFIND', 'MKCOL', 'MOVE', 'COPY'];
@@ -457,7 +459,7 @@ export function ApiExplorer({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {endpointGroups.map((group) => (
+                {ENDPOINT_GROUPS.map((group) => (
                   <SelectItem key={group.server} value={group.server}>
                     <div className="flex items-center gap-2">
                       {getServerIcon(group.server)}

@@ -1,2 +1,2 @@
 export { WebDavService } from './webdav';
-export type { WebDavFile, WebDavDirectory, WebDavServiceDeps, WebDavError } from './webdav.types';
+export type { WebDavFile, WebDavDirectory, WebDavError } from './webdav.types';

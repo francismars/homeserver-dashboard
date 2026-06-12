@@ -154,6 +154,31 @@ function startMockAdmin(info) {
   });
 }
 
+/** Minimal text-serving upstream (mock client / metrics servers) so the API
+ * explorer proxies have something to round-trip against. `routes` maps
+ * "METHOD /path" to { type, body }. */
+function startMockTextServer(routes) {
+  const server = http.createServer((req, res) => {
+    const p = new URL(req.url, 'http://localhost').pathname;
+    const hit = routes[`${req.method} ${p}`];
+    if (!hit) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('not found');
+    }
+    res.writeHead(200, { 'Content-Type': hit.type });
+    res.end(hit.body);
+  });
+  return new Promise((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      resolve({
+        url: `http://127.0.0.1:${server.address().port}`,
+        close: () => new Promise((r) => server.close(r)),
+      });
+    });
+  });
+}
+
 const HOMESERVER_CONFIG_TEMPLATE = (icannDomain, withPort) =>
   [
     '[general]',
@@ -198,6 +223,12 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
 
   const cf = await startMockCf(0, { quiet: true });
   const admin = await startMockAdmin({ ...MOCK_INFO_DEFAULTS, pkarr_icann_domain: infoDomain });
+  const client = await startMockTextServer({
+    'GET /': { type: 'text/plain', body: 'pubky homeserver e2e client' },
+  });
+  const metrics = await startMockTextServer({
+    'GET /metrics': { type: 'text/plain; version=0.0.4', body: '# TYPE e2e_up gauge\ne2e_up 1\n' },
+  });
 
   const port = await freePort();
   const nextLog = path.join(root, 'next-dev.log');
@@ -215,6 +246,8 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       HOMESERVER_LOG_PATH: hsLogPath,
       ADMIN_BASE_URL: admin.url,
       ADMIN_TOKEN: 'e2e-admin-token',
+      CLIENT_BASE_URL: client.url,
+      METRICS_BASE_URL: metrics.url,
       CF_API_BASE: cf.url,
     },
   });
@@ -302,6 +335,8 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       });
       await cf.close();
       await admin.close();
+      await client.close();
+      await metrics.close();
       await fs.rm(root, { recursive: true, force: true });
     },
   };

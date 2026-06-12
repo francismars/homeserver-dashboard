@@ -80,6 +80,74 @@ describe('webdav proxy utils', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it.each([['MOVE'], ['COPY']])(
+    'rewrites the %s Destination header from the proxy path to the upstream /dav URL',
+    async (davMethod) => {
+      const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 201 }));
+      const request = new NextRequest('http://localhost:8080/api/webdav/pk1/pub/old.txt', {
+        method: 'POST',
+        headers: {
+          'X-HTTP-Method-Override': davMethod,
+          Destination: '/api/webdav/pk1/pub/new.txt',
+        },
+      });
+
+      const response = await proxyWebDavRequest(request, Promise.resolve({ path: ['pk1', 'pub', 'old.txt'] }), 'POST');
+
+      expect(response.status).toBe(201);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toBe('http://homeserver:6286/dav/pk1/pub/old.txt');
+      expect(init?.method).toBe(davMethod);
+      const headers = new Headers(init?.headers as HeadersInit);
+      expect(headers.get('Destination')).toBe('http://homeserver:6286/dav/pk1/pub/new.txt');
+    },
+  );
+
+  it('rewrites an absolute-URL Destination against the upstream base', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    const request = new NextRequest('http://localhost:8080/api/webdav/pk1/pub/a.txt', {
+      method: 'POST',
+      headers: {
+        'X-HTTP-Method-Override': 'MOVE',
+        Destination: 'http://localhost:8080/api/webdav/pk1/pub/b.txt',
+      },
+    });
+
+    const response = await proxyWebDavRequest(request, Promise.resolve({ path: ['pk1', 'pub', 'a.txt'] }), 'POST');
+
+    expect(response.status).toBe(204);
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers as HeadersInit);
+    expect(headers.get('Destination')).toBe('http://homeserver:6286/dav/pk1/pub/b.txt');
+  });
+
+  it('round-trips binary bodies without corruption', async () => {
+    const uploaded = new Uint8Array([0x50, 0x4b, 0x00, 0x03, 0xff, 0x00, 0x7f]);
+    const downloaded = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x1a, 0xff]);
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        new Response(downloaded, { status: 200, headers: { 'Content-Type': 'application/octet-stream' } }),
+      );
+
+    const request = new NextRequest('http://localhost:8080/api/webdav/pk1/pub/bin.dat', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: uploaded,
+    });
+
+    const response = await proxyWebDavRequest(request, Promise.resolve({ path: ['pk1', 'pub', 'bin.dat'] }), 'PUT');
+
+    const [, init] = fetchMock.mock.calls[0];
+    const sentBody = new Uint8Array(init?.body as Buffer);
+    expect(Array.from(sentBody)).toEqual(Array.from(uploaded));
+
+    expect(response.status).toBe(200);
+    const received = new Uint8Array(await response.arrayBuffer());
+    expect(Array.from(received)).toEqual(Array.from(downloaded));
+  });
+
   it('proxies PROPFIND responses successfully', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response('<multistatus />', {

@@ -23,25 +23,3 @@ export type DisabledUsersResponse = {
   next_cursor: string | null;
 };
 export type GenerateInviteResponse = { token: string };
-export type AdminUsageResponse = {
-  usersTotal: number;
-  numUnusedSignupCodes: number;
-  totalDiskUsedMB: number;
-  usersByInvite?: Record<string, number>;
-  storageByUser?: Array<{ user: string; usedBytes: number }>;
-};
-
-export type UsageResponse = AdminUsageResponse; // Alias for backward compatibility
-
-export type AdminConfigResponse = {
-  configToml: string;
-  checksum: string;
-  updatedAt?: string;
-};
-
-export type AdminConfig = AdminConfigResponse; // Alias for backward compatibility
-
-export type AdminServiceDeps = {
-  baseUrl: string;
-  token?: string;
-};
