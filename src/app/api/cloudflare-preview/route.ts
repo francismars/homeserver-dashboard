@@ -7,6 +7,7 @@ import {
   CREDENTIALS_PATH,
   LOCAL_CONFIG_PATH,
   PREVIEW_ENV,
+  PREVIEW_PUBLISHED,
   SETUP_FLOW_LOCK,
   SETUP_FLOW_LOCK_MAX_AGE_MS,
   PREVIEW_INSTANT_LOG,
@@ -126,6 +127,11 @@ export async function POST(request: NextRequest) {
     const instantGone = state ? await killPid(state.pid, state.starttime) : true;
     await clearState(PREVIEW_INSTANT_STATE());
     await fs.rm(PREVIEW_ENV(), { force: true });
+    // The wrapper handshake is authoritative for published_url whenever the
+    // marker exists; left behind, a later re-enable would report the previous
+    // (dead) trycloudflare URL as currently published until the new preview
+    // service writes a fresh one. Same cleanup as teardownPreview().
+    await fs.rm(PREVIEW_PUBLISHED(), { force: true });
     logRouteInfo({
       requestId,
       route: ROUTE_NAME,

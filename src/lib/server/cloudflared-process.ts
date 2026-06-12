@@ -421,6 +421,19 @@ function isLockHolderAlive(pid: number): boolean {
   }
 }
 
+/** True when the lock file no longer protects a live flow: unparseable
+ * content, a dead holder pid, or a holder older than maxAgeMs (the flow's
+ * worst-case runtime). */
+async function isLockStale(file: string, maxAgeMs: number): Promise<boolean> {
+  try {
+    const holder = JSON.parse(await fs.readFile(file, 'utf-8')) as { pid?: number; started_at?: string };
+    const age = Date.now() - Date.parse(holder.started_at ?? '');
+    return typeof holder.pid !== 'number' || !isLockHolderAlive(holder.pid) || !(age < maxAgeMs);
+  } catch {
+    return true; // empty or corrupt lock protects nothing
+  }
+}
+
 /**
  * Returns false when the lock file cannot be created at all (unwritable
  * config dir): the flow then runs unlocked and surfaces the real filesystem
@@ -446,14 +459,7 @@ async function acquireFlowLock(file: string, maxAgeMs: number, name: string): Pr
       return true;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return false;
-      let stale = false;
-      try {
-        const holder = JSON.parse(await fs.readFile(file, 'utf-8')) as { pid?: number; started_at?: string };
-        const age = Date.now() - Date.parse(holder.started_at ?? '');
-        stale = typeof holder.pid !== 'number' || !isLockHolderAlive(holder.pid) || !(age < maxAgeMs);
-      } catch {
-        stale = true; // empty or corrupt lock protects nothing
-      }
+      const stale = await isLockStale(file, maxAgeMs);
       if (!stale || attempt > 0) throw new AlreadyRunningError(name);
       // Steal atomically: renaming the stale lock to a unique name is the one
       // point where exactly one racer can win. A blind rm here would let a
@@ -487,10 +493,13 @@ export async function withFlowLock<T>(name: string, maxAgeMs: number, fn: () => 
   }
 }
 
-/** Removes every flow lock (disconnect; the entrypoint does the same at
- * boot). Includes the legacy completion-lock name so an upgrade over a
+/** Removes flow locks whose holder is gone (disconnect's "start over" must
+ * not stay wedged behind a crashed flow). Live locks are kept: deleting one
+ * would let its still-running flow interleave with whatever the caller does
+ * next. The entrypoint still removes every lock at boot, when no holder can
+ * be alive. Includes the legacy completion-lock name so an upgrade over a
  * crashed flow cannot stay wedged. */
-export async function clearAllFlowLocks(): Promise<void> {
+export async function clearStaleFlowLocks(): Promise<void> {
   let entries: string[];
   try {
     entries = await fs.readdir(getConfigDir());
@@ -500,5 +509,12 @@ export async function clearAllFlowLocks(): Promise<void> {
   const locks = entries.filter(
     (f) => (f.startsWith('.flow-') && f.endsWith('.lock')) || f === '.connect-complete.lock',
   );
-  await Promise.all(locks.map((f) => fs.rm(path.join(getConfigDir(), f), { force: true })));
+  await Promise.all(
+    locks.map(async (f) => {
+      const file = path.join(getConfigDir(), f);
+      // The longest flow's max age bounds every lock: past it the holder has
+      // crashed or hung either way.
+      if (await isLockStale(file, SETUP_FLOW_LOCK_MAX_AGE_MS)) await fs.rm(file, { force: true });
+    }),
+  );
 }
