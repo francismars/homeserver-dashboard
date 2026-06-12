@@ -26,12 +26,21 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
       chmod 640 "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
     fi
   done
+  # An unused login cert is a zone-admin credential with a 15-minute
+  # authorization window. The dashboard enforces it only while its status
+  # route is polled, so reap over-age certs here too: the canonical path and
+  # the scratch dir where the login child delivers them.
+  find "$CLOUDFLARE_DIR" -maxdepth 1 -name cert.pem -mmin +15 -delete 2>/dev/null || true
+  find "$CLOUDFLARE_DIR/.cloudflared" -name cert.pem -mmin +15 -delete 2>/dev/null || true
   # A leftover login cert is a zone-admin credential; only the dashboard
   # process ever needs it.
   if [ -f "$CLOUDFLARE_DIR/cert.pem" ]; then
     chown nextjs:nodejs "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
     chmod 600 "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
   fi
+  # Flow locks are per-process and meaningless across a restart; a lock
+  # orphaned by a crash must not wedge the setup flows forever.
+  rm -f "$CLOUDFLARE_DIR"/.flow-*.lock "$CLOUDFLARE_DIR/.connect-complete.lock" 2>/dev/null || true
 fi
 
 # Make the homeserver's config.toml writable by the dashboard process.

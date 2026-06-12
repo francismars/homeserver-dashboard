@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, Check, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/libs/utils';
 import { RestartCallout } from './RestartCallout';
+import { StepList } from './StepList';
 
 /**
  * Pre-filled Cloudflare token-creation link (officially supported template
@@ -144,7 +144,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           <CheckCircle className="h-4 w-4" />
           <span>Tunnel configured for {doneHostname}</span>
         </div>
-        {steps && <StepList steps={steps} />}
+        {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-auto-steps" />}
         <RestartCallout>
           The tunnel connects within a few seconds. Restart the app from Umbrel to publish your domain to the Pubky
           network.
@@ -281,7 +281,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
       )}
 
       {/* Progress of a failed run */}
-      {steps && !conflict && <StepList steps={steps} />}
+      {steps && !conflict && <StepList steps={steps} labels={STEP_LABELS} testId="cf-auto-steps" />}
 
       {/* DNS conflict confirmation */}
       {conflict && (
@@ -324,25 +324,5 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
         </div>
       )}
     </div>
-  );
-}
-
-function StepList({ steps }: { steps: Step[] }) {
-  return (
-    <ul className="space-y-1" data-testid="cf-auto-steps">
-      {steps.map((s) => (
-        <li key={s.key} className="flex items-center gap-2 text-xs">
-          {s.status === 'done' ? (
-            <Check className="h-3.5 w-3.5 text-brand" />
-          ) : (
-            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-          )}
-          <span className={cn(s.status === 'done' ? 'text-muted-foreground' : 'text-destructive')}>
-            {STEP_LABELS[s.key]}
-            {s.detail ? ` - ${s.detail}` : ''}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -52,6 +52,11 @@ describe('cloudflare-disconnect route', () => {
     ] as const) {
       await fs.writeFile(path.join(tmpDir, f), content, 'utf-8');
     }
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://x.trycloudflare.com', 'utf-8');
+    // Scratch login-delivery dir: a cert here would resurrect the authorization.
+    await fs.mkdir(path.join(tmpDir, '.cloudflared'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.cloudflared', 'cert.pem'), 'CERT', 'utf-8');
     await fs.writeFile(
       configPath,
       ['[pkdns]', 'icann_domain = "pubky2.example.com"', 'public_icann_http_port = 443', 'other = 1'].join('\n'),
@@ -64,9 +69,10 @@ describe('cloudflare-disconnect route', () => {
     expect(data.ok).toBe(true);
     expect(data.message).toContain('still exist in your Cloudflare account');
 
-    for (const f of ['cert.pem', 'config.yml', 'credentials.json', 'testdrive.env']) {
+    for (const f of ['cert.pem', 'config.yml', 'credentials.json', 'testdrive.env', 'preview/published']) {
       await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
     }
+    await expect(fs.access(path.join(tmpDir, '.cloudflared'))).rejects.toThrow();
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('');
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('');
 
@@ -87,8 +93,32 @@ describe('cloudflare-disconnect route', () => {
     );
     const { res, lib } = await post();
     expect(res.status).toBe(200);
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(111);
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(222);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(111, undefined);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(222, undefined);
+  });
+
+  it('clears orphaned flow locks so a crashed setup cannot wedge future flows', async () => {
+    await fs.writeFile(path.join(tmpDir, '.flow-setup.lock'), '{}', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, '.flow-connect-start.lock'), '{}', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, '.connect-complete.lock'), '', 'utf-8');
+    const { res } = await post();
+    expect(res.status).toBe(200);
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.flow-connect-start.lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.connect-complete.lock'))).rejects.toThrow();
+  });
+
+  it('refuses with 409 while a live setup flow holds the lock, leaving artifacts intact', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+      'utf-8',
+    );
+    await fs.writeFile(path.join(tmpDir, 'token'), 'eyJ-token', 'utf-8');
+    const { res } = await post();
+    expect(res.status).toBe(409);
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('eyJ-token');
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).resolves.toBeUndefined();
   });
 
   it('succeeds with published_domain skipped when the homeserver config is absent', async () => {

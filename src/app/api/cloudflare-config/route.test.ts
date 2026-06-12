@@ -135,6 +135,68 @@ describe('cloudflare-config route', () => {
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
   });
 
+  it('POST rejects a domain-only save while a Connect setup exists', async () => {
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: x', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'domain'), 'old.example.com', 'utf-8');
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ domain: 'new.example.com' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    const payload = await response.json();
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain('Disconnect first');
+    expect(payload.error).toContain('Connect');
+    // The tunnel still serves the old hostname; the domain file must not drift.
+    expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('old.example.com');
+  });
+
+  it('POST allows a domain-only repoint while a manual token exists', async () => {
+    await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN, 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'domain'), 'old.example.com', 'utf-8');
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ domain: 'new.example.com' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('new.example.com');
+  });
+
+  it('POST rejects a domain-only save when no setup exists at all', async () => {
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ domain: 'pubky.example.com' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    const payload = await response.json();
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain('token is required');
+    await expect(fs.access(path.join(tmpDir, 'domain'))).rejects.toThrow();
+  });
+
+  it('POST switching to token mode removes the locally-managed config', async () => {
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: x', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{}', 'utf-8');
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ domain: 'pubky.example.com', token: VALID_TOKEN }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, 'credentials.json'))).rejects.toThrow();
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
+  });
+
   it.each([
     ['too short', 'short'],
     ['contains whitespace', 'a'.repeat(20) + ' ' + 'a'.repeat(20)],

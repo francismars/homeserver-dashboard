@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.13]
+
+Setup-flow correctness: every Cloudflare state transition is now crash-safe, serialized, and cleans up after itself.
+
+### Added
+
+- Cross-flow locks with staleness reaping: setup flows (Connect start/finish, API-token auto-setup, Preview enable) are serialized; an interrupted run can no longer permanently block "Finish setup" with a 409 or silently disable the Connect button. Locks abandoned by a crash are detected (dead pid or over-age) and stolen; disconnect and container start clear them.
+- Cert-derived domain: after authorizing, the dashboard reads the authorized zone from the certificate and offers a subdomain-only picker (suggestions: pubky, hs, homeserver) with the domain as a locked suffix, eliminating the wrong-zone hostname failure class. Falls back to the full-hostname input whenever the certificate cannot be parsed; the finish step also rejects out-of-zone hostnames server-side.
+- Connect card states its prerequisites up front (free Cloudflare account with your domain added) and points domain-less users at Preview mode.
+- E2E suite in `scripts/e2e/` (`npm run e2e`): mock Cloudflare API plus six browser-driven flows (token setup, preview, disconnect, overview health, connect-authorized, preview superseded by real setup). The live release-gate script (`scripts/validate-live-cloudflare.mjs`) now also covers preview enable/disable and disconnect.
+
+### Fixed
+
+- Completing a real setup (Connect or API token) now disables Preview mode: marker removed, temporary tunnel stopped.
+- All writes to `token`, `domain`, and `config.yml` are atomic (tmp + rename); crash-looping readers can no longer observe torn files. Mode switches delete the previous mode's files before writing the new mode's, closing the two-tunnels-at-once window.
+- Retrying a failed Connect completion reuses the already-created tunnel instead of creating duplicates and orphaning the first one in the user's Cloudflare account; a failed CF-side delete no longer discards the local credentials.
+- A failed Preview enable kills the child it spawned and removes the marker (no more "Failed to enable" with the GET reporting enabled).
+- Cancel and disconnect remove the scratch authorization certificate, so a cancelled authorization cannot resurrect; the login child is killed by `timeout` after 15 minutes even if nobody polls; over-age certificates are deleted at container start; an expired authorization is announced in the UI instead of silently resetting.
+- Stopping Preview escalates SIGTERM to SIGKILL and reports honestly when the process survived.
+- Saving a domain without a token in the manual form is rejected with an explanation instead of writing a half-configuration that publishes a dead address.
+- Process identity checks record the child's start time, so a recycled pid after a container restart can never kill the wrong process.
+
+### Changed
+
+- Shared `StepList` component for the Connect and auto-setup flows; preview-related internals renamed for clarity (on-disk names unchanged).
+
 ## [Unreleased]
 
 Baseline work toward v1.0.0: CI repair, test coverage, security fixes, dead-code cleanup, and dashboard-direct logs + config editing via the shared data-dir bind mount.

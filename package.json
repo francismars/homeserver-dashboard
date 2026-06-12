@@ -1,6 +1,6 @@
 {
   "name": "homeserver-dashboard",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 8080",
@@ -13,6 +13,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\" --ignore-path .prettierignore",
     "knip": "knip",
     "test": "vitest run",
+    "e2e": "node scripts/e2e/run-all.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
@@ -49,6 +50,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "29.1.1",
     "knip": "^6.14.2",
+    "playwright-core": "^1.60.0",
     "postcss": "8.5.15",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.8.0",

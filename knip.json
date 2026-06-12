@@ -5,9 +5,10 @@
     "next.config.*",
     "src/app/**/page.{js,jsx,ts,tsx}",
     "src/app/**/layout.{js,jsx,ts,tsx}",
-    "src/app/**/loading.{js,jsx,ts,tsx}"
+    "src/app/**/loading.{js,jsx,ts,tsx}",
+    "scripts/**/*.mjs"
   ],
-  "project": ["src/**/*.{js,jsx,ts,tsx}"],
+  "project": ["src/**/*.{js,jsx,ts,tsx}", "scripts/**/*.mjs"],
   "ignoreExportsUsedInFile": true,
   "ignoreIssues": {
     "src/components/ui/**": ["exports", "types"]

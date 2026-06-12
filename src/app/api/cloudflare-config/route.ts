@@ -3,6 +3,7 @@ import { constants as fsConstants, promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
+import { atomicWrite } from '@/lib/server/cloudflared-process';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-config';
@@ -161,18 +162,62 @@ export async function POST(request: NextRequest) {
     return errorResponse(error, requestId);
   }
 
+  // A domain-only save must land in a setup that can actually serve it.
+  if (body.domain !== undefined && body.token === undefined) {
+    const hasConnectConfig = await fs.access(path.join(CONFIG_DIR, 'config.yml')).then(
+      () => true,
+      () => false,
+    );
+    const hasToken = await fs
+      .readFile(TOKEN_FILE, 'utf-8')
+      .then((s) => s.trim().length > 0)
+      .catch(() => false);
+    // While a Connect setup exists, its tunnel keeps serving the hostname
+    // baked into config.yml: writing only the domain file would make status
+    // report the new domain (and the wrapper publish it) while the tunnel
+    // still serves the old one.
+    let error: RouteError | null = null;
+    if (hasConnectConfig) {
+      error = new RouteError(
+        400,
+        'bad_request',
+        'This domain is managed by the Connect Cloudflare setup, so saving it here would not change what the tunnel serves. Disconnect first, or use the Connect flow to change domains.',
+      );
+    } else if (!hasToken) {
+      error = new RouteError(
+        400,
+        'bad_request',
+        'A Cloudflare tunnel token is required for the domain to work. Paste the token along with the domain, or use one of the guided setups.',
+      );
+    }
+    if (error) {
+      logRouteError({
+        requestId,
+        route: ROUTE_NAME,
+        method: 'POST',
+        statusCode: error.status,
+        durationMs: Date.now() - startedAt,
+        errorType: error.type,
+        message: error.message,
+        meta: { hasConnectConfig },
+      });
+      return errorResponse(error, requestId);
+    }
+  }
+
   try {
+    if (body.token !== undefined && token) {
+      // Switching to token mode: drop the locally-managed config BEFORE the
+      // token lands, so a crash in between can never leave both modes
+      // validly configured with two tunnels running.
+      await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
+      await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
+    }
     if (body.domain !== undefined) {
-      await fs.writeFile(DOMAIN_FILE, domain, 'utf-8');
+      await atomicWrite(DOMAIN_FILE, domain);
     }
     if (body.token !== undefined) {
-      await fs.writeFile(TOKEN_FILE, token, 'utf-8');
-      if (token) {
-        // Switching to token mode: drop any locally-managed config so the
-        // cloudflared-local container stops claiming the old hostname.
-        await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
-        await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
-      }
+      await atomicWrite(TOKEN_FILE, token);
     }
     logRouteInfo({
       requestId,

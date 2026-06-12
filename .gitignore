@@ -19,6 +19,8 @@
 # misc
 .DS_Store
 *.pem
+# synthetic self-signed test fixtures, never real credentials
+!src/lib/server/__fixtures__/*.pem
 
 # debug
 npm-debug.log*

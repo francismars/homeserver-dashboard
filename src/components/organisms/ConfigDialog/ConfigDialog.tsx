@@ -241,16 +241,20 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     };
   }, [open]);
 
-  // Ensure we never stay on hidden tabs
+  // Ensure we never stay on hidden tabs. Visibility starts as false because
+  // it is UNKNOWN until the availability fetch lands, so each bounce must
+  // wait for its own tab's fetch: otherwise opening on the Cloudflare tab
+  // (the default, and the Overview "Fix it" target) races the two fetches
+  // and lands on Config whenever server-config resolves first.
   useEffect(() => {
-    if (activeTab === 'config' && !isConfigTabVisible) {
+    if (activeTab === 'config' && !configLoading && !isConfigTabVisible) {
       if (isCloudflareTabVisible) setActiveTab('cloudflare');
       return;
     }
-    if (activeTab === 'cloudflare' && !isCloudflareTabVisible) {
+    if (activeTab === 'cloudflare' && !cfLoading && !isCloudflareTabVisible) {
       if (isConfigTabVisible) setActiveTab('config');
     }
-  }, [activeTab, isConfigTabVisible, isCloudflareTabVisible]);
+  }, [activeTab, isConfigTabVisible, isCloudflareTabVisible, configLoading, cfLoading]);
 
   // Fetch Cloudflare config when dialog opens
   useEffect(() => {
