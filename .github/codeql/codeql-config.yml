@@ -1,0 +1,11 @@
+name: CodeQL config
+
+# The e2e suite is browser-driven test infrastructure: a mock Cloudflare server,
+# a dev-server harness, and Playwright specs whose assertions intentionally do
+# substring URL checks and read fabricated fixture files. It is never deployed,
+# so its findings (log-injection in the mock, url-substring checks in specs,
+# fixture file reads in the harness) are not production attack surface.
+paths-ignore:
+  - scripts/e2e
+  - '**/*.test.ts'
+  - '**/*.test.tsx'

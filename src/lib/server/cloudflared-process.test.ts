@@ -336,6 +336,35 @@ describe('withFlowLock', () => {
     expect(await withFlowLock('test', 60_000, async () => 'ran')).toBe('ran');
   });
 
+  it('lets only one of many concurrent callers steal the same stale lock', async () => {
+    const { withFlowLock, AlreadyRunningError } = await import('./cloudflared-process');
+    const staleHolder = () =>
+      JSON.stringify({ pid: 999999999, started_at: new Date(Date.now() - 61_000).toISOString() });
+    // Many trials: the old blind-rm steal double-acquired a few per thousand.
+    for (let trial = 0; trial < 200; trial += 1) {
+      await fs.writeFile(lockPath(), staleHolder());
+      let running = 0;
+      let peak = 0;
+      const run = () =>
+        withFlowLock('test', 60_000, async () => {
+          running += 1;
+          peak = Math.max(peak, running);
+          await new Promise((r) => setTimeout(r, 1));
+          running -= 1;
+          return 'ran';
+        });
+      const results = await Promise.allSettled([run(), run(), run(), run()]);
+      const ran = results.filter((r) => r.status === 'fulfilled').length;
+      const backedOff = results.filter(
+        (r) => r.status === 'rejected' && r.reason instanceof AlreadyRunningError,
+      ).length;
+      expect(peak).toBe(1); // never two critical sections at once
+      expect(ran).toBe(1);
+      expect(ran + backedOff).toBe(4);
+      await fs.rm(lockPath(), { force: true });
+    }
+  });
+
   it('steals an empty or corrupt lock file', async () => {
     const { withFlowLock } = await import('./cloudflared-process');
     await fs.writeFile(lockPath(), '', 'utf-8');

@@ -11,7 +11,7 @@
  * parse + pid identity probe).
  */
 import { execFile, spawn } from 'child_process';
-import { X509Certificate } from 'crypto';
+import { X509Certificate, randomUUID } from 'crypto';
 import { promisify } from 'util';
 import { closeSync, openSync, readFileSync } from 'fs';
 import { promises as fs } from 'fs';
@@ -455,7 +455,18 @@ async function acquireFlowLock(file: string, maxAgeMs: number, name: string): Pr
         stale = true; // empty or corrupt lock protects nothing
       }
       if (!stale || attempt > 0) throw new AlreadyRunningError(name);
-      await fs.rm(file, { force: true }); // steal, then one retry
+      // Steal atomically: renaming the stale lock to a unique name is the one
+      // point where exactly one racer can win. A blind rm here would let a
+      // second racer delete the fresh lock a first racer just created, so both
+      // would proceed. Losing the rename (ENOENT) means another racer already
+      // stole or replaced it, so we back off rather than retry.
+      try {
+        const stolen = `${file}.stale-${randomUUID()}`;
+        await fs.rename(file, stolen);
+        await fs.rm(stolen, { force: true });
+      } catch {
+        throw new AlreadyRunningError(name);
+      }
     }
   }
   throw new AlreadyRunningError(name);
