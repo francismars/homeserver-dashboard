@@ -35,7 +35,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy entrypoint script and fix line endings (Windows CRLF → Unix LF)
+# Embed cloudflared for the Connect (browser-auth) and Test-drive (quick
+# tunnel) setup flows. Pinned by digest, copied from the official image -
+# same supply-chain posture as the runtime cloudflared container. Static Go
+# binary, runs fine on alpine/musl.
+COPY --from=cloudflare/cloudflared:2026.5.2@sha256:12ff5c6992a9863db4da270746af7c244bcaee49353039af8104268a18d6c4f0 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
+
+# Copy entrypoint script and fix line endings (Windows CRLF -> Unix LF)
 COPY entrypoint.sh /tmp/entrypoint.sh
 RUN sed -i 's/\r$//' /tmp/entrypoint.sh && \
     mv /tmp/entrypoint.sh /usr/local/bin/entrypoint.sh && \

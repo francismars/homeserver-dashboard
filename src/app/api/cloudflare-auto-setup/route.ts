@@ -243,6 +243,11 @@ export async function POST(request: NextRequest) {
     // app restart; the restart is only needed to publish icann_domain.
     await fs.writeFile(path.join(CONFIG_DIR, 'token'), runToken, 'utf-8');
     await fs.writeFile(path.join(CONFIG_DIR, 'domain'), hostname, 'utf-8');
+    // Mode switch (mirror of the Connect flow's token truncation): a stale
+    // locally-managed config would keep a second tunnel running against the
+    // old hostname and make the Connect card claim "completed".
+    await fs.rm(path.join(CONFIG_DIR, 'config.yml'), { force: true });
+    await fs.rm(path.join(CONFIG_DIR, 'credentials.json'), { force: true });
     steps.push({ key: 'credentials', status: 'done' });
   } catch (e) {
     steps.push({ key: 'credentials', status: 'failed' });

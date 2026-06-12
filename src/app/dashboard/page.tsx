@@ -17,7 +17,8 @@ import Link from 'next/link';
 // The dashboard's own release version. The homeserver's version (from /info)
 // is shown on the Overview card, explicitly labeled; mixing the two in the
 // footer confused operators comparing against the Umbrel app version.
-import { version as dashboardVersion } from '../../../package.json';
+import packageJson from '../../../package.json';
+const dashboardVersion = packageJson.version;
 
 export default function DashboardPage() {
   const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
