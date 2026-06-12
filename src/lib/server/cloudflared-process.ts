@@ -56,33 +56,52 @@ export async function isBinaryAvailable(): Promise<boolean> {
   return binaryProbe.ok;
 }
 
+/** /proc/<pid>/stat field 22 (starttime, clock ticks since host boot). The
+ * (pid, starttime) pair identifies a process uniquely for the host's uptime,
+ * unlike a bare pid, which the kernel recycles. */
+function readProcStarttime(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+    // comm (field 2) may contain spaces; fields resume after its closing paren.
+    const rest = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    const starttime = Number(rest[19]); // field 22
+    return Number.isFinite(starttime) ? starttime : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * A pid from a state file may belong to a different process after a container
  * restart (PID namespaces restart from 1; state files on the bind mount
  * survive). Trust a pid only when it is alive AND its command is one we
  * could have spawned - otherwise a stale state file could make us SIGTERM an
- * arbitrary same-uid process, including the dashboard itself.
+ * arbitrary same-uid process, including the dashboard itself. When the state
+ * file recorded the child's starttime, the live process must match it too:
+ * the comm check alone cannot tell our cloudflared from a pid-reuse one.
  */
-function isOurProcess(pid: number): boolean {
+function isOurProcess(pid: number, starttime?: number): boolean {
   try {
     const comm = readFileSync(`/proc/${pid}/comm`, 'utf-8').trim();
-    return comm === 'cloudflared' || comm === 'timeout';
+    if (comm !== 'cloudflared' && comm !== 'timeout') return false;
   } catch {
     return false;
   }
+  if (starttime !== undefined && readProcStarttime(pid) !== starttime) return false;
+  return true;
 }
 
-export function isPidAlive(pid: number): boolean {
+export function isPidAlive(pid: number, starttime?: number): boolean {
   try {
     process.kill(pid, 0);
   } catch {
     return false;
   }
-  return isOurProcess(pid);
+  return isOurProcess(pid, starttime);
 }
 
-export function killPid(pid: number): void {
-  if (!isOurProcess(pid)) return;
+export function killPid(pid: number, starttime?: number): void {
+  if (!isOurProcess(pid, starttime)) return;
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
@@ -90,15 +109,21 @@ export function killPid(pid: number): void {
   }
 }
 
+export interface SpawnedChild {
+  pid: number;
+  starttime?: number;
+}
+
 /**
  * Spawns a command detached with stdout+stderr appended to logPath.
- * Returns the child's pid. The caller persists it in a state file.
+ * Returns the child's pid plus its /proc starttime. The caller persists
+ * both in a state file.
  */
 export async function spawnDetached(
   command: string[],
   logPath: string,
   env: Record<string, string> = {},
-): Promise<number> {
+): Promise<SpawnedChild> {
   await fs.mkdir(getConfigDir(), { recursive: true });
   await fs.writeFile(logPath, '', 'utf-8'); // fresh log per attempt
   const out = openSync(logPath, 'a');
@@ -113,7 +138,8 @@ export async function spawnDetached(
   closeSync(out);
   closeSync(err);
   if (child.pid === undefined) throw new Error(`Failed to spawn ${bin}`);
-  return child.pid;
+  // Capture identity now, while the pid is guaranteed to still be ours.
+  return { pid: child.pid, starttime: readProcStarttime(child.pid) ?? undefined };
 }
 
 /** One-shot cloudflared invocation (create / route dns / delete). Async so a
@@ -207,7 +233,14 @@ export async function relocateDeliveredCert(): Promise<void> {
   } catch {
     return;
   }
-  await fs.rename(delivered, CERT_PATH());
+  try {
+    await fs.rename(delivered, CERT_PATH());
+  } catch (e) {
+    // Two concurrent polls can both pass the access check; the loser's
+    // rename finds the file already moved.
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw e;
+  }
   await fs.chmod(CERT_PATH(), 0o600);
   await fs.rm(path.join(getConfigDir(), '.cloudflared'), { recursive: true, force: true });
 }
@@ -224,31 +257,27 @@ export async function parseLoginUrl(): Promise<string | null> {
 export interface ProcessState {
   pid: number;
   started_at: string; // ISO
+  /** /proc starttime of the spawned child (see readProcStarttime); absent in
+   * state files written before this field existed. */
+  starttime?: number;
 }
 
 export async function readState(file: string): Promise<ProcessState | null> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(file, 'utf-8');
-    const parsed = JSON.parse(raw) as ProcessState;
-    if (typeof parsed.pid !== 'number' || typeof parsed.started_at !== 'string') return null;
-    return parsed;
+    raw = await fs.readFile(file, 'utf-8');
   } catch {
     return null;
   }
-}
-
-/**
- * Atomically claims the state file (O_EXCL). Returns false when another
- * request already holds it - the spawn mutex against double-start races.
- */
-export async function claimState(file: string): Promise<boolean> {
-  await fs.mkdir(getConfigDir(), { recursive: true });
   try {
-    const handle = await fs.open(file, 'wx');
-    await handle.close();
-    return true;
+    const parsed = JSON.parse(raw) as ProcessState;
+    if (typeof parsed.pid !== 'number' || typeof parsed.started_at !== 'string') throw new Error('malformed state');
+    return parsed;
   } catch {
-    return false;
+    // A half-written file reads as absent but still exists on disk; reap it
+    // so it cannot block anything and the flow can start fresh.
+    await fs.rm(file, { force: true });
+    return null;
   }
 }
 
@@ -266,4 +295,109 @@ export async function clearState(file: string): Promise<void> {
   } catch {
     // best effort
   }
+}
+
+/** Thrown when a flow lock is held by a live, in-age holder. Routes map it
+ * to their 409 "already in progress" responses. */
+export class AlreadyRunningError extends Error {
+  constructor(name: string) {
+    super(`The "${name}" flow is already running`);
+    this.name = 'AlreadyRunningError';
+  }
+}
+
+/** Lock shared by every flow that writes setup artifacts (connect complete,
+ * auto-setup, preview enable). Interleaving two of them can point DNS at one
+ * tunnel while the saved token runs another, or let preview shadow a real
+ * domain whose setup completed mid-enable. */
+export const SETUP_FLOW_LOCK = 'setup';
+/** Worst case is connect complete: two 30s tunnel-create attempts plus route
+ * dns. Anything older is a crashed holder and its lock gets stolen. */
+export const SETUP_FLOW_LOCK_MAX_AGE_MS = 3 * 60_000;
+export const CONNECT_START_FLOW_LOCK = 'connect-start';
+/** Connect start worst case: spawn plus 10s of login-URL polling. */
+export const CONNECT_START_FLOW_LOCK_MAX_AGE_MS = 60_000;
+
+const flowLockPath = (name: string) => path.join(getConfigDir(), `.flow-${name}.lock`);
+
+/** Liveness only - flow locks are held by dashboard workers, not cloudflared
+ * children, so the comm check in isOurProcess does not apply. */
+function isLockHolderAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Returns false when the lock file cannot be created at all (unwritable
+ * config dir): the flow then runs unlocked and surfaces the real filesystem
+ * error itself, which beats a misleading "already in progress". A crashed
+ * holder must not wedge the flow forever: an existing lock is stolen when it
+ * is unparseable, its pid is dead, or it is older than maxAgeMs (the flow's
+ * worst-case runtime). Otherwise throws AlreadyRunningError.
+ */
+async function acquireFlowLock(file: string, maxAgeMs: number, name: string): Promise<boolean> {
+  try {
+    await fs.mkdir(getConfigDir(), { recursive: true });
+  } catch {
+    return false;
+  }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const handle = await fs.open(file, 'wx');
+      try {
+        await handle.writeFile(JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }), 'utf-8');
+      } finally {
+        await handle.close();
+      }
+      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return false;
+      let stale = false;
+      try {
+        const holder = JSON.parse(await fs.readFile(file, 'utf-8')) as { pid?: number; started_at?: string };
+        const age = Date.now() - Date.parse(holder.started_at ?? '');
+        stale = typeof holder.pid !== 'number' || !isLockHolderAlive(holder.pid) || !(age < maxAgeMs);
+      } catch {
+        stale = true; // empty or corrupt lock protects nothing
+      }
+      if (!stale || attempt > 0) throw new AlreadyRunningError(name);
+      await fs.rm(file, { force: true }); // steal, then one retry
+    }
+  }
+  throw new AlreadyRunningError(name);
+}
+
+/**
+ * Runs fn under an on-disk exclusive lock (O_EXCL create; no module memory,
+ * same constraint as the state files). Throws AlreadyRunningError when a
+ * live, in-age holder exists; always releases the lock when fn settles.
+ */
+export async function withFlowLock<T>(name: string, maxAgeMs: number, fn: () => Promise<T>): Promise<T> {
+  const file = flowLockPath(name);
+  const acquired = await acquireFlowLock(file, maxAgeMs, name);
+  try {
+    return await fn();
+  } finally {
+    if (acquired) await fs.rm(file, { force: true });
+  }
+}
+
+/** Removes every flow lock (disconnect; the entrypoint does the same at
+ * boot). Includes the legacy completion-lock name so an upgrade over a
+ * crashed flow cannot stay wedged. */
+export async function clearAllFlowLocks(): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(getConfigDir());
+  } catch {
+    return;
+  }
+  const locks = entries.filter(
+    (f) => (f.startsWith('.flow-') && f.endsWith('.lock')) || f === '.connect-complete.lock',
+  );
+  await Promise.all(locks.map((f) => fs.rm(path.join(getConfigDir(), f), { force: true })));
 }

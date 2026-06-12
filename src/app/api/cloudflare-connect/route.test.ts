@@ -11,7 +11,7 @@ vi.mock('@/lib/server/cloudflared-process', async (importOriginal) => {
     isBinaryAvailable: vi.fn(() => true),
     isPidAlive: vi.fn(() => true),
     killPid: vi.fn(),
-    spawnDetached: vi.fn(async () => 7777),
+    spawnDetached: vi.fn(async () => ({ pid: 7777 })),
     runCloudflared: vi.fn(() => ({ ok: true, output: '' })),
     parseLoginUrl: vi.fn(async () => 'https://dash.cloudflare.com/argotunnel?aud=&callback=abc'),
   };
@@ -55,7 +55,7 @@ describe('cloudflare-connect route', () => {
     }
     (lib.isBinaryAvailable as Mock).mockReturnValue(true);
     (lib.isPidAlive as Mock).mockReturnValue(true);
-    (lib.spawnDetached as Mock).mockResolvedValue(7777);
+    (lib.spawnDetached as Mock).mockResolvedValue({ pid: 7777 });
     (lib.runCloudflared as Mock).mockReturnValue({ ok: true, output: '' });
     (lib.parseLoginUrl as Mock).mockResolvedValue(AUTH_URL);
     const mod = await import('./route');
@@ -236,7 +236,7 @@ describe('cloudflare-connect route', () => {
     await writeCert();
     const data = await (await post(POST, { action: 'cancel' })).json();
     expect(data.status).toBe('idle');
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(999);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(999, undefined);
     await expect(fs.access(path.join(tmpDir, 'cert.pem'))).rejects.toThrow();
   });
 
@@ -255,6 +255,33 @@ describe('cloudflare-connect route', () => {
     await writeCert();
     const res = await post(POST, { action: 'complete', hostname: 'bad host!' });
     expect(res.status).toBe(400);
+  });
+
+  it('complete returns 409 while the setup lock is held by a live flow', async () => {
+    const { lib, POST } = await routes();
+    await writeCert();
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+    );
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
+    const data = await res.json();
+    expect(res.status).toBe(409);
+    expect(data.error).toContain('already in progress');
+    expect(lib.runCloudflared as Mock).not.toHaveBeenCalled();
+  });
+
+  it('a lock orphaned by a crashed completion (dead pid) is stolen, not a permanent 409', async () => {
+    const { POST } = await routes();
+    await writeCert();
+    await writeCreds('uuid-42');
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: 999999999, started_at: new Date().toISOString() }),
+    );
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
+    expect(res.status).toBe(200);
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
   });
 
   it('stale login (dead pid) resets to idle so the user can retry', async () => {

@@ -3,12 +3,14 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import {
+  AlreadyRunningError,
   CREDENTIALS_PATH,
   LOCAL_CONFIG_PATH,
   PREVIEW_ENV,
+  SETUP_FLOW_LOCK,
+  SETUP_FLOW_LOCK_MAX_AGE_MS,
   TESTDRIVE_LOG,
   TESTDRIVE_STATE,
-  claimState,
   clearState,
   getCloudflaredBin,
   getConfigDir,
@@ -22,6 +24,7 @@ import {
   quickTunnelFailed,
   readState,
   spawnDetached,
+  withFlowLock,
   writeState,
 } from '@/lib/server/cloudflared-process';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
@@ -75,7 +78,7 @@ async function hasPermanentSetup(): Promise<boolean> {
 async function instantStatus(): Promise<{ status: 'stopped' | 'starting' | 'running'; url?: string; error?: string }> {
   const state = await readState(TESTDRIVE_STATE());
   if (!state) return { status: 'stopped' };
-  if (!isPidAlive(state.pid)) {
+  if (!isPidAlive(state.pid, state.starttime)) {
     const failed = await quickTunnelFailed();
     await clearState(TESTDRIVE_STATE());
     return failed
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
 
   if (body.action === 'disable') {
     const state = await readState(TESTDRIVE_STATE());
-    if (state) killPid(state.pid);
+    if (state) killPid(state.pid, state.starttime);
     await clearState(TESTDRIVE_STATE());
     await fs.rm(PREVIEW_ENV(), { force: true });
     logRouteInfo({
@@ -144,65 +147,77 @@ export async function POST(request: NextRequest) {
       requestId,
     );
   }
-  if (await hasPermanentSetup()) {
-    return errorResponse(
-      new RouteError(
-        409,
-        'bad_request',
-        'A permanent Cloudflare setup already exists. Preview mode is for trying things out before setting up a real domain.',
-      ),
-      requestId,
-    );
-  }
-
   try {
-    // The marker gates the cloudflared-preview compose service (env_file)
-    // and tells the config wrapper to publish the URL on the next start.
-    // The preview dir must be writable by the cloudflared-preview container
-    // (UID 65532) BEFORE it starts - cloudflared silently skips an
-    // uncreatable logfile instead of crashing (live finding), so a crash-loop
-    // cannot self-heal this. World-writable is acceptable: single-user
-    // device, the dir only ever holds the tunnel's own log (the URL in it is
-    // public by nature). chmod explicitly (mkdir mode is umask-clipped).
-    await fs.mkdir(path.join(getConfigDir(), 'preview'), { recursive: true });
-    await fs.chmod(path.join(getConfigDir(), 'preview'), 0o777);
-    await fs.writeFile(PREVIEW_ENV(), `TUNNEL_URL=${getTestdriveOrigin()}\n`, 'utf-8');
+    // The setup lock keeps the permanent-setup check and the marker write
+    // atomic against connect complete / auto-setup: a setup completing in
+    // between must not end up shadowed by preview.
+    return await withFlowLock(SETUP_FLOW_LOCK, SETUP_FLOW_LOCK_MAX_AGE_MS, async () => {
+      if (await hasPermanentSetup()) {
+        return errorResponse(
+          new RouteError(
+            409,
+            'bad_request',
+            'A permanent Cloudflare setup already exists. Preview mode is for trying things out before setting up a real domain.',
+          ),
+          requestId,
+        );
+      }
 
-    // Instant tunnel so the user gets a working URL right away (uncapped;
-    // it dies with the container and the compose service takes over after
-    // the restart that actually publishes the address).
-    const existing = await instantStatus();
-    if (existing.status === 'stopped' && (await claimState(TESTDRIVE_STATE()))) {
-      const pid = await spawnDetached(
-        [getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()],
-        TESTDRIVE_LOG(),
-      );
-      await writeState(TESTDRIVE_STATE(), { pid, started_at: new Date().toISOString() });
-    }
-    logRouteInfo({
-      requestId,
-      route: ROUTE_NAME,
-      method: 'POST',
-      statusCode: 200,
-      durationMs: Date.now() - startedAt,
-      message: 'Preview enabled',
+      try {
+        // The marker gates the cloudflared-preview compose service (env_file)
+        // and tells the config wrapper to publish the URL on the next start.
+        // The preview dir must be writable by the cloudflared-preview container
+        // (UID 65532) BEFORE it starts - cloudflared silently skips an
+        // uncreatable logfile instead of crashing (live finding), so a crash-loop
+        // cannot self-heal this. World-writable is acceptable: single-user
+        // device, the dir only ever holds the tunnel's own log (the URL in it is
+        // public by nature). chmod explicitly (mkdir mode is umask-clipped).
+        await fs.mkdir(path.join(getConfigDir(), 'preview'), { recursive: true });
+        await fs.chmod(path.join(getConfigDir(), 'preview'), 0o777);
+        await fs.writeFile(PREVIEW_ENV(), `TUNNEL_URL=${getTestdriveOrigin()}\n`, 'utf-8');
+
+        // Instant tunnel so the user gets a working URL right away (uncapped;
+        // it dies with the container and the compose service takes over after
+        // the restart that actually publishes the address).
+        const existing = await instantStatus();
+        if (existing.status === 'stopped') {
+          const child = await spawnDetached(
+            [getCloudflaredBin(), 'tunnel', '--no-autoupdate', '--url', getTestdriveOrigin()],
+            TESTDRIVE_LOG(),
+          );
+          await writeState(TESTDRIVE_STATE(), { ...child, started_at: new Date().toISOString() });
+        }
+        logRouteInfo({
+          requestId,
+          route: ROUTE_NAME,
+          method: 'POST',
+          statusCode: 200,
+          durationMs: Date.now() - startedAt,
+          message: 'Preview enabled',
+        });
+        return NextResponse.json(
+          { enabled: true, instant: await instantStatus(), requestId },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+      } catch (e) {
+        await clearState(TESTDRIVE_STATE());
+        const error = new RouteError(500, 'internal_error', 'Failed to enable preview mode');
+        logRouteError({
+          requestId,
+          route: ROUTE_NAME,
+          method: 'POST',
+          statusCode: error.status,
+          durationMs: Date.now() - startedAt,
+          errorType: error.type,
+          message: e instanceof Error ? e.message : String(e),
+        });
+        return errorResponse(error, requestId);
+      }
     });
-    return NextResponse.json(
-      { enabled: true, instant: await instantStatus(), requestId },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
   } catch (e) {
-    await clearState(TESTDRIVE_STATE());
-    const error = new RouteError(500, 'internal_error', 'Failed to enable preview mode');
-    logRouteError({
-      requestId,
-      route: ROUTE_NAME,
-      method: 'POST',
-      statusCode: error.status,
-      durationMs: Date.now() - startedAt,
-      errorType: error.type,
-      message: e instanceof Error ? e.message : String(e),
-    });
-    return errorResponse(error, requestId);
+    if (e instanceof AlreadyRunningError) {
+      return errorResponse(new RouteError(409, 'bad_request', 'Setup is already in progress'), requestId);
+    }
+    throw e;
   }
 }

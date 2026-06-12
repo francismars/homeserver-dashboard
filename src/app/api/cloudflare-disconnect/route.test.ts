@@ -87,8 +87,19 @@ describe('cloudflare-disconnect route', () => {
     );
     const { res, lib } = await post();
     expect(res.status).toBe(200);
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(111);
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(222);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(111, undefined);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(222, undefined);
+  });
+
+  it('clears orphaned flow locks so a crashed setup cannot wedge future flows', async () => {
+    await fs.writeFile(path.join(tmpDir, '.flow-setup.lock'), '{}', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, '.flow-connect-start.lock'), '{}', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, '.connect-complete.lock'), '', 'utf-8');
+    const { res } = await post();
+    expect(res.status).toBe(200);
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.flow-connect-start.lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.connect-complete.lock'))).rejects.toThrow();
   });
 
   it('succeeds with published_domain skipped when the homeserver config is absent', async () => {

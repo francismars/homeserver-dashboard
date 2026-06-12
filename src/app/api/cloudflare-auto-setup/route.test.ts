@@ -398,6 +398,31 @@ describe('cloudflare-auto-setup route', () => {
     expect(logged.join('\n')).not.toContain(TOKEN);
   });
 
+  it('returns 409 without touching Cloudflare while the setup lock is held by a live flow', async () => {
+    installFetchMock(makeRules(), calls);
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+    );
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(409);
+    expect(data.error).toContain('already in progress');
+    expect(calls).toHaveLength(0);
+    await expect(fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).rejects.toThrow();
+  });
+
+  it('a setup lock orphaned by a crashed run (dead pid) is stolen, not a permanent 409', async () => {
+    installFetchMock(makeRules(), calls);
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: 999999999, started_at: new Date().toISOString() }),
+    );
+    const res = await post(validBody);
+    expect(res.status).toBe(200);
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
+  });
+
   it('returns 500 when the credentials write fails, with the failed step marked', async () => {
     installFetchMock(makeRules(), calls);
     // A regular file in the way makes mkdir fail fast with ENOTDIR

@@ -51,7 +51,7 @@ describe('cloudflare-preview route', () => {
     }
     (lib.isBinaryAvailable as Mock).mockResolvedValue(true);
     (lib.isPidAlive as Mock).mockReturnValue(true);
-    (lib.spawnDetached as Mock).mockResolvedValue(4242);
+    (lib.spawnDetached as Mock).mockResolvedValue({ pid: 4242 });
     (lib.parseQuickTunnelUrl as Mock).mockResolvedValue(null);
     (lib.quickTunnelConnected as Mock).mockResolvedValue(true);
     const mod = await import('./route');
@@ -142,7 +142,7 @@ describe('cloudflare-preview route', () => {
     await post(POST, { action: 'enable' });
     const res = await post(POST, { action: 'disable' });
     expect((await res.json()).enabled).toBe(false);
-    expect(lib.killPid as Mock).toHaveBeenCalledWith(4242);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(4242, undefined);
     await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
     const data = await (await get(GET)).json();
     expect(data.enabled).toBe(false);
@@ -160,6 +160,20 @@ describe('cloudflare-preview route', () => {
     data = await (await get(GET)).json();
     expect(data.instant.status).toBe('running');
     expect(data.instant.url).toBe('https://fresh.trycloudflare.com');
+  });
+
+  it('enable returns 409 while the setup lock is held by a live flow', async () => {
+    const { lib, POST } = await routes();
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+    );
+    const res = await post(POST, { action: 'enable' });
+    const data = await res.json();
+    expect(res.status).toBe(409);
+    expect(data.error).toContain('already in progress');
+    expect(lib.spawnDetached as Mock).not.toHaveBeenCalled();
+    await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
   });
 
   it('503 when cloudflared unavailable', async () => {

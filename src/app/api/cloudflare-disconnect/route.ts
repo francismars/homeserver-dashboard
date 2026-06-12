@@ -9,6 +9,7 @@ import {
   LOCAL_CONFIG_PATH,
   PREVIEW_ENV,
   TESTDRIVE_STATE,
+  clearAllFlowLocks,
   clearState,
   getConfigDir,
   killPid,
@@ -45,9 +46,11 @@ export async function POST(request: NextRequest) {
     // Stop any child processes (pending browser-auth login, instant preview tunnel)
     for (const stateFile of [CONNECT_STATE(), TESTDRIVE_STATE()]) {
       const state = await readState(stateFile);
-      if (state) killPid(state.pid);
+      if (state) killPid(state.pid, state.starttime);
       await clearState(stateFile);
     }
+    // A lock orphaned by a crashed flow must not survive a "start over".
+    await clearAllFlowLocks();
     steps.push({ key: 'processes', status: 'done' });
 
     // Remove every mode's artifacts

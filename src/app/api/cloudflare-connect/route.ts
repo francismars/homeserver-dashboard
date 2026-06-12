@@ -4,14 +4,18 @@ import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import {
+  AlreadyRunningError,
   CERT_PATH,
   getConfigDir,
   CONNECT_LOG,
   CONNECT_MAX_AGE_MS,
   CONNECT_STATE,
+  CONNECT_START_FLOW_LOCK,
+  CONNECT_START_FLOW_LOCK_MAX_AGE_MS,
   CREDENTIALS_PATH,
   LOCAL_CONFIG_PATH,
-  claimState,
+  SETUP_FLOW_LOCK,
+  SETUP_FLOW_LOCK_MAX_AGE_MS,
   clearState,
   getCloudflaredBin,
   isBinaryAvailable,
@@ -22,6 +26,7 @@ import {
   relocateDeliveredCert,
   runCloudflared,
   spawnDetached,
+  withFlowLock,
   writeState,
 } from '@/lib/server/cloudflared-process';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
@@ -90,7 +95,7 @@ async function currentStatus(): Promise<{
   }
   const state = await readState(CONNECT_STATE());
   if (state) {
-    const alive = isPidAlive(state.pid);
+    const alive = isPidAlive(state.pid, state.starttime);
     const fresh = Date.now() - Date.parse(state.started_at) < CONNECT_MAX_AGE_MS;
     if (alive && fresh) {
       const url = await parseLoginUrl();
@@ -98,7 +103,7 @@ async function currentStatus(): Promise<{
       return { status: 'waiting' };
     }
     // dead or stale: clean up so the user can start fresh
-    if (alive) killPid(state.pid);
+    if (alive) killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
   }
   return { status: 'idle' };
@@ -134,7 +139,7 @@ export async function POST(request: NextRequest) {
   // ---- cancel -----------------------------------------------------------
   if (body.action === 'cancel') {
     const state = await readState(CONNECT_STATE());
-    if (state) killPid(state.pid);
+    if (state) killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
     await fs.rm(CERT_PATH(), { force: true });
     return NextResponse.json({ status: 'idle', requestId }, { headers: { 'Cache-Control': 'no-store' } });
@@ -149,44 +154,51 @@ export async function POST(request: NextRequest) {
     if (existing.status === 'authorized' || existing.status === 'completed') {
       return NextResponse.json({ ...existing, requestId }, { headers: { 'Cache-Control': 'no-store' } });
     }
-    // Spawn mutex: O_EXCL claim. A concurrent start loses and reports the
-    // winner's state on its next poll.
-    if (!(await claimState(CONNECT_STATE()))) {
-      const winner = await currentStatus();
-      return NextResponse.json({ ...winner, requestId }, { headers: { 'Cache-Control': 'no-store' } });
-    }
     try {
-      const pid = await spawnDetached([getCloudflaredBin(), 'tunnel', 'login'], CONNECT_LOG(), {
-        // login saves to $HOME/.cloudflared/cert.pem; aim HOME at our dir.
-        HOME: getConfigDir(),
-        TUNNEL_ORIGIN_CERT: CERT_PATH(),
+      // Spawn mutex: a concurrent start loses the lock and reports the
+      // winner's state instead of spawning a second login.
+      return await withFlowLock(CONNECT_START_FLOW_LOCK, CONNECT_START_FLOW_LOCK_MAX_AGE_MS, async () => {
+        // Re-check under the lock: the previous holder may have spawned already.
+        const current = await currentStatus();
+        if (current.status !== 'idle') {
+          return NextResponse.json({ ...current, requestId }, { headers: { 'Cache-Control': 'no-store' } });
+        }
+        const child = await spawnDetached([getCloudflaredBin(), 'tunnel', 'login'], CONNECT_LOG(), {
+          // login saves to $HOME/.cloudflared/cert.pem; aim HOME at our dir.
+          HOME: getConfigDir(),
+          TUNNEL_ORIGIN_CERT: CERT_PATH(),
+        });
+        await writeState(CONNECT_STATE(), { ...child, started_at: new Date().toISOString() });
+        // The URL prints to stderr immediately (live-verified); give it a moment.
+        let url: string | null = null;
+        for (let i = 0; i < 20 && !url; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          url = await parseLoginUrl();
+        }
+        if (!url) {
+          killPid(child.pid, child.starttime);
+          await clearState(CONNECT_STATE());
+          throw new Error('cloudflared did not produce a login URL');
+        }
+        logRouteInfo({
+          requestId,
+          route: ROUTE_NAME,
+          method: 'POST',
+          statusCode: 200,
+          durationMs: Date.now() - startedAt,
+          message: 'Connect login started',
+          meta: { pid: child.pid },
+        });
+        return NextResponse.json(
+          { status: 'waiting', auth_url: url, requestId },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
       });
-      await writeState(CONNECT_STATE(), { pid, started_at: new Date().toISOString() });
-      // The URL prints to stderr immediately (live-verified); give it a moment.
-      let url: string | null = null;
-      for (let i = 0; i < 20 && !url; i++) {
-        await new Promise((r) => setTimeout(r, 500));
-        url = await parseLoginUrl();
-      }
-      if (!url) {
-        killPid(pid);
-        await clearState(CONNECT_STATE());
-        throw new Error('cloudflared did not produce a login URL');
-      }
-      logRouteInfo({
-        requestId,
-        route: ROUTE_NAME,
-        method: 'POST',
-        statusCode: 200,
-        durationMs: Date.now() - startedAt,
-        message: 'Connect login started',
-        meta: { pid },
-      });
-      return NextResponse.json(
-        { status: 'waiting', auth_url: url, requestId },
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
     } catch (e) {
+      if (e instanceof AlreadyRunningError) {
+        const winner = await currentStatus();
+        return NextResponse.json({ ...winner, requestId }, { headers: { 'Cache-Control': 'no-store' } });
+      }
       await clearState(CONNECT_STATE());
       const error = new RouteError(500, 'internal_error', 'Failed to start the Cloudflare login');
       logRouteError({
@@ -224,15 +236,15 @@ export async function POST(request: NextRequest) {
 
   // Completion lock: two tabs finishing simultaneously would create two
   // tunnels and leave config.yml referencing one while credentials.json
-  // holds the other's secret. O_EXCL lockfile; released in finally.
-  const completeLock = path.join(getConfigDir(), '.connect-complete.lock');
-  if (!(await claimState(completeLock))) {
-    return errorResponse(new RouteError(409, 'bad_request', 'Setup is already in progress'), requestId);
-  }
+  // holds the other's secret. Shared with auto-setup and preview enable so
+  // no other flow rewrites the setup artifacts mid-completion.
   try {
-    return await runComplete();
-  } finally {
-    await clearState(completeLock);
+    return await withFlowLock(SETUP_FLOW_LOCK, SETUP_FLOW_LOCK_MAX_AGE_MS, runComplete);
+  } catch (e) {
+    if (e instanceof AlreadyRunningError) {
+      return errorResponse(new RouteError(409, 'bad_request', 'Setup is already in progress'), requestId);
+    }
+    throw e;
   }
 
   // Everything below runs under the completion lock.

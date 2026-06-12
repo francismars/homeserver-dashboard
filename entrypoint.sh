@@ -32,6 +32,9 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
     chown nextjs:nodejs "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
     chmod 600 "$CLOUDFLARE_DIR/cert.pem" 2>/dev/null || true
   fi
+  # Flow locks are per-process and meaningless across a restart; a lock
+  # orphaned by a crash must not wedge the setup flows forever.
+  rm -f "$CLOUDFLARE_DIR"/.flow-*.lock "$CLOUDFLARE_DIR/.connect-complete.lock" 2>/dev/null || true
 fi
 
 # Make the homeserver's config.toml writable by the dashboard process.
