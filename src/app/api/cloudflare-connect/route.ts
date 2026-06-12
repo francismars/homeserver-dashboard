@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
   const requestId = getRequestId(request);
   const status = await currentStatus();
   return NextResponse.json(
-    { ...status, supported: isBinaryAvailable(), requestId },
+    { ...status, supported: await isBinaryAvailable(), requestId },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
