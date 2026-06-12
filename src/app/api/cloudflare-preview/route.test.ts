@@ -144,15 +144,19 @@ describe('cloudflare-preview route', () => {
     expect(data.published_url).toBe('https://current-one.trycloudflare.com');
   });
 
-  it('disable kills the instant tunnel and removes the marker', async () => {
+  it('disable kills the instant tunnel and removes the marker and published handshake', async () => {
     const { lib, POST, GET } = await routes();
     await post(POST, { action: 'enable' });
+    // A leftover handshake would resurface as published_url on re-enable.
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://old.trycloudflare.com', 'utf-8');
     const res = await post(POST, { action: 'disable' });
     const body = await res.json();
     expect(body.enabled).toBe(false);
     expect(body.message).toBe('Preview disabled.');
     expect(lib.killPid as Mock).toHaveBeenCalledWith(4242, undefined);
     await expect(fs.access(path.join(tmpDir, 'testdrive.env'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, 'preview', 'published'))).rejects.toThrow();
     const data = await (await get(GET)).json();
     expect(data.enabled).toBe(false);
   });
