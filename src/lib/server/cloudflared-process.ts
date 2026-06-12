@@ -24,8 +24,6 @@ export const getCloudflaredBin = () => process.env.CLOUDFLARED_BIN || '/usr/loca
 export const getConfigDir = () => process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
 /** Where the test-drive quick tunnel forwards to. */
 export const getTestdriveOrigin = () => process.env.TESTDRIVE_ORIGIN || 'http://homeserver:6286';
-/** Quick tunnels are auto-stopped after this long. */
-export const TESTDRIVE_MAX_AGE_MS = 30 * 60 * 1000;
 /** A login attempt (and an unused authorization cert) older than this is expired. */
 export const CONNECT_MAX_AGE_MS = 15 * 60 * 1000;
 
