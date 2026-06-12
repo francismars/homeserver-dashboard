@@ -440,7 +440,10 @@ describe('withFlowLock', () => {
         (r) => r.status === 'rejected' && r.reason instanceof AlreadyRunningError,
       ).length;
       expect(peak).toBe(1); // never two critical sections at once
-      expect(ran).toBe(1);
+      // Under load a caller's FIRST acquisition attempt can land after the
+      // winner already released, and taking a free lock then is correct - so
+      // more than one fulfillment is legal as long as they never overlapped.
+      expect(ran).toBeGreaterThanOrEqual(1);
       expect(ran + backedOff).toBe(4);
       await fs.rm(lockPath(), { force: true });
     }
@@ -480,16 +483,28 @@ describe('withFlowLock', () => {
     expect(await winner).toBe('winner');
   });
 
-  it('clearAllFlowLocks removes flow locks (and the legacy name) but nothing else', async () => {
-    const { clearAllFlowLocks } = await import('./cloudflared-process');
+  it('clearStaleFlowLocks removes stale locks (and the legacy name) but keeps live locks and other files', async () => {
+    const { clearStaleFlowLocks } = await import('./cloudflared-process');
+    // Stale: no pid, over-age holder, and the unparseable legacy file.
     await fs.writeFile(path.join(tmpDir, '.flow-setup.lock'), '{}', 'utf-8');
-    await fs.writeFile(path.join(tmpDir, '.flow-connect-start.lock'), '{}', 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-connect-start.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date(Date.now() - 10 * 60_000).toISOString() }),
+      'utf-8',
+    );
     await fs.writeFile(path.join(tmpDir, '.connect-complete.lock'), '', 'utf-8');
+    // Live: our own pid, fresh.
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-live.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+      'utf-8',
+    );
     await fs.writeFile(path.join(tmpDir, 'token'), 'keep-me', 'utf-8');
-    await clearAllFlowLocks();
+    await clearStaleFlowLocks();
     await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).rejects.toThrow();
     await expect(fs.access(path.join(tmpDir, '.flow-connect-start.lock'))).rejects.toThrow();
     await expect(fs.access(path.join(tmpDir, '.connect-complete.lock'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.flow-live.lock'))).resolves.toBeUndefined();
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('keep-me');
   });
 });

@@ -138,17 +138,18 @@ describe('cloudflare-config route', () => {
       expect(payload.restart_reason).toBe('config_changed');
     });
 
-    it('deletion after the boot (teardown) is caught via the config dir mtime', async () => {
+    it('deletion after the boot (preview teardown) is caught via the teardown stamp', async () => {
       await fs.writeFile(path.join(tmpDir, 'testdrive.env'), 'TUNNEL_URL=x');
       await ageTo(path.join(tmpDir, 'testdrive.env'), 200);
-      await ageTo(tmpDir, 200);
       await fs.writeFile(stampPath(), 'stamp');
       await ageTo(stampPath(), 100);
+      // What teardownPreview leaves behind: marker gone, stamp touched.
       await fs.rm(path.join(tmpDir, 'testdrive.env'));
+      await fs.writeFile(path.join(tmpDir, '.preview-teardown-stamp'), new Date().toISOString());
       const { GET } = await loadRoute();
       const payload = await (await GET(getRequest())).json();
       expect(payload.restart_pending).toBe(true);
-      expect(payload.restart_reason).toBe('setup_changed');
+      expect(payload.restart_reason).toBe('preview_changed');
     });
   });
 

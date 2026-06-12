@@ -49,13 +49,11 @@ describe('detectRestartPending', () => {
     await writeAged(inConfig('token'), 100);
     await writeAged(inConfig('domain'), 100);
     await writeAged(process.env.HOMESERVER_CONFIG_PATH!, 100);
-    await ageTo(configDir, 100);
     await writeStamp(50);
     expect(await detectRestartPending()).toEqual({ restart_pending: false, restart_reason: null });
   });
 
   it('stamp present but no state files at all: false', async () => {
-    await ageTo(configDir, 100);
     await writeStamp(50);
     expect(await detectRestartPending()).toEqual({ restart_pending: false, restart_reason: null });
   });
@@ -65,7 +63,6 @@ describe('detectRestartPending', () => {
     async (file) => {
       await writeStamp(50);
       await writeAged(inConfig(file), 10);
-      await ageTo(configDir, 100);
       expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'setup_changed' });
     },
   );
@@ -73,31 +70,39 @@ describe('detectRestartPending', () => {
   it('testdrive.env newer than the stamp: preview_changed', async () => {
     await writeStamp(50);
     await writeAged(inConfig('testdrive.env'), 10);
-    await ageTo(configDir, 100);
     expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'preview_changed' });
   });
 
   it('config.toml newer than the stamp: config_changed', async () => {
     await writeStamp(50);
     await writeAged(process.env.HOMESERVER_CONFIG_PATH!, 10);
-    await ageTo(configDir, 100);
     expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'config_changed' });
   });
 
-  it('deletion case: a teardown leaves fewer files but bumps the dir mtime', async () => {
+  it('deletion case: a preview teardown leaves fewer files but touches its stamp', async () => {
     await writeAged(inConfig('testdrive.env'), 100);
     await writeStamp(50);
-    // Teardown after the boot: the marker disappears, only the directory
-    // mtime carries the change.
+    // Teardown after the boot: the marker disappears; the teardown stamp
+    // (written by teardownPreview) carries the change.
     await fs.rm(inConfig('testdrive.env'));
-    expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'setup_changed' });
+    await writeAged(inConfig('.preview-teardown-stamp'), 10);
+    expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'preview_changed' });
+  });
+
+  it('transient flow files do not flip the signal (aborted Connect flow)', async () => {
+    await writeStamp(50);
+    // A started-then-cancelled Connect flow leaves fresh transient files and
+    // bumps the config dir mtime, but no setup artifact changed.
+    await writeAged(inConfig('.flow-connect-start.lock'), 10);
+    await writeAged(inConfig('.connect.json'), 10);
+    await writeAged(inConfig('.connect.log'), 10);
+    expect(await detectRestartPending()).toEqual({ restart_pending: false, restart_reason: null });
   });
 
   it('newest change wins the reason: config.toml edited after the setup', async () => {
     await writeStamp(50);
     await writeAged(inConfig('token'), 20);
     await writeAged(process.env.HOMESERVER_CONFIG_PATH!, 5);
-    await ageTo(configDir, 100);
     expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'config_changed' });
   });
 
@@ -105,7 +110,6 @@ describe('detectRestartPending', () => {
     await writeStamp(50);
     await writeAged(process.env.HOMESERVER_CONFIG_PATH!, 20);
     await writeAged(inConfig('token'), 5);
-    await ageTo(configDir, 100);
     expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'setup_changed' });
   });
 

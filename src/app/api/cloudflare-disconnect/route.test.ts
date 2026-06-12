@@ -112,6 +112,19 @@ describe('cloudflare-disconnect route', () => {
     await expect(fs.access(path.join(tmpDir, '.connect-complete.lock'))).rejects.toThrow();
   });
 
+  it('refuses with 409 while a live setup flow holds the lock, leaving artifacts intact', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, '.flow-setup.lock'),
+      JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }),
+      'utf-8',
+    );
+    await fs.writeFile(path.join(tmpDir, 'token'), 'eyJ-token', 'utf-8');
+    const { res } = await post();
+    expect(res.status).toBe(409);
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('eyJ-token');
+    await expect(fs.access(path.join(tmpDir, '.flow-setup.lock'))).resolves.toBeUndefined();
+  });
+
   it('succeeds with published_domain skipped when the homeserver config is absent', async () => {
     const { res } = await post();
     const data = await res.json();

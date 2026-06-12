@@ -5,8 +5,8 @@ import {
   DOMAIN_PATH,
   LOCAL_CONFIG_PATH,
   PREVIEW_ENV,
+  PREVIEW_TEARDOWN_STAMP,
   TOKEN_PATH,
-  getConfigDir,
 } from './cloudflared-process';
 
 export type RestartReason = 'setup_changed' | 'preview_changed' | 'config_changed';
@@ -44,10 +44,12 @@ async function mtimeMs(p: string): Promise<number | null> {
  * Pubky clients find the server) only republishes when the homeserver
  * process restarts.
  *
- * The newest mtime among the present files decides the reason. The config
- * DIRECTORY's own mtime is tracked too (last, losing mtime ties to the file
- * candidates): a teardown leaves fewer files, so no surviving file carries
- * the change's mtime, but the directory does.
+ * The newest mtime among the present files decides the reason. Only durable
+ * setup artifacts are candidates - NOT the config directory's mtime, which
+ * transient files (flow locks, .connect.json, login logs) bump even when no
+ * setup artifact changed, e.g. a started-then-cancelled Connect flow.
+ * Deletions still register: disconnect truncates token/domain (fresh
+ * mtimes), and a preview teardown touches its dedicated stamp file.
  */
 export async function detectRestartPending(): Promise<RestartPendingInfo> {
   const stamp = await mtimeMs(BOOT_STAMP_PATH());
@@ -58,8 +60,8 @@ export async function detectRestartPending(): Promise<RestartPendingInfo> {
     [LOCAL_CONFIG_PATH(), 'setup_changed'],
     [CREDENTIALS_PATH(), 'setup_changed'],
     [PREVIEW_ENV(), 'preview_changed'],
+    [PREVIEW_TEARDOWN_STAMP(), 'preview_changed'],
     [getHomeserverConfigPath(), 'config_changed'],
-    [getConfigDir(), 'setup_changed'],
   ];
   let newest = stamp;
   let reason: RestartReason | null = null;
