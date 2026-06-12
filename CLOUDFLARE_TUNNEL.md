@@ -1,6 +1,8 @@
-# Cloudflare Tunnel Setup
+# Cloudflare Tunnel Setup (manual path)
 
 Expose your homeserver publicly **without port forwarding** using Cloudflare Tunnel.
+
+> **You probably don't need this document.** The dashboard's Settings → Cloudflare tab has two automated setups that do all of the below for you: **Connect Cloudflare account** (browser login, zero copy-paste, recommended) and **Set up with an API token**. There is also an in-app step-by-step guide at `/cloudflare-guide`. This document covers the manual token path and serves as the under-the-hood reference for debugging any of the setups.
 
 ## Prerequisites
 
@@ -29,9 +31,10 @@ Expose your homeserver publicly **without port forwarding** using Cloudflare Tun
 
 1. Open **Pubky Homeserver** in Umbrel
 2. Click the **Settings** icon (gear) → **Cloudflare** tab
-3. Enter your **Domain** (e.g. `pubky.yourdomain.com`) and **Tunnel token**
-4. Click **Save**
-5. **Restart the app** from Umbrel (Stop → Start)
+3. Expand **Set up manually instead**
+4. Enter your **Public address** (e.g. `pubky.yourdomain.com`) and **Tunnel token**
+5. Click **Save**
+6. **Restart the app** from Umbrel (Stop → Start)
 
 ### 4. Verify
 
@@ -81,6 +84,8 @@ cat ~/umbrel/app-data/pubky-homeserver/cloudflare/domain
 cat ~/umbrel/app-data/pubky-homeserver/cloudflare/token
 ```
 
+Token/manual setups write `domain` + `token`. The Connect-account setup writes `domain` + `config.yml` + `credentials.json` instead (locally-managed tunnel); its `token` file is empty. Preview mode uses `testdrive.env` and the `preview/` dir.
+
 ### Check PKARR is published
 
 ```bash
@@ -121,5 +126,5 @@ Useful for seeing app install/start/stop events and errors.
 ## Notes
 
 - Only the HTTP endpoint (port 6286) is tunneled; Pubky TLS (6287) requires direct connectivity
-- The tunnel container downloads `cloudflared` on first start (may take a moment)
+- `cloudflared` runs from a pinned `cloudflare/cloudflared` image (no download at runtime); the dashboard image embeds the same binary for the Connect and Preview flows
 - Config is stored in `app-data/pubky-homeserver/cloudflare/`
