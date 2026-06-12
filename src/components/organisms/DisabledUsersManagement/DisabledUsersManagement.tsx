@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { copyToClipboard } from '@/libs/utils';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { Check, ClipboardPaste, Copy, Search, ShieldBan } from 'lucide-react';
 import type { DisabledUser } from '@/services/admin/admin.types';
 
@@ -50,7 +50,7 @@ export function DisabledUsersManagement({
   // dialog just closes silently and the operator is left guessing.
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<'disable' | 'enable' | null>(null);
-  const [copiedPubkey, setCopiedPubkey] = useState<string | null>(null);
+  const { copiedKey: copiedPubkey, copy } = useCopyFeedback();
   const [searchQuery, setSearchQuery] = useState('');
   const disabledUsersWithDisplayName = useMemo(
     () =>
@@ -79,11 +79,12 @@ export function DisabledUsersManagement({
     }
   }, []);
 
-  const handleCopyPubkey = useCallback(async (pubkey: string) => {
-    await copyToClipboard({ text: pubkey });
-    setCopiedPubkey(pubkey);
-    setTimeout(() => setCopiedPubkey(null), 2000);
-  }, []);
+  const handleCopyPubkey = useCallback(
+    async (pubkey: string) => {
+      await copy(pubkey, pubkey);
+    },
+    [copy],
+  );
 
   const handleDisableByPubkey = useCallback(async () => {
     const pubkey = pubkeyToDisable.trim();

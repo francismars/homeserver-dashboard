@@ -34,7 +34,7 @@ import {
   ArrowDown,
   Pencil,
 } from 'lucide-react';
-import { cn } from '@/libs/utils';
+import { cn } from '@/lib/utils';
 import type { FileBrowserProps } from './FileBrowser.types';
 
 type SortField = 'name' | 'size' | 'date' | 'type';

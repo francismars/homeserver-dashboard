@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigDialog } from './ConfigDialog';
 
@@ -329,5 +329,53 @@ describe('ConfigDialog Cloudflare status surface', () => {
     renderDialog();
     await waitFor(() => expect(screen.getByText('Settings are not available in this environment.')).toBeTruthy());
     expect(screen.queryByRole('button', { name: 'Cloudflare' })).toBeNull();
+  });
+
+  it('post-setup health probe chain stops on unmount (no probes fire after the dialog is gone)', async () => {
+    // Fake timers from the start; waitFor would hang under them, so each step
+    // settles its microtasks via advanceTimersByTimeAsync(0) and asserts directly.
+    vi.useFakeTimers();
+    try {
+      // An unreachable domain keeps the chain re-arming (up to 4 attempts);
+      // exactly the case where a leaked timer would keep probing after unmount.
+      const backend = mockBackend({
+        cloudflareConfig: cfConfig('off'),
+        connect: { supported: true, status: 'idle' },
+        publicHealth: { ok: false, status: 503 },
+      });
+      const view = renderDialog();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('cf-connect-start')).toBeTruthy();
+
+      // Drive the connect flow to completion so the dialog arms the chain.
+      backend.connect = { supported: true, status: 'authorized', authorized_domain: 'example.com' };
+      fireEvent.click(screen.getByTestId('cf-connect-start'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      fireEvent.change(screen.getByTestId('cf-connect-subdomain'), { target: { value: 'pubky' } });
+      backend.connect = { ok: true, status: 'completed', hostname: 'pubky.example.com' };
+      backend.cloudflareConfig = cfConfig('connect', 'pubky.example.com');
+      fireEvent.click(screen.getByTestId('cf-connect-complete'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('cf-connect-success')).toBeTruthy();
+
+      const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+      const probeCalls = () =>
+        fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/public-health')).length;
+      const before = probeCalls();
+
+      view.unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(probeCalls()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

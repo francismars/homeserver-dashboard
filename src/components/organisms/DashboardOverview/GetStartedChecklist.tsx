@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Circle, CircleCheckBig, X } from 'lucide-react';
-import { cn } from '@/libs/utils';
+import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'setup-guide-dismissed';
 

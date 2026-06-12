@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@/libs/utils';
+import { cn } from '@/lib/utils';
 import { useAdminInfo } from '@/hooks/admin';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
@@ -76,7 +77,11 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [adminPassword, setAdminPassword] = useState<string | null>(null);
   const [isAdminPasswordVisible, setIsAdminPasswordVisible] = useState(false);
   const [adminPasswordError, setAdminPasswordError] = useState<string | null>(null);
-  const [adminPasswordCopied, setAdminPasswordCopied] = useState(false);
+  const {
+    copiedKey: adminPasswordCopiedKey,
+    copy: copyAdminPassword,
+    reset: resetAdminPasswordCopied,
+  } = useCopyFeedback();
 
   const ensureAdminPassword = async (): Promise<string | null> => {
     if (adminPassword) return adminPassword;
@@ -105,22 +110,17 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const handleCopyAdminPassword = async () => {
     const password = await ensureAdminPassword();
     if (!password) return;
-    try {
-      await navigator.clipboard.writeText(password);
-      setAdminPasswordCopied(true);
-      setTimeout(() => setAdminPasswordCopied(false), 2000);
-    } catch {
-      // Clipboard unavailable (insecure context); the eye toggle still works.
-    }
+    // A copy failure (clipboard unavailable) is silent; the eye toggle still works.
+    await copyAdminPassword(password);
   };
 
   // Re-mask the password whenever the dialog closes.
   useEffect(() => {
     if (!open) {
       setIsAdminPasswordVisible(false);
-      setAdminPasswordCopied(false);
+      resetAdminPasswordCopied();
     }
-  }, [open]);
+  }, [open, resetAdminPasswordCopied]);
 
   // Cloudflare state. The mode comes from the server (file fingerprints);
   // the Status surface is the only place that asserts it. Setup cards are
@@ -151,6 +151,21 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   // pkarr record actually advertises. Separate from HTTPS reachability - the
   // tunnel reconnects without a restart, the pkarr record does not.
   const { data: adminInfo, refetch: refetchAdminInfo } = useAdminInfo();
+
+  // The post-setup health probe chain re-arms itself via setTimeout for up to
+  // ~37s; track the pending timer so closing the dialog or unmounting stops
+  // the chain instead of leaving it probing (and setting state) in the dark.
+  const probeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearProbeTimer = () => {
+    if (probeTimerRef.current) {
+      clearTimeout(probeTimerRef.current);
+      probeTimerRef.current = null;
+    }
+  };
+  useEffect(() => clearProbeTimer, []);
+  useEffect(() => {
+    if (!open) clearProbeTimer();
+  }, [open]);
 
   const checkHealth = async (domain: string): Promise<boolean> => {
     setHealthStatus('checking');
@@ -424,13 +439,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
     // "Not reachable" right after the green success state.
     setHealthStatus('checking');
     const probeHealth = async (attempt: number) => {
+      probeTimerRef.current = null;
       const reachable = await checkHealth(hostname);
       if (!reachable && attempt < 4) {
         setHealthStatus('checking');
-        setTimeout(() => void probeHealth(attempt + 1), 8_000);
+        probeTimerRef.current = setTimeout(() => void probeHealth(attempt + 1), 8_000);
       }
     };
-    setTimeout(() => void probeHealth(1), 5_000);
+    clearProbeTimer();
+    probeTimerRef.current = setTimeout(() => void probeHealth(1), 5_000);
   };
 
   const handlePreviewEnabled = () => {
@@ -647,7 +664,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                       data-testid="admin-password-copy"
                       aria-label="Copy admin password"
                     >
-                      {adminPasswordCopied ? (
+                      {adminPasswordCopiedKey ? (
                         <Check className="h-3.5 w-3.5 text-brand" />
                       ) : (
                         <Copy className="h-3.5 w-3.5" />

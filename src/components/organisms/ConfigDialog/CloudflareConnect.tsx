@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
+import { usePolling } from '@/hooks/usePolling';
 import { StepList } from './StepList';
 
 type ConnectStatus = 'idle' | 'waiting' | 'authorized' | 'completed';
@@ -52,7 +53,6 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [doneHostname, setDoneHostname] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = async () => {
     try {
@@ -75,17 +75,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   }, []);
 
   // Poll while waiting for the user to authorize on cloudflare.com.
-  useEffect(() => {
-    if (status !== 'waiting') {
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = null;
-      return;
-    }
-    pollRef.current = setInterval(() => void refresh(), 3000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [status]);
+  usePolling(refresh, 3000, { enabled: status === 'waiting' });
 
   const act = async (body: Record<string, unknown>) => {
     setBusy(true);

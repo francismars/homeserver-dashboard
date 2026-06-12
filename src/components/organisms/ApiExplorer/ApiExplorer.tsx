@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Play, Copy, Check, Server, Globe, BarChart3, Info } from 'lucide-react';
-import { cn } from '@/libs/utils';
-import { copyToClipboard } from '@/libs/utils';
+import { cn } from '@/lib/utils';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import type { ApiEndpoint, EndpointGroup } from './ApiExplorer.types';
 
 // All three homeserver ports are reached through same-origin dashboard proxies
@@ -255,7 +255,7 @@ export function ApiExplorer() {
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copiedKey, copy, reset: resetCopied } = useCopyFeedback();
 
   const currentGroup = ENDPOINT_GROUPS.find((g) => g.server === selectedServer) || ENDPOINT_GROUPS[0];
   const currentEndpoints = currentGroup.endpoints;
@@ -281,7 +281,7 @@ export function ApiExplorer() {
   const handleSendRequest = async () => {
     setIsLoading(true);
     setResponse(null);
-    setCopied(false);
+    resetCopied();
 
     try {
       const path = selectedEndpoint
@@ -406,9 +406,7 @@ export function ApiExplorer() {
   const handleCopyResponse = async () => {
     if (!response) return;
     const text = `Status: ${response.status} ${response.statusText}\n\nHeaders:\n${JSON.stringify(response.headers, null, 2)}\n\nBody:\n${response.body}`;
-    await copyToClipboard({ text });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    await copy(text);
   };
 
   const getStatusColor = (status: number) => {
@@ -605,7 +603,7 @@ export function ApiExplorer() {
               <div className="flex items-center justify-between">
                 <Label>Response</Label>
                 <Button variant="ghost" size="sm" onClick={handleCopyResponse}>
-                  {copied ? (
+                  {copiedKey ? (
                     <>
                       <Check className="mr-2 h-4 w-4" />
                       Copied

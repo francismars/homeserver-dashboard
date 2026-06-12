@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Copy, Check, QrCode, X, Gift, Plus } from 'lucide-react';
-import { copyToClipboard } from '@/libs/utils';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { QRCodeSVG } from 'qrcode.react';
 
 export interface InviteManagementProps {
@@ -50,8 +50,7 @@ export function InviteManagement({
   isStatsLoading,
   homeserverPubkey,
 }: InviteManagementProps) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedUrlIndex, setCopiedUrlIndex] = useState<number | null>(null);
+  const { copiedKey, copy } = useCopyFeedback();
   const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
 
   // Auto-expand the QR for a freshly-created invite, but not for invites
@@ -71,13 +70,8 @@ export function InviteManagement({
   const totalUsed = hasStats ? Math.max(0, signupCodesTotal - signupCodesUnused) : undefined;
 
   const handleCopy = async (invite: string, index: number) => {
-    try {
-      await copyToClipboard({ text: invite });
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch {
-      // Handle copy error silently
-    }
+    // Copy failures (clipboard unavailable) are silent.
+    await copy(invite, `code-${index}`);
   };
 
   const generateSignupUrl = (inviteCode: string): string | null => {
@@ -88,13 +82,7 @@ export function InviteManagement({
   const handleCopyUrl = async (inviteCode: string, index: number) => {
     const url = generateSignupUrl(inviteCode);
     if (!url) return;
-    try {
-      await copyToClipboard({ text: url });
-      setCopiedUrlIndex(index);
-      setTimeout(() => setCopiedUrlIndex(null), 2000);
-    } catch {
-      // Handle copy error silently
-    }
+    await copy(url, `url-${index}`);
   };
 
   const handleGenerate = async () => {
@@ -228,14 +216,16 @@ export function InviteManagement({
                       </div>
                       <div className="flex shrink-0 gap-2">
                         <Button
-                          variant={copiedIndex === index ? 'secondary' : 'ghost'}
+                          variant={copiedKey === `code-${index}` ? 'secondary' : 'ghost'}
                           size="icon"
                           onClick={() => handleCopy(invite, index)}
                           className="h-8 w-8 shrink-0"
-                          title={copiedIndex === index ? 'Copied' : 'Copy code'}
-                          aria-label={copiedIndex === index ? 'Copied invite code' : `Copy invite code ${index + 1}`}
+                          title={copiedKey === `code-${index}` ? 'Copied' : 'Copy code'}
+                          aria-label={
+                            copiedKey === `code-${index}` ? 'Copied invite code' : `Copy invite code ${index + 1}`
+                          }
                         >
-                          {copiedIndex === index ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          {copiedKey === `code-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
                         {signupUrl && (
                           <Button
@@ -275,12 +265,12 @@ export function InviteManagement({
                                 size="icon"
                                 onClick={() => handleCopyUrl(invite, index)}
                                 className="h-8 w-8 shrink-0"
-                                title={copiedUrlIndex === index ? 'Copied' : 'Copy URL'}
+                                title={copiedKey === `url-${index}` ? 'Copied' : 'Copy URL'}
                                 aria-label={
-                                  copiedUrlIndex === index ? 'Copied invite URL' : `Copy invite URL ${index + 1}`
+                                  copiedKey === `url-${index}` ? 'Copied invite URL' : `Copy invite URL ${index + 1}`
                                 }
                               >
-                                {copiedUrlIndex === index ? (
+                                {copiedKey === `url-${index}` ? (
                                   <Check className="h-4 w-4" />
                                 ) : (
                                   <Copy className="h-4 w-4" />

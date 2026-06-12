@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/libs/utils';
+import { cn } from '@/lib/utils';
+import { usePolling } from '@/hooks/usePolling';
 import type { LevelFilter, LogEntry, LogsResponse } from './DashboardLogs.types';
 
 const POLL_INTERVAL_MS = 5_000;
@@ -85,13 +86,7 @@ export function DashboardLogs() {
     };
   }, [fetchLogs]);
 
-  useEffect(() => {
-    if (isPaused) return;
-    const interval = setInterval(() => {
-      void fetchLogs();
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [isPaused, fetchLogs]);
+  usePolling(fetchLogs, POLL_INTERVAL_MS, { enabled: !isPaused });
 
   const handleDownload = useCallback(async () => {
     setDownloadError(null);
@@ -121,38 +116,44 @@ export function DashboardLogs() {
     }
   }, [level]);
 
-  const rendered = useMemo(
-    () =>
-      items.map((entry, i) => {
-        const isRaw = entry.raw !== undefined;
-        const lvl = (entry.level ?? '').toLowerCase();
-        const badgeClass = LEVEL_BADGE[lvl] ?? 'bg-muted text-muted-foreground';
-        return (
-          <div
-            key={i}
-            className="flex gap-2 border-b border-border/40 px-3 py-1 font-mono text-xs leading-relaxed hover:bg-muted/30"
-            data-testid="logs-row"
-          >
-            <span className="shrink-0 text-muted-foreground tabular-nums">{fmtTs(entry.ts)}</span>
-            {!isRaw && (
-              <Badge variant="outline" className={cn('h-5 shrink-0 px-1.5 uppercase', badgeClass)}>
-                {entry.level ?? '?'}
-              </Badge>
+  // Stable row keys on a sliding window: keyed by content plus an occurrence
+  // counter for duplicate lines, instead of the array index, so rows keep
+  // their identity as old lines fall off the top between polls.
+  const rendered = useMemo(() => {
+    const seen = new Map<string, number>();
+    return items.map((entry) => {
+      const base = `${entry.ts ?? ''}|${entry.target ?? ''}|${entry.raw ?? entry.msg ?? ''}`;
+      const occurrence = seen.get(base) ?? 0;
+      seen.set(base, occurrence + 1);
+      const key = occurrence === 0 ? base : `${base}|${occurrence}`;
+      const isRaw = entry.raw !== undefined;
+      const lvl = (entry.level ?? '').toLowerCase();
+      const badgeClass = LEVEL_BADGE[lvl] ?? 'bg-muted text-muted-foreground';
+      return (
+        <div
+          key={key}
+          className="flex gap-2 border-b border-border/40 px-3 py-1 font-mono text-xs leading-relaxed hover:bg-muted/30"
+          data-testid="logs-row"
+        >
+          <span className="shrink-0 text-muted-foreground tabular-nums">{fmtTs(entry.ts)}</span>
+          {!isRaw && (
+            <Badge variant="outline" className={cn('h-5 shrink-0 px-1.5 uppercase', badgeClass)}>
+              {entry.level ?? '?'}
+            </Badge>
+          )}
+          {entry.target && (
+            <span className="max-w-[14rem] shrink-0 truncate text-muted-foreground/80">{entry.target}</span>
+          )}
+          <span className="break-words text-foreground/90">
+            {entry.raw ?? entry.msg ?? ''}
+            {entry.fields && fmtFields(entry.fields) && (
+              <span className="ml-2 text-muted-foreground/80">{fmtFields(entry.fields)}</span>
             )}
-            {entry.target && (
-              <span className="max-w-[14rem] shrink-0 truncate text-muted-foreground/80">{entry.target}</span>
-            )}
-            <span className="break-words text-foreground/90">
-              {entry.raw ?? entry.msg ?? ''}
-              {entry.fields && fmtFields(entry.fields) && (
-                <span className="ml-2 text-muted-foreground/80">{fmtFields(entry.fields)}</span>
-              )}
-            </span>
-          </div>
-        );
-      }),
-    [items],
-  );
+          </span>
+        </div>
+      );
+    });
+  }, [items]);
 
   return (
     <Card>

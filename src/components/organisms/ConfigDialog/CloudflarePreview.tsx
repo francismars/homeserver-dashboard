@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Copy, ExternalLink, FlaskConical, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { usePolling } from '@/hooks/usePolling';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from './RestartCallout';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 
@@ -40,9 +42,8 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
   const [state, setState] = useState<PreviewState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copiedKey, copy } = useCopyFeedback();
   const [justEnabled, setJustEnabled] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = async () => {
     try {
@@ -60,16 +61,9 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
 
   // Poll fast while the instant tunnel is coming up, slow while running.
   // Only the in-session feedback needs it; the Status surface polls its own.
-  useEffect(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = null;
-    if (!justEnabled || !state?.enabled) return;
-    const interval = state.instant.status === 'starting' ? 3000 : 20000;
-    pollRef.current = setInterval(() => void refresh(), interval);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [justEnabled, state?.enabled, state?.instant.status]);
+  usePolling(refresh, state?.instant.status === 'starting' ? 3000 : 20000, {
+    enabled: justEnabled && Boolean(state?.enabled),
+  });
 
   const enable = async () => {
     setBusy(true);
@@ -89,16 +83,6 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
       setError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const copyUrl = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable
     }
   };
 
@@ -169,10 +153,10 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2"
-                onClick={() => void copyUrl(activeUrl)}
+                onClick={() => void copy(activeUrl)}
                 aria-label="Copy URL"
               >
-                {copied ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3.5 w-3.5" />}
+                {copiedKey ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3.5 w-3.5" />}
               </Button>
               <a
                 href={activeUrl}

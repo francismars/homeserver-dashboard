@@ -7,7 +7,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
-import { cn, copyToClipboard } from '@/libs/utils';
+import { cn } from '@/lib/utils';
+import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
@@ -114,26 +115,17 @@ function AddressScopeBadge({ address }: { address: string }) {
 }
 
 function CopyValueButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await copyToClipboard({ text: value });
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable
-    }
-  };
+  const { copiedKey, copy } = useCopyFeedback();
   return (
     <Button
       type="button"
       variant="ghost"
       size="sm"
       className="h-6 shrink-0 px-1.5"
-      onClick={() => void copy()}
+      onClick={() => void copy(value)}
       aria-label={label}
     >
-      {copied ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3 w-3" />}
+      {copiedKey ? <span className="text-xs text-brand">Copied</span> : <Copy className="h-3 w-3" />}
     </Button>
   );
 }
@@ -157,15 +149,19 @@ export function DashboardOverview({
   const probeHostname = domainHostname(info?.pkarr_icann_domain);
   const [domainHealth, setDomainHealth] = useState<DomainHealth>('not_set_up');
 
-  const checkDomain = async (hostname: string) => {
+  const checkDomain = async (hostname: string, isCancelled: () => boolean = () => false) => {
     setDomainHealth('checking');
+    let next: DomainHealth;
     try {
       const res = await fetch(`/api/public-health?domain=${encodeURIComponent(hostname)}`, { cache: 'no-store' });
       const data = await res.json();
-      setDomainHealth(data.ok ? 'reachable' : 'unreachable');
+      next = data.ok ? 'reachable' : 'unreachable';
     } catch {
-      setDomainHealth('unreachable');
+      next = 'unreachable';
     }
+    // A response that lands after the effect re-ran (domain changed) or the
+    // component unmounted must not write a stale verdict.
+    if (!isCancelled()) setDomainHealth(next);
   };
 
   useEffect(() => {
@@ -173,7 +169,11 @@ export function DashboardOverview({
       setDomainHealth('not_set_up');
       return;
     }
-    void checkDomain(probeHostname);
+    let cancelled = false;
+    void checkDomain(probeHostname, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [probeHostname]);
 
   // Durable restart-pending signal (boot stamp vs state mtimes, server

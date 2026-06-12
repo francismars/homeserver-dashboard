@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminService } from '@/services/admin/admin';
+import { usePolling } from '@/hooks/usePolling';
 import type { AdminInfoResponse } from '@/services/admin/admin.types';
 
 const getService = () => new AdminService();
@@ -59,15 +60,16 @@ export function useAdminInfo() {
 
   // Boot-window recovery: while the info is errored or absent, retry in the
   // background until the homeserver answers, then go back to fetch-on-demand
-  // only. The in-flight guard keeps slow requests from stacking.
-  useEffect(() => {
-    if (data && !error) return;
-    const id = setInterval(() => {
+  // only. usePolling serializes its own ticks; inFlightRef additionally keeps
+  // a retry from overlapping a manual refetch.
+  usePolling(
+    () => {
       if (inFlightRef.current) return;
-      void fetchInfo(true);
-    }, RETRY_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [data, error, fetchInfo]);
+      return fetchInfo(true);
+    },
+    RETRY_INTERVAL_MS,
+    { enabled: !data || !!error },
+  );
 
   return { data, isLoading, error, refetch };
 }
