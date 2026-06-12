@@ -3,6 +3,9 @@ import { type Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vite
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../lib/server/__fixtures__');
 
 vi.mock('@/lib/server/cloudflared-process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/server/cloudflared-process')>();
@@ -80,6 +83,13 @@ describe('cloudflare-connect route', () => {
     );
 
   const writeCert = () => fs.writeFile(path.join(tmpDir, 'cert.pem'), 'CERT', 'utf-8');
+  /** Realistic cert: key + certificate (SAN example.com, *.example.com) + token block. */
+  const writeRealCert = async () =>
+    fs.writeFile(
+      path.join(tmpDir, 'cert.pem'),
+      await fs.readFile(path.join(FIXTURES, 'origincert-example.pem'), 'utf-8'),
+      'utf-8',
+    );
   const writeCreds = (id = 'tunnel-uuid-1') =>
     fs.writeFile(path.join(tmpDir, 'credentials.json'), JSON.stringify({ TunnelID: id }), 'utf-8');
 
@@ -106,13 +116,13 @@ describe('cloudflare-connect route', () => {
     expect(data.supported).toBe(true);
   });
 
-  it('start spawns tunnel login with the cert destination and returns the auth URL', async () => {
+  it('start spawns tunnel login under a 15-minute timeout wrapper and returns the auth URL', async () => {
     const { lib, POST } = await routes();
     const data = await (await post(POST, { action: 'start' })).json();
     expect(data.status).toBe('waiting');
     expect(data.auth_url).toBe(AUTH_URL);
     expect(lib.spawnDetached as Mock).toHaveBeenCalledWith(
-      [expect.stringContaining('cloudflared'), 'tunnel', 'login'],
+      ['timeout', '900', expect.stringContaining('cloudflared'), 'tunnel', 'login'],
       expect.stringContaining('.connect.log'),
       expect.objectContaining({ TUNNEL_ORIGIN_CERT: expect.stringContaining('cert.pem') }),
     );
@@ -133,7 +143,7 @@ describe('cloudflare-connect route', () => {
     const { lib, POST } = await routes();
     await post(POST, { action: 'start' });
     expect(lib.spawnDetached as Mock).toHaveBeenCalledWith(
-      [expect.stringContaining('cloudflared'), 'tunnel', 'login'],
+      ['timeout', '900', expect.stringContaining('cloudflared'), 'tunnel', 'login'],
       expect.stringContaining('.connect.log'),
       expect.objectContaining({ HOME: tmpDir }),
     );
@@ -283,14 +293,73 @@ describe('cloudflare-connect route', () => {
     await expect(fs.access(path.join(tmpDir, '.testdrive.json'))).rejects.toThrow();
   });
 
-  it('an authorization cert older than 15 minutes expires to idle', async () => {
+  it('an authorization cert older than 15 minutes expires to idle with the expired hint', async () => {
     const { GET } = await routes();
     await writeCert();
     const old = new Date(Date.now() - 16 * 60 * 1000);
     await fs.utimes(path.join(tmpDir, 'cert.pem'), old, old);
     const data = await (await get(GET)).json();
     expect(data.status).toBe('idle');
+    expect(data.expired).toBe(true);
     await expect(fs.access(path.join(tmpDir, 'cert.pem'))).rejects.toThrow();
+  });
+
+  it('an over-age waiting login is killed and reported as expired', async () => {
+    const { lib, GET } = await routes();
+    await fs.writeFile(
+      path.join(tmpDir, '.connect.json'),
+      JSON.stringify({ pid: 999, started_at: new Date(Date.now() - 16 * 60 * 1000).toISOString() }),
+    );
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('idle');
+    expect(data.expired).toBe(true);
+    expect(lib.killPid as Mock).toHaveBeenCalledWith(999, undefined);
+    await expect(fs.access(path.join(tmpDir, '.connect.json'))).rejects.toThrow();
+  });
+
+  it('cancel removes the scratch .cloudflared dir so a late delivery cannot resurrect the authorization', async () => {
+    const { POST } = await routes();
+    await fs.mkdir(path.join(tmpDir, '.cloudflared'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.cloudflared', 'cert.pem'), 'CERT', 'utf-8');
+    const data = await (await post(POST, { action: 'cancel' })).json();
+    expect(data.status).toBe('idle');
+    await expect(fs.access(path.join(tmpDir, '.cloudflared'))).rejects.toThrow();
+  });
+
+  it('GET authorized includes the domain parsed from the cert SAN', async () => {
+    const { GET } = await routes();
+    await writeRealCert();
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('authorized');
+    expect(data.authorized_domain).toBe('example.com');
+  });
+
+  it('GET authorized reports authorized_domain null for an unparseable cert', async () => {
+    const { GET } = await routes();
+    await writeCert();
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('authorized');
+    expect(data.authorized_domain).toBeNull();
+  });
+
+  it('complete rejects an out-of-zone hostname with a clear 400 when the cert parses', async () => {
+    const { lib, POST } = await routes();
+    await writeRealCert();
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.other.net' });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toContain('example.com');
+    expect(lib.runCloudflared as Mock).not.toHaveBeenCalled();
+  });
+
+  it('complete accepts an in-zone hostname when the cert parses', async () => {
+    const { lib, POST } = await routes();
+    await writeRealCert();
+    primeCloudflared(lib.runCloudflared as Mock, [{ ok: true }]);
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
   });
 
   it('route dns wrong-zone error gives an actionable message', async () => {

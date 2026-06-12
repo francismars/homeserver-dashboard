@@ -11,6 +11,7 @@
  * parse + pid identity probe).
  */
 import { execFile, spawn } from 'child_process';
+import { X509Certificate } from 'crypto';
 import { promisify } from 'util';
 import { closeSync, openSync, readFileSync } from 'fs';
 import { promises as fs } from 'fs';
@@ -40,6 +41,11 @@ export const PREVIEW_PUBLISHED = () => path.join(getConfigDir(), 'preview', 'pub
 export const CONNECT_STATE = () => path.join(getConfigDir(), '.connect.json');
 export const CONNECT_LOG = () => path.join(getConfigDir(), '.connect.log');
 export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
+/** Where the login child (HOME redirected to the config dir) drops the cert
+ * before relocateDeliveredCert moves it to CERT_PATH. Cancel/disconnect must
+ * remove it too, or a cert delivered between polls resurrects a cancelled
+ * authorization on the next status read. */
+export const CONNECT_SCRATCH_DIR = () => path.join(getConfigDir(), '.cloudflared');
 export const CREDENTIALS_PATH = () => path.join(getConfigDir(), 'credentials.json');
 export const LOCAL_CONFIG_PATH = () => path.join(getConfigDir(), 'config.yml');
 
@@ -265,7 +271,7 @@ export async function quickTunnelFailed(): Promise<boolean> {
  * delivered cert to CERT_PATH and removes the scratch directory.
  */
 export async function relocateDeliveredCert(): Promise<void> {
-  const delivered = path.join(getConfigDir(), '.cloudflared', 'cert.pem');
+  const delivered = path.join(CONNECT_SCRATCH_DIR(), 'cert.pem');
   try {
     await fs.access(delivered);
   } catch {
@@ -280,7 +286,37 @@ export async function relocateDeliveredCert(): Promise<void> {
     throw e;
   }
   await fs.chmod(CERT_PATH(), 0o600);
-  await fs.rm(path.join(getConfigDir(), '.cloudflared'), { recursive: true, force: true });
+  await fs.rm(CONNECT_SCRATCH_DIR(), { recursive: true, force: true });
+}
+
+const PEM_CERT_BLOCK = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/;
+const DOMAIN_SHAPE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/**
+ * The zone the login cert authorizes, read from the SAN DNS entries of its
+ * CERTIFICATE block (the cert.pem cloudflared delivers also carries a private
+ * key and an Argo token block). Wildcard labels are stripped; with several
+ * entries (zone + *.zone) the shortest survivor is the apex. Returns null on
+ * ANY problem: a live cert's layout has not been validated against this
+ * parser yet, so the full-hostname flow must keep working when it fails.
+ */
+export async function parseAuthorizedDomain(): Promise<string | null> {
+  try {
+    const pem = await fs.readFile(CERT_PATH(), 'utf-8');
+    const block = pem.match(PEM_CERT_BLOCK)?.[0];
+    if (!block) return null;
+    const san = new X509Certificate(block).subjectAltName ?? '';
+    const domains = san
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.startsWith('DNS:'))
+      .map((entry) => entry.slice('DNS:'.length).replace(/^\*\./, '').toLowerCase())
+      .filter((domain) => DOMAIN_SHAPE.test(domain));
+    if (domains.length === 0) return null;
+    return domains.reduce((apex, candidate) => (candidate.length < apex.length ? candidate : apex));
+  } catch {
+    return null;
+  }
 }
 
 export async function parseLoginUrl(): Promise<string | null> {

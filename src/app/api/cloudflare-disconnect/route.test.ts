@@ -54,6 +54,9 @@ describe('cloudflare-disconnect route', () => {
     }
     await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
     await fs.writeFile(path.join(tmpDir, 'preview', 'published'), 'https://x.trycloudflare.com', 'utf-8');
+    // Scratch login-delivery dir: a cert here would resurrect the authorization.
+    await fs.mkdir(path.join(tmpDir, '.cloudflared'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.cloudflared', 'cert.pem'), 'CERT', 'utf-8');
     await fs.writeFile(
       configPath,
       ['[pkdns]', 'icann_domain = "pubky2.example.com"', 'public_icann_http_port = 443', 'other = 1'].join('\n'),
@@ -69,6 +72,7 @@ describe('cloudflare-disconnect route', () => {
     for (const f of ['cert.pem', 'config.yml', 'credentials.json', 'testdrive.env', 'preview/published']) {
       await expect(fs.access(path.join(tmpDir, f))).rejects.toThrow();
     }
+    await expect(fs.access(path.join(tmpDir, '.cloudflared'))).rejects.toThrow();
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('');
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('');
 

@@ -26,6 +26,12 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
       chmod 640 "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
     fi
   done
+  # An unused login cert is a zone-admin credential with a 15-minute
+  # authorization window. The dashboard enforces it only while its status
+  # route is polled, so reap over-age certs here too: the canonical path and
+  # the scratch dir where the login child delivers them.
+  find "$CLOUDFLARE_DIR" -maxdepth 1 -name cert.pem -mmin +15 -delete 2>/dev/null || true
+  find "$CLOUDFLARE_DIR/.cloudflared" -name cert.pem -mmin +15 -delete 2>/dev/null || true
   # A leftover login cert is a zone-admin credential; only the dashboard
   # process ever needs it.
   if [ -f "$CLOUDFLARE_DIR/cert.pem" ]; then

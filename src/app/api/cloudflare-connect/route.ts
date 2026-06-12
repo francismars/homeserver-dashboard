@@ -8,6 +8,7 @@ import {
   CERT_PATH,
   getConfigDir,
   CONNECT_LOG,
+  CONNECT_SCRATCH_DIR,
   CONNECT_MAX_AGE_MS,
   CONNECT_STATE,
   CONNECT_START_FLOW_LOCK,
@@ -22,6 +23,7 @@ import {
   isBinaryAvailable,
   isPidAlive,
   killPid,
+  parseAuthorizedDomain,
   parseLoginUrl,
   readState,
   relocateDeliveredCert,
@@ -71,6 +73,12 @@ async function currentStatus(): Promise<{
   status: 'idle' | 'waiting' | 'authorized' | 'completed';
   auth_url?: string;
   hostname?: string;
+  /** Zone the cert authorizes, or null when the cert could not be parsed
+   * (the client then falls back to its full-hostname input). */
+  authorized_domain?: string | null;
+  /** Set when idle was reached by expiring an over-age login or cert, so the
+   * UI can say why the waiting card vanished instead of silently resetting. */
+  expired?: boolean;
 }> {
   // The login child saves the cert under $HOME/.cloudflared (HOME points at
   // the config dir); pick it up and move it to the canonical path first.
@@ -91,9 +99,9 @@ async function currentStatus(): Promise<{
     const certStat = await fs.stat(CERT_PATH());
     if (Date.now() - certStat.mtimeMs > CONNECT_MAX_AGE_MS) {
       await fs.rm(CERT_PATH(), { force: true });
-      return { status: 'idle' };
+      return { status: 'idle', expired: true };
     }
-    return { status: 'authorized' };
+    return { status: 'authorized', authorized_domain: await parseAuthorizedDomain() };
   }
   const state = await readState(CONNECT_STATE());
   if (state) {
@@ -107,6 +115,9 @@ async function currentStatus(): Promise<{
     // dead or stale: clean up so the user can start fresh
     if (alive) await killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
+    // Over-age means the authorization window lapsed; a fresh-but-dead login
+    // is a crash, not an expiry, and resets silently as before.
+    if (!fresh) return { status: 'idle', expired: true };
   }
   return { status: 'idle' };
 }
@@ -144,6 +155,7 @@ export async function POST(request: NextRequest) {
     if (state) await killPid(state.pid, state.starttime);
     await clearState(CONNECT_STATE());
     await fs.rm(CERT_PATH(), { force: true });
+    await fs.rm(CONNECT_SCRATCH_DIR(), { recursive: true, force: true });
     return NextResponse.json({ status: 'idle', requestId }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -165,11 +177,19 @@ export async function POST(request: NextRequest) {
         if (current.status !== 'idle') {
           return NextResponse.json({ ...current, requestId }, { headers: { 'Cache-Control': 'no-store' } });
         }
-        const child = await spawnDetached([getCloudflaredBin(), 'tunnel', 'login'], CONNECT_LOG(), {
-          // login saves to $HOME/.cloudflared/cert.pem; aim HOME at our dir.
-          HOME: getConfigDir(),
-          TUNNEL_ORIGIN_CERT: CERT_PATH(),
-        });
+        // The timeout wrapper kills the login at the authorization deadline
+        // even when nobody polls the status route (which is what otherwise
+        // enforces CONNECT_MAX_AGE_MS). The recorded pid is the timeout
+        // process; isPidAlive/killPid accept comm "timeout" for that reason.
+        const child = await spawnDetached(
+          ['timeout', String(CONNECT_MAX_AGE_MS / 1000), getCloudflaredBin(), 'tunnel', 'login'],
+          CONNECT_LOG(),
+          {
+            // login saves to $HOME/.cloudflared/cert.pem; aim HOME at our dir.
+            HOME: getConfigDir(),
+            TUNNEL_ORIGIN_CERT: CERT_PATH(),
+          },
+        );
         await writeState(CONNECT_STATE(), { ...child, started_at: new Date().toISOString() });
         // The URL prints to stderr immediately (live-verified); give it a moment.
         let url: string | null = null;
@@ -232,6 +252,20 @@ export async function POST(request: NextRequest) {
   if (!(await fileExists(CERT_PATH()))) {
     return errorResponse(
       new RouteError(409, 'bad_request', 'Not authorized yet. Open the Cloudflare link and click Authorize first.'),
+      requestId,
+    );
+  }
+  // When the cert parses, an out-of-zone hostname can be rejected here with a
+  // clear message instead of failing late inside `tunnel route dns`. A null
+  // parse skips the check; route dns then remains the (late) backstop.
+  const authorizedDomain = await parseAuthorizedDomain();
+  if (authorizedDomain && hostname !== authorizedDomain && !hostname.endsWith(`.${authorizedDomain}`)) {
+    return errorResponse(
+      new RouteError(
+        400,
+        'bad_request',
+        `${hostname} is not under the domain you authorized (${authorizedDomain}). Use a hostname ending in .${authorizedDomain}.`,
+      ),
       requestId,
     );
   }

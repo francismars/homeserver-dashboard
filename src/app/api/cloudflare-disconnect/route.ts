@@ -4,6 +4,7 @@ import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import {
   CERT_PATH,
+  CONNECT_SCRATCH_DIR,
   CONNECT_STATE,
   CREDENTIALS_PATH,
   LOCAL_CONFIG_PATH,
@@ -54,8 +55,10 @@ export async function POST(request: NextRequest) {
     await clearAllFlowLocks();
     steps.push({ key: 'processes', status: 'done' });
 
-    // Remove every mode's artifacts
+    // Remove every mode's artifacts (the scratch dir too: a cert delivered
+    // there after the kill would resurrect the authorization on the next poll)
     await fs.rm(CERT_PATH(), { force: true });
+    await fs.rm(CONNECT_SCRATCH_DIR(), { recursive: true, force: true });
     await fs.rm(LOCAL_CONFIG_PATH(), { force: true });
     await fs.rm(CREDENTIALS_PATH(), { force: true });
     for (const f of ['token', 'domain']) {

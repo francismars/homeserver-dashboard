@@ -3,6 +3,9 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__');
 
 // Unmocked: these tests pin the log-parsing behavior against REAL cloudflared
 // output captured during the live de-risk runs (2026-06-12).
@@ -234,6 +237,55 @@ describe('cloudflared-process log parsing', () => {
         // already gone
       }
     }
+  });
+});
+
+describe('parseAuthorizedDomain', () => {
+  const originalEnv = { ...process.env };
+  let tmpDir: string;
+  const certPath = () => path.join(tmpDir, 'cert.pem');
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cfd-cert-test-'));
+    process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+  });
+
+  afterEach(async () => {
+    process.env = { ...originalEnv };
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('extracts the zone apex from a multi-block PEM (key + cert + token block)', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    // Fixture mirrors the cloudflared cert.pem layout: PRIVATE KEY first,
+    // then the CERTIFICATE (SAN: example.com, *.example.com), then an
+    // ARGO TUNNEL TOKEN block.
+    await fs.copyFile(path.join(FIXTURES, 'origincert-example.pem'), certPath());
+    expect(await parseAuthorizedDomain()).toBe('example.com');
+  });
+
+  it('strips the wildcard label from a wildcard-only SAN', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    await fs.copyFile(path.join(FIXTURES, 'cert-wildcard-only.pem'), certPath());
+    expect(await parseAuthorizedDomain()).toBe('wild.example.net');
+  });
+
+  it('returns null for garbage content, a non-certificate PEM block, and a missing file', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    expect(await parseAuthorizedDomain()).toBeNull(); // missing
+    await fs.writeFile(certPath(), 'not a pem at all', 'utf-8');
+    expect(await parseAuthorizedDomain()).toBeNull();
+    await fs.writeFile(
+      certPath(),
+      '-----BEGIN CERTIFICATE-----\nbm90IGEgY2VydA==\n-----END CERTIFICATE-----\n',
+      'utf-8',
+    );
+    expect(await parseAuthorizedDomain()).toBeNull();
+    // PEM with blocks but no CERTIFICATE block at all
+    const multiblock = await fs.readFile(path.join(FIXTURES, 'origincert-example.pem'), 'utf-8');
+    const withoutCert = multiblock.replace(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----\n/, '');
+    await fs.writeFile(certPath(), withoutCert, 'utf-8');
+    expect(await parseAuthorizedDomain()).toBeNull();
   });
 });
 
