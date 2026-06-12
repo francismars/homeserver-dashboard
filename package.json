@@ -1,6 +1,6 @@
 {
   "name": "homeserver-dashboard",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 8080",

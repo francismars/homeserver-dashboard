@@ -12,6 +12,7 @@ import { cn } from '@/libs/utils';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
+import { RestartCallout } from './RestartCallout';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
@@ -112,6 +113,28 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
   const [cfMessage, setCfMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
+
+  const handleDisconnectAll = async () => {
+    if (!confirmDisconnect) {
+      setConfirmDisconnect(true);
+      return;
+    }
+    setConfirmDisconnect(false);
+    try {
+      const res = await fetch('/api/cloudflare-disconnect', { method: 'POST' });
+      const data = await res.json().catch(() => ({}) as Record<string, never>);
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setCfConfig((c) => (c ? { ...c, domain: null, configured: false } : c));
+      setCfDomain('');
+      setCfToken('');
+      setHealthStatus('idle');
+      setDisconnectMessage(data.message || 'Disconnected. Restart the app from Umbrel to finish.');
+    } catch (err) {
+      setCfMessage({ type: 'error', text: err instanceof Error ? err.message : 'Disconnect failed' });
+    }
+  };
 
   const fetchConfig = async () => {
     setConfigError(null);
@@ -574,6 +597,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                         )}
                       </div>
 
+                      {disconnectMessage && <RestartCallout>{disconnectMessage}</RestartCallout>}
                       {cfConfig?.configured && cfConfig.domain && (
                         <div className="flex items-center justify-between gap-3">
                           <code className="truncate font-mono text-xs text-muted-foreground">{cfConfig.domain}</code>
@@ -592,6 +616,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                               onClick={() => checkHealth(cfConfig.domain!)}
                             >
                               {healthStatus === 'checking' ? <RefreshCw className="h-3 w-3 animate-spin" /> : 'Check'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={() => void handleDisconnectAll()}
+                              data-testid="cf-disconnect"
+                            >
+                              {confirmDisconnect ? 'Confirm?' : 'Disconnect'}
                             </Button>
                           </div>
                         </div>
