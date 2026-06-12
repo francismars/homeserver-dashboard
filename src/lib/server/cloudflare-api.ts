@@ -106,6 +106,9 @@ export interface CfTunnel {
   /** False for locally-managed tunnels (config file + credentials.json); our
    * remote ingress PUT would be ignored by those. */
   remote_config?: boolean;
+  /** 'cloudflare' for remotely-managed tunnels, 'local' for locally-managed
+   * ones; some responses carry this instead of (or alongside) remote_config. */
+  config_src?: string;
 }
 
 export async function findTunnelByName(apiToken: string, accountId: string, name: string): Promise<CfTunnel | null> {
@@ -158,11 +161,13 @@ export interface CfDnsRecord {
   proxied?: boolean;
 }
 
-/** All records at this exact name, any type - A/AAAA conflicts matter too. */
+/** All records at this exact name, any type - A/AAAA conflicts matter too.
+ * `name.exact` is the documented exact-match filter (bare `name` is the
+ * legacy fuzzy form). */
 export function listDnsRecordsAtName(apiToken: string, zoneId: string, hostname: string): Promise<CfDnsRecord[]> {
   return cfFetch<CfDnsRecord[]>(
     apiToken,
-    `/zones/${encodeURIComponent(zoneId)}/dns_records?name=${encodeURIComponent(hostname)}`,
+    `/zones/${encodeURIComponent(zoneId)}/dns_records?name.exact=${encodeURIComponent(hostname)}`,
   );
 }
 

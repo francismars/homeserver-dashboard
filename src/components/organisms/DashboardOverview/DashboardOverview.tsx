@@ -456,8 +456,9 @@ export function DashboardOverview({
       {/* Where the data actually lives; the dashboard offers no export, so
           this is the one place the backup story is told. */}
       <p className="px-1 text-xs text-muted-foreground/70" data-testid="backup-note">
-        Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory on your
-        Umbrel. Include it in your Umbrel backups; losing it means losing this server&apos;s identity.
+        Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory, and umbrelOS
+        1.5+ built-in backups include app data automatically. Just don&apos;t exclude this app in your backup settings;
+        losing this data means losing this server&apos;s identity.
       </p>
     </div>
   );

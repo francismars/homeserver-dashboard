@@ -57,12 +57,30 @@ export function startMockCf(port = 0, { quiet = false } = {}) {
         return send(200, ok({ id: ZONE_ID, name: 'example.com', status: 'active', account: { id: ACCOUNT_ID } }));
       }
       if (req.method === 'GET' && p === `/accounts/${ACCOUNT_ID}/cfd_tunnel`) {
-        return send(200, ok(state.tunnelExists ? [{ id: TUNNEL_ID, name: 'pubky-homeserver' }] : []));
+        return send(
+          200,
+          ok(
+            state.tunnelExists
+              ? [{ id: TUNNEL_ID, name: 'pubky-homeserver', remote_config: true, config_src: 'cloudflare' }]
+              : [],
+          ),
+        );
       }
       if (req.method === 'POST' && p === `/accounts/${ACCOUNT_ID}/cfd_tunnel`) {
         state.tunnelExists = true;
-        // mirror the API reference: create response has no token field
-        return send(200, ok({ id: TUNNEL_ID, name: 'pubky-homeserver', remote_config: true }));
+        // Live responses carry the run token inline on create; serving it here
+        // makes e2e exercise production's primary path (the GET .../token
+        // endpoint below stays for the adopt path).
+        return send(
+          200,
+          ok({
+            id: TUNNEL_ID,
+            name: 'pubky-homeserver',
+            remote_config: true,
+            config_src: 'cloudflare',
+            token: 'mock-run-token-eyJabc',
+          }),
+        );
       }
       if (req.method === 'GET' && p === `/accounts/${ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/token`) {
         return send(200, ok('mock-run-token-eyJabc'));
@@ -71,7 +89,9 @@ export function startMockCf(port = 0, { quiet = false } = {}) {
         return send(200, ok({}));
       }
       if (req.method === 'GET' && p === `/zones/${ZONE_ID}/dns_records`) {
-        const name = url.searchParams.get('name');
+        // The dashboard uses the documented exact-match filter (name.exact);
+        // accept the legacy bare form too.
+        const name = url.searchParams.get('name.exact') ?? url.searchParams.get('name');
         return send(200, ok(state.dnsRecords.filter((r) => r.name === name)));
       }
       if (req.method === 'POST' && p === `/zones/${ZONE_ID}/dns_records`) {

@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
     let runToken: string | undefined;
     try {
       const existing = await findTunnelByName(apiToken, accountId, TUNNEL_NAME);
-      if (existing && existing.remote_config === false) {
+      if (existing && (existing.remote_config === false || existing.config_src === 'local')) {
         // A locally-managed tunnel ignores remote ingress config; "adopting" it
         // would report success while routing nothing.
         steps.push({ key: 'tunnel', status: 'failed', detail: 'Locally-managed tunnel with the same name' });

@@ -400,12 +400,13 @@ describe('DashboardOverview backup note', () => {
     vi.restoreAllMocks();
   });
 
-  it('tells the operator where the data lives and to include it in Umbrel backups', async () => {
+  it('tells the operator where the data lives and not to exclude the app from umbrelOS backups', async () => {
     mockBackend();
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
     const note = screen.getByTestId('backup-note');
-    expect(note.textContent).toContain('data directory on your Umbrel');
-    expect(note.textContent).toContain('Include it in your Umbrel backups');
+    expect(note.textContent).toContain("this app's data directory");
+    expect(note.textContent).toContain('include app data automatically');
+    expect(note.textContent).toContain("don't exclude this app");
     expect(note.textContent).toContain("losing this server's identity");
   });
 });

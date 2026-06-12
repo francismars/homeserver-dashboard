@@ -186,10 +186,12 @@ describe('cloudflare-api client', () => {
   });
 
   describe('dns record calls', () => {
-    it('listDnsRecordsAtName queries the exact (encoded) name with no type filter', async () => {
+    it('listDnsRecordsAtName queries via the exact-match name filter with no type filter', async () => {
       fetchMock.mockResolvedValue(ok([]));
       await listDnsRecordsAtName(TOKEN, 'zone-1', 'pubky.example.com');
-      expect(String(fetchMock.mock.calls[0][0])).toBe(`${API_BASE}/zones/zone-1/dns_records?name=pubky.example.com`);
+      expect(String(fetchMock.mock.calls[0][0])).toBe(
+        `${API_BASE}/zones/zone-1/dns_records?name.exact=pubky.example.com`,
+      );
     });
 
     it('createDnsRecord creates a proxied CNAME at the tunnel address', async () => {

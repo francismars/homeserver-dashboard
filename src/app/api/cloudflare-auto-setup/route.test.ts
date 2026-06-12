@@ -268,6 +268,20 @@ describe('cloudflare-auto-setup route', () => {
     expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
   });
 
+  it('refuses to adopt a tunnel reporting config_src "local" even without remote_config', async () => {
+    installFetchMock(
+      makeRules({
+        listTunnels: () => cfOk([{ id: TUNNEL_ID, name: 'pubky-homeserver', config_src: 'local' }]),
+      }),
+      calls,
+    );
+    const res = await post(validBody);
+    const data = await res.json();
+    expect(res.status).toBe(409);
+    expect(data.error).toContain('locally-managed');
+    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
+  });
+
   it('uses a token from the create response when present (skips the GET)', async () => {
     installFetchMock(
       makeRules({
