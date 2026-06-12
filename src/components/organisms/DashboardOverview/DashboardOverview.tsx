@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { cn, copyToClipboard } from '@/libs/utils';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
+import { GetStartedChecklist } from './GetStartedChecklist';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
 type DomainHealth = 'not_set_up' | 'checking' | 'reachable' | 'unreachable';
@@ -92,7 +93,16 @@ function CopyValueButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function DashboardOverview({ info, isLoading, error, onFixCloudflare, onRetry }: DashboardOverviewProps) {
+export function DashboardOverview({
+  info,
+  isLoading,
+  error,
+  onFixCloudflare,
+  onRetry,
+  onGoToInvites,
+  setupGuideDismissed,
+  onDismissSetupGuide,
+}: DashboardOverviewProps) {
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
@@ -123,15 +133,20 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare, onR
   // Durable restart-pending signal (boot stamp vs state mtimes, server
   // derived): survives page reloads, unlike the Settings dialog's session
   // state. Reachability cannot stand in for it - the tunnel reconnects
-  // without a restart, the pkarr publication does not.
+  // without a restart, the pkarr publication does not. The same read carries
+  // the server-derived Cloudflare mode, which drives the get-started step.
   const [restartPending, setRestartPending] = useState(false);
+  const [cloudflareMode, setCloudflareMode] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
         const res = await fetch('/api/cloudflare-config', { cache: 'no-store' });
         const data = await res.json();
-        if (!cancelled) setRestartPending(data.restart_pending === true);
+        if (!cancelled) {
+          setRestartPending(data.restart_pending === true);
+          setCloudflareMode(typeof data.mode === 'string' ? data.mode : null);
+        }
       } catch {
         // unknown: keep the callout hidden
       }
@@ -203,6 +218,18 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare, onR
 
   return (
     <div className="space-y-4">
+      {/* Get-started checklist: rendered only when its wiring is present
+          (onDismissSetupGuide) and the user has not dismissed it. */}
+      {onDismissSetupGuide && setupGuideDismissed === false && (
+        <GetStartedChecklist
+          reachableDone={cloudflareMode !== null && cloudflareMode !== 'off' && domainHealth === 'reachable'}
+          inviteDone={info.num_signup_codes > 0}
+          signupDone={info.num_users > 0}
+          onSetUpAccess={onFixCloudflare}
+          onCreateInvite={onGoToInvites}
+          onDismiss={onDismissSetupGuide}
+        />
+      )}
       <div className="grid gap-4">
         <Card>
           <CardHeader className="pb-4">
@@ -378,6 +405,13 @@ export function DashboardOverview({ info, isLoading, error, onFixCloudflare, onR
           </CardContent>
         </Card>
       </div>
+
+      {/* Where the data actually lives; the dashboard offers no export, so
+          this is the one place the backup story is told. */}
+      <p className="px-1 text-xs text-muted-foreground/70" data-testid="backup-note">
+        Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory on your
+        Umbrel. Include it in your Umbrel backups; losing it means losing this server&apos;s identity.
+      </p>
     </div>
   );
 }

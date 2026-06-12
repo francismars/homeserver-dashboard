@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
-import { DashboardOverview } from '@/components/organisms/DashboardOverview';
+import { DashboardOverview, useSetupGuideDismissal } from '@/components/organisms/DashboardOverview';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
 import { FileBrowser } from '@/components/organisms/FileBrowser';
 import { DisabledUsersManagement } from '@/components/organisms/DisabledUsersManagement';
@@ -12,7 +12,19 @@ import { ConfigDialog } from '@/components/organisms/ConfigDialog';
 import { InviteManagement } from '@/components/organisms/InviteManagement';
 import { ServerControlDialog } from '@/components/organisms/ServerControlDialog';
 import { DashboardLogs } from '@/components/organisms/DashboardLogs';
-import { Github, BookOpen, HelpCircle, Home, Users, Files, Plug, Gift, ScrollText, Cloud } from 'lucide-react';
+import {
+  Github,
+  BookOpen,
+  HelpCircle,
+  Home,
+  Users,
+  Files,
+  Plug,
+  Gift,
+  ScrollText,
+  Cloud,
+  ListChecks,
+} from 'lucide-react';
 import Link from 'next/link';
 // The dashboard's own release version. The homeserver's version (from /info)
 // is shown on the Overview card, explicitly labeled; mixing the two in the
@@ -48,6 +60,7 @@ export default function DashboardPage() {
     isGeneratingInvite,
     isDisablingUser,
     isEnablingUser,
+    generateInviteError,
     generatedInvites,
   } = useAdminActions();
   const {
@@ -60,6 +73,22 @@ export default function DashboardPage() {
     loadMore: loadMoreDisabledUsers,
     removeDisabledUserLocally,
   } = useDisabledUsers();
+
+  // Controlled tabs: the get-started checklist's "Open Invites" CTA and the
+  // footer's "Setup guide" link both need to drive the active tab.
+  const [activeTab, setActiveTab] = useState('overview');
+  const {
+    dismissed: setupGuideDismissed,
+    dismiss: dismissSetupGuide,
+    restore: restoreSetupGuide,
+  } = useSetupGuideDismissal();
+  const handleShowSetupGuide = useCallback(() => {
+    restoreSetupGuide();
+    setActiveTab('overview');
+  }, [restoreSetupGuide]);
+  const handleGoToInvites = useCallback(() => {
+    setActiveTab('invites');
+  }, []);
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [serverControlAction, setServerControlAction] = useState<'restart' | 'shutdown' | null>(null);
@@ -82,7 +111,13 @@ export default function DashboardPage() {
   }, []);
 
   const handleGenerateInvite = useCallback(async () => {
-    await generateInvite();
+    // The failure is surfaced via generateInviteError; swallowing the throw
+    // here keeps it out of the console as an unhandled rejection.
+    try {
+      await generateInvite();
+    } catch {
+      return;
+    }
     await refetchInfo();
   }, [generateInvite, refetchInfo]);
 
@@ -188,7 +223,7 @@ export default function DashboardPage() {
             showSettingsButton={canOpenSettings}
           />
 
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList
               className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
                 // Base tabs (Overview, Invites, Files, API) = 4; plus 1 each for
@@ -247,6 +282,9 @@ export default function DashboardPage() {
                 error={infoError}
                 onFixCloudflare={handleFixCloudflare}
                 onRetry={() => void refetchInfo()}
+                onGoToInvites={handleGoToInvites}
+                setupGuideDismissed={setupGuideDismissed}
+                onDismissSetupGuide={dismissSetupGuide}
               />
             </TabsContent>
 
@@ -278,6 +316,7 @@ export default function DashboardPage() {
                 invites={generatedInvites}
                 onGenerate={handleGenerateInvite}
                 isGenerating={isGeneratingInvite}
+                generateError={generateInviteError?.message ?? null}
                 signupCodesTotal={info?.num_signup_codes}
                 signupCodesUnused={info?.num_unused_signup_codes}
                 isStatsLoading={infoLoading}
@@ -343,6 +382,18 @@ export default function DashboardPage() {
 
             {/* Links */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:justify-end sm:gap-6">
+              {/* Way back to the dismissed get-started checklist */}
+              {setupGuideDismissed === true && (
+                <button
+                  type="button"
+                  onClick={handleShowSetupGuide}
+                  className="flex cursor-pointer items-center gap-1.5 transition-colors hover:text-foreground"
+                  data-testid="setup-guide-link"
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  <span>Setup guide</span>
+                </button>
+              )}
               <Link
                 href="https://github.com/pubky/pubky-core/"
                 target="_blank"

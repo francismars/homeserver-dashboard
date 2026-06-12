@@ -244,6 +244,28 @@ describe('ConfigDialog Cloudflare status surface', () => {
     await waitFor(() => expect(screen.getByTestId('cf-status-reachable')).toBeTruthy());
   });
 
+  it('a setup completing in this session points at the next step (invites + Pubky Ring)', async () => {
+    const backend = mockBackend({ cloudflareConfig: cfConfig('off') });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-manual-toggle')).toBeTruthy());
+    expect(screen.queryByTestId('cf-next-step')).toBeNull();
+    fireEvent.click(screen.getByTestId('cf-manual-toggle'));
+    fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'pubky.example.com' } });
+    fireEvent.change(screen.getByLabelText('Tunnel token'), { target: { value: 'tunnel-token' } });
+    backend.cloudflareConfig = cfConfig('token', 'pubky.example.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByTestId('cf-next-step')).toBeTruthy());
+    expect(screen.getByTestId('cf-next-step').textContent).toContain('create an invite in the Invites tab');
+    expect(screen.getByTestId('cf-next-step').textContent).toContain('Pubky Ring');
+  });
+
+  it('a mode already active from a previous session shows no next-step line', async () => {
+    mockBackend({ cloudflareConfig: cfConfig('token', 'pubky.example.com') });
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('cf-mode-badge')).toBeTruthy());
+    expect(screen.queryByTestId('cf-next-step')).toBeNull();
+  });
+
   it('a 500 keeps the tab with a retry state instead of hiding it as unsupported', async () => {
     const backend = mockBackend({
       cloudflareConfig: { status: 500, json: { error: 'Could not read the Cloudflare configuration' } },

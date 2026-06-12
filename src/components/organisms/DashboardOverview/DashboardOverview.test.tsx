@@ -16,12 +16,12 @@ const baseInfo: AdminInfoResponse = {
 };
 
 /** Routes the component's two fetches: the public-health probe and the
- * restart-pending read from /api/cloudflare-config. */
-function mockBackend({ healthOk = true, restartPending = null as boolean | null } = {}) {
+ * restart-pending + mode read from /api/cloudflare-config. */
+function mockBackend({ healthOk = true, restartPending = null as boolean | null, mode = null as string | null } = {}) {
   vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
     const url = String(input);
     const json = url.startsWith('/api/cloudflare-config')
-      ? { restart_pending: restartPending }
+      ? { restart_pending: restartPending, mode }
       : { ok: healthOk, status: healthOk ? 200 : 530 };
     return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
@@ -198,6 +198,123 @@ describe('DashboardOverview server identity', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_pubky_address));
     fireEvent.click(screen.getByLabelText('Copy domain'));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_icann_domain));
+  });
+});
+
+describe('DashboardOverview get-started checklist', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const wiring = {
+    onGoToInvites: () => {},
+    setupGuideDismissed: false,
+    onDismissSetupGuide: () => {},
+  };
+  const freshInstall = { ...baseInfo, num_users: 0, num_signup_codes: 0 };
+
+  it('reachable step is done only when the mode is active AND the probe answers ok', async () => {
+    mockBackend({ healthOk: true, mode: 'token' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('done'));
+    expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('pending');
+    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('mode off keeps the reachable step pending even when the probe answers ok', async () => {
+    mockBackend({ healthOk: true, mode: 'off' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('an active mode with an unreachable domain keeps the reachable step pending', async () => {
+    mockBackend({ healthOk: false, mode: 'connect' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('/info signals drive the invite and signup steps', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+        isLoading={false}
+        error={null}
+        {...wiring}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done'));
+    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('all three done: collapses to the slim all-set state', async () => {
+    mockBackend({ healthOk: true, mode: 'connect' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+        isLoading={false}
+        error={null}
+        {...wiring}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('setup-guide-allset')).toBeTruthy());
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+  });
+
+  it('CTAs reuse the existing affordances: Set up access opens Cloudflare, Open Invites switches tabs', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    const onFixCloudflare = vi.fn();
+    const onGoToInvites = vi.fn();
+    render(
+      <DashboardOverview
+        info={freshInstall}
+        isLoading={false}
+        error={null}
+        {...wiring}
+        onFixCloudflare={onFixCloudflare}
+        onGoToInvites={onGoToInvites}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('setup-step-reachable-cta'));
+    expect(onFixCloudflare).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId('setup-step-invite-cta'));
+    expect(onGoToInvites).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismissed (or dismissal not yet read) renders no checklist', async () => {
+    mockBackend();
+    const { rerender } = render(
+      <DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} setupGuideDismissed={true} />,
+    );
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+    rerender(
+      <DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} setupGuideDismissed={null} />,
+    );
+    expect(screen.queryByTestId('setup-guide')).toBeNull();
+  });
+});
+
+describe('DashboardOverview backup note', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('tells the operator where the data lives and to include it in Umbrel backups', async () => {
+    mockBackend();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    const note = screen.getByTestId('backup-note');
+    expect(note.textContent).toContain('data directory on your Umbrel');
+    expect(note.textContent).toContain('Include it in your Umbrel backups');
+    expect(note.textContent).toContain("losing this server's identity");
   });
 });
 

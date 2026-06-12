@@ -8,4 +8,10 @@ export type DashboardOverviewProps = {
   onFixCloudflare?: () => void;
   /** Manual "Retry now" in the connection-error state. */
   onRetry?: () => void;
+  /** Switches the dashboard to the Invites tab (get-started step 2 CTA). */
+  onGoToInvites?: () => void;
+  /** null = not yet read from localStorage; the checklist renders only on false. */
+  setupGuideDismissed?: boolean | null;
+  /** Persists the dismissal; the checklist renders only when this is wired. */
+  onDismissSetupGuide?: () => void;
 };

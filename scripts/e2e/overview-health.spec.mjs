@@ -25,6 +25,79 @@ await runSpec(
     check((await page1.locator('text=Public domain').count()) >= 1, 'Public domain label shown');
     check((await page1.locator('text=PKARR').count()) === 0, 'no visible PKARR jargon');
 
+    step('get-started checklist: step states come from the admin signals');
+    // Mock admin defaults: 5 signup codes, 3 users; no Cloudflare files, so
+    // the server-derived mode is off and the reachable step stays pending
+    // even though the domain probe answered ok.
+    await page1.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
+    const stepState = (page, id) => page.getAttribute(`[data-testid="${id}"]`, 'data-state');
+    check((await stepState(page1, 'setup-step-reachable')) === 'pending', 'reachable step pending while mode is off');
+    check((await stepState(page1, 'setup-step-invite')) === 'done', 'invite step done (num_signup_codes > 0)');
+    check((await stepState(page1, 'setup-step-signup')) === 'done', 'signup step done (num_users > 0)');
+
+    step('get-started checklist: fresh install has every step pending');
+    const pageFresh = await ctx.newPage();
+    await pageFresh.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false }) }),
+    );
+    await pageFresh.route('**/api/admin/info', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.num_users = 0;
+      json.num_signup_codes = 0;
+      await route.fulfill({ response: res, json });
+    });
+    await pageFresh.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageFresh.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
+    check((await stepState(pageFresh, 'setup-step-reachable')) === 'pending', 'fresh install: reachable pending');
+    check((await stepState(pageFresh, 'setup-step-invite')) === 'pending', 'fresh install: invite pending');
+    check((await stepState(pageFresh, 'setup-step-signup')) === 'pending', 'fresh install: signup pending');
+    check(
+      (await pageFresh.locator('text=Your first invite is for your own account').count()) === 1,
+      'first-invite copy shown',
+    );
+
+    step('get-started checklist: all steps done collapses to the all-set state');
+    const pageDone = await ctx.newPage();
+    await pageDone.route('**/api/public-health*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
+    );
+    await pageDone.route('**/api/cloudflare-config', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          supported: true,
+          mode: 'token',
+          domain: 'pubky.example.com',
+          configured: true,
+          restart_pending: false,
+        }),
+      }),
+    );
+    await pageDone.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { timeout: 30000 });
+    check(true, 'all-set state shown when reachable, invite and signup are all done');
+    check((await pageDone.locator('[data-testid="setup-guide"]').count()) === 0, 'full checklist collapsed');
+
+    step('get-started checklist: dismissal sticks across reload, footer link restores');
+    await pageDone.click('[data-testid="setup-guide-dismiss"]');
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { state: 'detached', timeout: 15000 });
+    await pageDone.waitForSelector('[data-testid="setup-guide-link"]', { timeout: 15000 });
+    check(true, 'dismissed: card gone, footer "Setup guide" link appeared');
+    await pageDone.reload({ waitUntil: 'domcontentloaded' });
+    await pageDone.waitForSelector('[data-testid="setup-guide-link"]', { timeout: 30000 });
+    check(
+      (await pageDone.locator('[data-testid="setup-guide"], [data-testid="setup-guide-allset"]').count()) === 0,
+      'checklist stays dismissed after a reload',
+    );
+    await pageDone.click('[data-testid="setup-guide-link"]');
+    await pageDone.waitForSelector('[data-testid="setup-guide-allset"]', { timeout: 15000 });
+    check(true, 'footer link brings the checklist back');
+    // The restore click also cleared the stored flag, so the later pages in
+    // this shared context see the card again.
+    await pageDone.close();
+
     step('unreachable: probe fails, Fix it opens the Cloudflare tab');
     const page2 = await ctx.newPage();
     await page2.route('**/api/public-health*', (route) =>

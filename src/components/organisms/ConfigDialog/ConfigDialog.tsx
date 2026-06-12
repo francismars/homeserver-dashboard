@@ -770,6 +770,13 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                       </div>
 
                       {cfStatusCallout && <RestartCallout>{cfStatusCallout}</RestartCallout>}
+                      {/* A setup just completed in this session: point at what
+                          comes after instead of leaving the user at a dead end. */}
+                      {recentChange && (
+                        <p className="text-xs text-muted-foreground" data-testid="cf-next-step">
+                          Next: create an invite in the Invites tab so you can sign up from Pubky Ring.
+                        </p>
+                      )}
                       {cfMode !== 'off' && (
                         <div className="flex items-center justify-between gap-3">
                           <code
