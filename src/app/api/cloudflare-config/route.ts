@@ -3,7 +3,8 @@ import { constants as fsConstants, promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
-import { atomicWrite } from '@/lib/server/cloudflared-process';
+import { atomicWrite, fileExists } from '@/lib/server/cloudflared-process';
+import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-config';
@@ -34,57 +35,50 @@ async function isCloudflareConfigSupported(): Promise<boolean> {
 
 /**
  * GET /api/cloudflare-config
- * Returns current Cloudflare domain (if set). Token is never returned.
+ * Returns the server-derived setup mode plus the current domain (if set).
+ * Token is never returned. `supported: false` means only one thing: the
+ * config dir is not accessible in this environment (the tab is pointless);
+ * any other failure is an honest 500 so the client can retry instead of
+ * hiding the tab.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const requestId = getRequestId(request);
   const startedAt = Date.now();
   const supported = await isCloudflareConfigSupported();
   try {
-    const domain = await fs
-      .readFile(DOMAIN_FILE, 'utf-8')
-      .then((s) => s.trim())
-      .catch(() => null);
-    const hasToken = await fs
-      .readFile(TOKEN_FILE, 'utf-8')
-      .then((s) => s.trim().length > 0)
-      .catch(() => false);
-    // Locally-managed mode (Connect flow) has no token; config.yml +
-    // credentials.json are its equivalent.
-    const hasLocalConfig =
-      (await fs.access(path.join(CONFIG_DIR, 'config.yml')).then(
-        () => true,
-        () => false,
-      )) &&
-      (await fs.access(path.join(CONFIG_DIR, 'credentials.json')).then(
-        () => true,
-        () => false,
-      ));
-    const response = NextResponse.json({
-      domain: domain || null,
-      configured: !!(domain && (hasToken || hasLocalConfig)),
-      supported,
-    });
+    const { mode, domain } = await detectCloudflareMode();
+    const response = NextResponse.json(
+      {
+        domain,
+        mode,
+        configured: mode === 'connect' || mode === 'token',
+        supported,
+        requestId,
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
     logRouteInfo({
-      requestId: crypto.randomUUID(),
+      requestId,
       route: ROUTE_NAME,
       method: 'GET',
       statusCode: 200,
       durationMs: Date.now() - startedAt,
       message: 'Cloudflare config read',
-      meta: { configured: !!(domain && hasToken), supported },
+      meta: { mode, supported },
     });
     return response;
-  } catch {
+  } catch (e) {
+    const error = new RouteError(500, 'internal_error', 'Could not read the Cloudflare configuration');
     logRouteError({
-      requestId: crypto.randomUUID(),
+      requestId,
       route: ROUTE_NAME,
       method: 'GET',
-      statusCode: 200,
+      statusCode: error.status,
       durationMs: Date.now() - startedAt,
-      errorType: 'internal_error',
-      message: 'Cloudflare config read fallback',
+      errorType: error.type,
+      message: e instanceof Error ? e.message : String(e),
     });
-    return NextResponse.json({ domain: null, configured: false, supported: false });
+    return errorResponse(error, requestId);
   }
 }
 
@@ -164,10 +158,7 @@ export async function POST(request: NextRequest) {
 
   // A domain-only save must land in a setup that can actually serve it.
   if (body.domain !== undefined && body.token === undefined) {
-    const hasConnectConfig = await fs.access(path.join(CONFIG_DIR, 'config.yml')).then(
-      () => true,
-      () => false,
-    );
+    const hasConnectConfig = await fileExists(path.join(CONFIG_DIR, 'config.yml'));
     const hasToken = await fs
       .readFile(TOKEN_FILE, 'utf-8')
       .then((s) => s.trim().length > 0)

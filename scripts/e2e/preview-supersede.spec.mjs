@@ -37,6 +37,13 @@ await runSpec('preview-supersede', async ({ env, browser }) => {
 
   step('preview card reflects the teardown after a reload');
   await openCloudflareTab(page, env.baseUrl);
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="cf-mode-badge"]')?.textContent?.trim() === 'API token',
+    { timeout: 15000 },
+  );
+  check(true, 'Status badge shows the token setup, not preview');
+  // The token mode is active, so the cards sit behind the disclosure.
+  await page.click('[data-testid="cf-switch-method-toggle"]');
   await page.waitForSelector('[data-testid="cf-preview-enable"]', { timeout: 15000 });
   check(true, 'enable button back (preview off)');
 

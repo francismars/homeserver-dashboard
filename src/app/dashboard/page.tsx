@@ -110,6 +110,10 @@ export default function DashboardPage() {
         if (cloudflareRes.ok) {
           const cloudflareData = (await cloudflareRes.json()) as { supported?: boolean };
           isCloudflareSupported = Boolean(cloudflareData.supported);
+        } else if (cloudflareRes.status >= 500) {
+          // A read failure is "temporarily unavailable", not "unsupported";
+          // keep Settings reachable so the dialog can offer a retry.
+          isCloudflareSupported = true;
         }
 
         let isConfigWritable = false;

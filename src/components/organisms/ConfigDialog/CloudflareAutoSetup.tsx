@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RestartCallout } from './RestartCallout';
 import { StepList } from './StepList';
 
 /**
@@ -137,6 +136,8 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
     }
   };
 
+  // In-session completion feedback only; the persistent state (and the
+  // restart callout) lives on the dialog's Status surface.
   if (doneHostname) {
     return (
       <div className="space-y-3" data-testid="cf-auto-success">
@@ -145,10 +146,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           <span>Tunnel configured for {doneHostname}</span>
         </div>
         {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-auto-steps" />}
-        <RestartCallout>
-          The tunnel connects within a few seconds. Restart the app from Umbrel to publish your domain to the Pubky
-          network.
-        </RestartCallout>
+        <p className="text-xs text-muted-foreground">The Status section above tracks this setup from here on.</p>
       </div>
     );
   }

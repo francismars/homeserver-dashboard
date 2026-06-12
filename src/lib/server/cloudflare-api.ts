@@ -11,13 +11,10 @@
  * - CF_API_BASE is overridable for tests/e2e only; defaults to the real API.
  */
 
+import { INGRESS_SERVICE } from './cloudflared-process';
+
 const CF_API_BASE = process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4';
 const CALL_TIMEOUT_MS = 15_000;
-
-/** The fixed tunnel name the app owns. Re-runs adopt it (idempotency). */
-export const TUNNEL_NAME = 'pubky-homeserver';
-/** Where the tunnel forwards traffic inside the Umbrel network. */
-export const INGRESS_SERVICE = 'http://homeserver:6286';
 
 export class CfApiError extends Error {
   status: number;

@@ -32,30 +32,54 @@ describe('cloudflare-config route', () => {
     return { GET: mod.GET, POST: mod.POST };
   }
 
-  it('GET returns unconfigured when no files exist', async () => {
+  const getRequest = () => new NextRequest('http://localhost:8080/api/cloudflare-config');
+
+  it('GET returns mode off when no files exist', async () => {
     const { GET } = await loadRoute();
-    const response = await GET();
+    const response = await GET(getRequest());
     const payload = await response.json();
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(payload.domain).toBe(null);
+    expect(payload.mode).toBe('off');
     expect(payload.configured).toBe(false);
     expect(payload.supported).toBe(true);
   });
 
-  it('GET reports configured when both domain and token are present', async () => {
+  it('GET reports token mode when both domain and token are present', async () => {
     await fs.writeFile(path.join(tmpDir, 'domain'), 'pubky.example.com');
     await fs.writeFile(path.join(tmpDir, 'token'), VALID_TOKEN);
     const { GET } = await loadRoute();
-    const response = await GET();
+    const response = await GET(getRequest());
     const payload = await response.json();
     expect(payload.domain).toBe('pubky.example.com');
+    expect(payload.mode).toBe('token');
     expect(payload.configured).toBe(true);
+  });
+
+  it('GET reports connect mode for a locally-managed setup', async () => {
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: x');
+    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{}');
+    await fs.writeFile(path.join(tmpDir, 'domain'), 'pubky.example.com');
+    const { GET } = await loadRoute();
+    const payload = await (await GET(getRequest())).json();
+    expect(payload.mode).toBe('connect');
+    expect(payload.domain).toBe('pubky.example.com');
+    expect(payload.configured).toBe(true);
+  });
+
+  it('GET reports preview mode from the marker, not configured', async () => {
+    await fs.writeFile(path.join(tmpDir, 'testdrive.env'), 'TUNNEL_URL=http://homeserver:6286\n');
+    const { GET } = await loadRoute();
+    const payload = await (await GET(getRequest())).json();
+    expect(payload.mode).toBe('preview');
+    expect(payload.configured).toBe(false);
   });
 
   it('GET never leaks the cloudflare token in the response', async () => {
     await fs.writeFile(path.join(tmpDir, 'token'), 'extremely-secret-token-xyz');
     const { GET } = await loadRoute();
-    const response = await GET();
+    const response = await GET(getRequest());
     const payload = await response.json();
     expect(JSON.stringify(payload)).not.toContain('extremely-secret-token-xyz');
   });
@@ -63,9 +87,24 @@ describe('cloudflare-config route', () => {
   it('GET reports unsupported when CONFIG_DIR is missing', async () => {
     process.env.CLOUDFLARE_CONFIG_DIR = path.join(tmpDir, 'does-not-exist');
     const { GET } = await loadRoute();
-    const response = await GET();
+    const response = await GET(getRequest());
     const payload = await response.json();
+    expect(response.status).toBe(200);
     expect(payload.supported).toBe(false);
+  });
+
+  it('GET returns an honest 500 on an unexpected error instead of supported:false', async () => {
+    vi.doMock('@/lib/server/cloudflare-mode', () => ({
+      detectCloudflareMode: vi.fn().mockRejectedValue(new Error('disk exploded')),
+    }));
+    const { GET } = await loadRoute();
+    const response = await GET(getRequest());
+    const payload = await response.json();
+    expect(response.status).toBe(500);
+    expect(payload.type).toBe('internal_error');
+    expect(payload.requestId).toBeTruthy();
+    expect(JSON.stringify(payload)).not.toContain('supported');
+    vi.doUnmock('@/lib/server/cloudflare-mode');
   });
 
   it('POST rejects invalid JSON body with 400', async () => {
