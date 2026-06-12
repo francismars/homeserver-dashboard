@@ -22,6 +22,11 @@ const CHROME = process.env.E2E_CHROME || '/usr/bin/google-chrome';
 const DEV_BOOT_TIMEOUT_MS = 120_000;
 
 export const FIXTURE_CERT = path.join(REPO_ROOT, 'src', 'lib', 'server', '__fixtures__', 'origincert-example.pem');
+/** Modern login layout (cloudflared >= 2025.2.1): one ARGO TUNNEL TOKEN block
+ * whose embedded zoneID/apiToken match the mock CF server's ZONE_ID and
+ * VALID_TOKEN, so the dashboard resolves the zone name (example.com) over
+ * CF_API_BASE. */
+export const FIXTURE_CERT_TOKEN = path.join(REPO_ROOT, 'src', 'lib', 'server', '__fixtures__', 'cert-token-only.pem');
 
 // ---------------------------------------------------------------------------
 // tiny assertion + reporting helpers (throw on failure; specs exit non-zero)

@@ -246,14 +246,94 @@ describe('parseAuthorizedDomain', () => {
   let tmpDir: string;
   const certPath = () => path.join(tmpDir, 'cert.pem');
 
+  // Mirrors the fixture's embedded token payload (see cert-token-only.pem);
+  // the values double as the e2e mock-cf-server's ZONE_ID / VALID_TOKEN.
+  const TOKEN_ZONE_ID = 'a'.repeat(32);
+  const TOKEN_API_TOKEN = 'mock-cf-api-token-valid-12345678';
+
+  const cfResponse = (status: number, json: unknown) =>
+    new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
+  const zoneOk = (name: string) =>
+    cfResponse(200, {
+      success: true,
+      errors: [],
+      result: { id: TOKEN_ZONE_ID, name, status: 'active', account: { id: 'acc-1' } },
+    });
+  const zoneForbidden = () =>
+    cfResponse(403, { success: false, errors: [{ code: 9109, message: 'Unauthorized to access' }], result: null });
+
+  /** A token block PEM whose payload is base64 of the given string. */
+  const tokenBlock = (payload: string) =>
+    `-----BEGIN ARGO TUNNEL TOKEN-----\n${Buffer.from(payload, 'utf-8').toString('base64')}\n-----END ARGO TUNNEL TOKEN-----\n`;
+
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cfd-cert-test-'));
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.CF_API_BASE = 'https://cf-api.test/client/v4';
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     process.env = { ...originalEnv };
     await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('resolves the zone name via the Cloudflare API for a token-only cert (modern login layout)', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(zoneOk('example.com'));
+    await fs.copyFile(path.join(FIXTURES, 'cert-token-only.pem'), certPath());
+    expect(await parseAuthorizedDomain()).toBe('example.com');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`https://cf-api.test/client/v4/zones/${TOKEN_ZONE_ID}`);
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN_API_TOKEN}`);
+  });
+
+  it('caches the resolved zone per cert mtime: the status poll does not refetch', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(zoneOk('example.com'));
+    await fs.copyFile(path.join(FIXTURES, 'cert-token-only.pem'), certPath());
+    const pinned = new Date('2026-06-12T00:00:00Z');
+    await fs.utimes(certPath(), pinned, pinned);
+    expect(await parseAuthorizedDomain()).toBe('example.com');
+    expect(await parseAuthorizedDomain()).toBe('example.com');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A rewritten cert (new mtime = new login) must re-resolve.
+    fetchMock.mockResolvedValue(zoneOk('other.example.org'));
+    const later = new Date('2026-06-12T00:05:00Z');
+    await fs.utimes(certPath(), later, later);
+    expect(await parseAuthorizedDomain()).toBe('other.example.org');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls through to null when the API rejects the token and no CERTIFICATE block exists', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    vi.spyOn(global, 'fetch').mockResolvedValue(zoneForbidden());
+    await fs.copyFile(path.join(FIXTURES, 'cert-token-only.pem'), certPath());
+    expect(await parseAuthorizedDomain()).toBeNull();
+  });
+
+  it('falls through to the legacy SAN parse when the API rejects a combined token+certificate cert', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    vi.spyOn(global, 'fetch').mockResolvedValue(zoneForbidden());
+    const tokenOnly = await fs.readFile(path.join(FIXTURES, 'cert-token-only.pem'), 'utf-8');
+    const legacy = await fs.readFile(path.join(FIXTURES, 'origincert-example.pem'), 'utf-8');
+    const certBlock = legacy.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/)?.[0] ?? '';
+    await fs.writeFile(certPath(), `${tokenOnly}${certBlock}\n`, 'utf-8');
+    expect(await parseAuthorizedDomain()).toBe('example.com');
+  });
+
+  it('falls through without calling the API on a bad-base64/JSON or incomplete token block', async () => {
+    const { parseAuthorizedDomain } = await import('./cloudflared-process');
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(zoneOk('never.example'));
+    await fs.writeFile(certPath(), tokenBlock('not json at all'), 'utf-8');
+    expect(await parseAuthorizedDomain()).toBeNull();
+    // zoneID present but not 32-hex
+    await fs.writeFile(certPath(), tokenBlock(JSON.stringify({ zoneID: 'nope', apiToken: 'tok' })), 'utf-8');
+    expect(await parseAuthorizedDomain()).toBeNull();
+    // apiToken missing
+    await fs.writeFile(certPath(), tokenBlock(JSON.stringify({ zoneID: TOKEN_ZONE_ID })), 'utf-8');
+    expect(await parseAuthorizedDomain()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('extracts the zone apex from a multi-block PEM (key + cert + token block)', async () => {

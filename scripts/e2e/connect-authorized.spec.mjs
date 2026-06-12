@@ -1,11 +1,11 @@
 // Connect Cloudflare account flow with the fake cloudflared binary:
 // prerequisites copy on the idle card, browser-auth wait state, the
-// cert-derived subdomain picker (fixture cert authorizes example.com), the
-// full-hostname fallback when the cert does not parse, and the expired
-// idle card.
+// cert-derived subdomain picker (token-only cert resolved to example.com via
+// the mock Cloudflare API), the legacy SAN-cert picker, the full-hostname
+// fallback when the cert does not parse, and the expired idle card.
 import { promises as fs } from 'fs';
 import path from 'path';
-import { runSpec, openCloudflareTab, check, step, sleep, FIXTURE_CERT } from './lib/harness.mjs';
+import { runSpec, openCloudflareTab, check, step, sleep, FIXTURE_CERT, FIXTURE_CERT_TOKEN } from './lib/harness.mjs';
 
 await runSpec('connect-authorized', async ({ env, browser }) => {
   const page = await (await browser.newContext({ viewport: { width: 1200, height: 1100 } })).newPage();
@@ -30,16 +30,16 @@ await runSpec('connect-authorized', async ({ env, browser }) => {
   const authHref = await page.locator('[data-testid="cf-connect-auth-link"]').getAttribute('href');
   check(authHref.startsWith('https://dash.cloudflare.com/argotunnel?'), 'auth link parsed from the login log');
 
-  step('deliver the fixture cert (authorizes example.com)');
+  step('deliver the token-only cert (zone resolved to example.com via the mock CF API)');
   await fs.mkdir(path.join(env.configDir, '.cloudflared'), { recursive: true });
-  await fs.copyFile(FIXTURE_CERT, path.join(env.configDir, '.cloudflared', 'cert.pem'));
+  await fs.copyFile(FIXTURE_CERT_TOKEN, path.join(env.configDir, '.cloudflared', 'cert.pem'));
   await page.waitForSelector('[data-testid="cf-connect-authorized"]', { timeout: 20000 });
   check(true, 'authorized panel appeared (cert relocated + detected)');
 
   step('subdomain-only input with locked suffix and suggestion chips');
   await page.waitForSelector('[data-testid="cf-connect-subdomain"]', { timeout: 5000 });
   const suffix = (await page.locator('[data-testid="cf-connect-domain-suffix"]').textContent()).trim();
-  check(suffix === '.example.com', 'suffix locked to the authorized zone', suffix);
+  check(suffix === '.example.com', 'suffix locked to the API-resolved zone', suffix);
   for (const chip of ['pubky', 'hs', 'homeserver']) {
     check((await page.locator(`[data-testid="cf-connect-chip-${chip}"]`).count()) === 1, `chip "${chip}" present`);
   }
@@ -100,9 +100,27 @@ await runSpec('connect-authorized', async ({ env, browser }) => {
     domainOnly.data.error,
   );
 
-  step('fallback path: unparseable cert keeps the full-hostname input');
+  step('legacy cert path: SAN-parsed zone still drives the subdomain picker');
   const disconnect = await env.api('/api/cloudflare-disconnect', { method: 'POST' });
   check(disconnect.status === 200, 'disconnect resets the setup for the second pass');
+  await openCloudflareTab(page, env.baseUrl);
+  await page.waitForSelector('[data-testid="cf-connect-start"]', { timeout: 15000 });
+  await page.click('[data-testid="cf-connect-start"]');
+  await page.waitForSelector('[data-testid="cf-connect-waiting"]', { timeout: 25000 });
+  await fs.mkdir(path.join(env.configDir, '.cloudflared'), { recursive: true });
+  await fs.copyFile(FIXTURE_CERT, path.join(env.configDir, '.cloudflared', 'cert.pem'));
+  await page.waitForSelector('[data-testid="cf-connect-authorized"]', { timeout: 20000 });
+  await page.waitForSelector('[data-testid="cf-connect-subdomain"]', { timeout: 5000 });
+  const legacySuffix = (await page.locator('[data-testid="cf-connect-domain-suffix"]').textContent()).trim();
+  check(legacySuffix === '.example.com', 'suffix derived from the legacy cert SAN', legacySuffix);
+  const cancelLegacy = await env.api('/api/cloudflare-connect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'cancel' }),
+  });
+  check(cancelLegacy.status === 200, 'legacy authorization cancelled');
+
+  step('fallback path: unparseable cert keeps the full-hostname input');
   await openCloudflareTab(page, env.baseUrl);
   await page.waitForSelector('[data-testid="cf-connect-start"]', { timeout: 15000 });
   await page.click('[data-testid="cf-connect-start"]');

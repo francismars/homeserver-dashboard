@@ -85,12 +85,31 @@ describe('cloudflare-connect route', () => {
     );
 
   const writeCert = () => fs.writeFile(path.join(tmpDir, 'cert.pem'), 'CERT', 'utf-8');
-  /** Realistic cert: key + certificate (SAN example.com, *.example.com) + token block. */
+  /** Realistic legacy cert: key + certificate (SAN example.com, *.example.com) + token block. */
   const writeRealCert = async () =>
     fs.writeFile(
       path.join(tmpDir, 'cert.pem'),
       await fs.readFile(path.join(FIXTURES, 'origincert-example.pem'), 'utf-8'),
       'utf-8',
+    );
+  /** Modern cert layout (cloudflared >= 2025.2.1): a single ARGO TUNNEL TOKEN
+   * block; the zone name only exists behind the Cloudflare API. */
+  const writeTokenCert = async () =>
+    fs.writeFile(
+      path.join(tmpDir, 'cert.pem'),
+      await fs.readFile(path.join(FIXTURES, 'cert-token-only.pem'), 'utf-8'),
+      'utf-8',
+    );
+  const mockZoneFetch = (name: string) =>
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          errors: [],
+          result: { id: 'a'.repeat(32), name, status: 'active', account: { id: 'acc-1' } },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     );
   const writeCreds = (id = 'tunnel-uuid-1') =>
     fs.writeFile(path.join(tmpDir, 'credentials.json'), JSON.stringify({ TunnelID: id }), 'utf-8');
@@ -392,6 +411,56 @@ describe('cloudflare-connect route', () => {
     const data = await (await get(GET)).json();
     expect(data.status).toBe('authorized');
     expect(data.authorized_domain).toBeNull();
+  });
+
+  it('GET authorized resolves authorized_domain from a token-only cert via the Cloudflare API', async () => {
+    const { GET } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    const data = await (await get(GET)).json();
+    expect(data.status).toBe('authorized');
+    expect(data.authorized_domain).toBe('example.com');
+  });
+
+  it('complete rejects an out-of-zone hostname against the API-resolved zone of a token-only cert', async () => {
+    const { lib, POST } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.other.net' });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toContain('example.com');
+    expect(lib.runCloudflared as Mock).not.toHaveBeenCalled();
+  });
+
+  it('complete accepts an in-zone hostname under the API-resolved zone of a token-only cert', async () => {
+    const { lib, POST } = await routes();
+    mockZoneFetch('example.com');
+    await writeTokenCert();
+    primeCloudflared(lib.runCloudflared as Mock, [{ ok: true }]);
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.example.com' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+  });
+
+  it('complete skips the zone belt when the token cannot be resolved (API 403)', async () => {
+    const { lib, POST } = await routes();
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ success: false, errors: [{ code: 9109, message: 'Unauthorized' }], result: null }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+    await writeTokenCert();
+    primeCloudflared(lib.runCloudflared as Mock, [{ ok: true }]);
+    const res = await post(POST, { action: 'complete', hostname: 'pubky.anywhere.net' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
   });
 
   it('complete rejects an out-of-zone hostname with a clear 400 when the cert parses', async () => {
