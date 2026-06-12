@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, CheckCircle, AlertCircle, Eye, EyeOff, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/libs/utils';
 import { CloudflareAutoSetup } from './CloudflareAutoSetup';
+import { CloudflareConnect } from './CloudflareConnect';
+import { CloudflareTestDrive } from './CloudflareTestDrive';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareConfig = { domain: string | null; configured: boolean; supported: boolean };
@@ -247,10 +249,11 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
     };
   }, [open]);
 
-  // Manual tunnel form is collapsed behind a toggle once automatic setup is
-  // the primary path; stays expanded if a tunnel is already configured (the
-  // common reason to come back is rotating the token).
+  // Four setup tiers live together: Connect (primary), API token and Manual
+  // are collapsed escape hatches, Test drive sits apart as a no-account
+  // preview. Collapsed-by-default keeps the tab scannable.
   const [showManualSetup, setShowManualSetup] = useState(false);
+  const [showApiTokenSetup, setShowApiTokenSetup] = useState(false);
 
   const handleAutoConfigured = (hostname: string) => {
     setCfDomain(hostname);
@@ -586,12 +589,33 @@ export function ConfigDialog({ open, onOpenChange, writable = false }: ConfigDia
 
                     <div className="h-px bg-border/50" />
 
-                    {/* Automatic setup (primary path) */}
-                    <CloudflareAutoSetup onConfigured={handleAutoConfigured} />
+                    {/* Option Z: browser-auth connect (primary path) */}
+                    <CloudflareConnect onConfigured={handleAutoConfigured} />
 
                     <div className="h-px bg-border/50" />
 
-                    {/* Manual setup (collapsed escape hatch) */}
+                    {/* Option Y: API-token automatic setup (collapsed) */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setShowApiTokenSetup((s) => !s)}
+                      data-testid="cf-api-token-toggle"
+                    >
+                      {showApiTokenSetup ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                      Set up with an API token instead
+                    </button>
+                    {showApiTokenSetup && <CloudflareAutoSetup onConfigured={handleAutoConfigured} />}
+
+                    {/* Option W: no-account temporary preview */}
+                    <CloudflareTestDrive />
+
+                    <div className="h-px bg-border/50" />
+
+                    {/* Option X: manual setup (collapsed escape hatch) */}
                     <button
                       type="button"
                       className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
