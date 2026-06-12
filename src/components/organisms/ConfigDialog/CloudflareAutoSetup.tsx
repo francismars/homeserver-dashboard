@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/libs/utils';
+import { RestartCallout } from './RestartCallout';
 
 /**
  * Pre-filled Cloudflare token-creation link (officially supported template
@@ -144,10 +145,10 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
           <span>Tunnel configured for {doneHostname}</span>
         </div>
         {steps && <StepList steps={steps} />}
-        <p className="text-xs text-muted-foreground">
+        <RestartCallout>
           The tunnel connects within a few seconds. Restart the app from Umbrel to publish your domain to the Pubky
           network.
-        </p>
+        </RestartCallout>
       </div>
     );
   }

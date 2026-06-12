@@ -31,6 +31,11 @@ export const CONNECT_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const TESTDRIVE_STATE = () => path.join(getConfigDir(), '.testdrive.json');
 export const TESTDRIVE_LOG = () => path.join(getConfigDir(), '.testdrive.log');
+/** Marker that enables preview mode: gates the cloudflared-preview compose
+ * service (env_file) AND tells the config wrapper to publish the URL. */
+export const PREVIEW_ENV = () => path.join(getConfigDir(), 'testdrive.env');
+/** Logfile of the cloudflared-preview compose service (post-restart). */
+export const PREVIEW_SERVICE_LOG = () => path.join(getConfigDir(), 'preview', 'quick.log');
 export const CONNECT_STATE = () => path.join(getConfigDir(), '.connect.json');
 export const CONNECT_LOG = () => path.join(getConfigDir(), '.connect.log');
 export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
@@ -151,6 +156,18 @@ export async function parseQuickTunnelUrl(): Promise<string | null> {
       if (!match.startsWith('https://api.')) return match;
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Latest URL the post-restart preview service obtained (appending logfile,
+ * api.trycloudflare.com noise excluded). */
+export async function parsePreviewPublishedUrl(): Promise<string | null> {
+  try {
+    const log = await fs.readFile(PREVIEW_SERVICE_LOG(), 'utf-8');
+    const matches = (log.match(QUICK_TUNNEL_URL_PATTERN) ?? []).filter((m) => !m.startsWith('https://api.'));
+    return matches[matches.length - 1] ?? null;
   } catch {
     return null;
   }
