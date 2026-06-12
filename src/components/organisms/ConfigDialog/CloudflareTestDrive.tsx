@@ -16,7 +16,7 @@ export function CloudflareTestDrive() {
   const [status, setStatus] = useState<DriveStatus>('stopped');
   const [supported, setSupported] = useState(true);
   const [url, setUrl] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [expiresInMin, setExpiresInMin] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +29,10 @@ export function CloudflareTestDrive() {
       setSupported(Boolean(data.supported));
       setStatus(data.status);
       setUrl(data.url ?? null);
-      setExpiresAt(data.expires_at ?? null);
+      // computed at fetch time, not render time (render must stay pure)
+      setExpiresInMin(
+        data.expires_at ? Math.max(0, Math.round((Date.parse(data.expires_at) - Date.now()) / 60000)) : null,
+      );
     } catch {
       // transient
     }
@@ -68,7 +71,9 @@ export function CloudflareTestDrive() {
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       setStatus(data.status);
       setUrl(data.url ?? null);
-      setExpiresAt(data.expires_at ?? null);
+      setExpiresInMin(
+        data.expires_at ? Math.max(0, Math.round((Date.parse(data.expires_at) - Date.now()) / 60000)) : null,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed');
     } finally {
@@ -88,8 +93,6 @@ export function CloudflareTestDrive() {
   };
 
   if (!supported) return null;
-
-  const expiresInMin = expiresAt ? Math.max(0, Math.round((Date.parse(expiresAt) - Date.now()) / 60000)) : null;
 
   return (
     <div className="space-y-2 rounded border border-border/60 bg-muted/10 p-3" data-testid="cf-test-drive">
