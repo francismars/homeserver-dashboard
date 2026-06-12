@@ -53,6 +53,15 @@ export default function DashboardPage() {
     setIsConfigDialogOpen(true);
   }, []);
 
+  // "Fix it" on the Overview's domain-health chip: open Settings directly on
+  // the Cloudflare tab (the nonce forces the tab even if the dialog last
+  // showed Config).
+  const [cloudflareFocusNonce, setCloudflareFocusNonce] = useState(0);
+  const handleFixCloudflare = useCallback(() => {
+    setCloudflareFocusNonce((n) => n + 1);
+    setIsConfigDialogOpen(true);
+  }, []);
+
   const handleGenerateInvite = useCallback(async () => {
     await generateInvite();
     await refetchInfo();
@@ -189,7 +198,12 @@ export default function DashboardPage() {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
-              <DashboardOverview info={info} isLoading={infoLoading} error={infoError} />
+              <DashboardOverview
+                info={info}
+                isLoading={infoLoading}
+                error={infoError}
+                onFixCloudflare={handleFixCloudflare}
+              />
             </TabsContent>
 
             {disabledUsersEnabled && (
@@ -249,7 +263,12 @@ export default function DashboardPage() {
 
           {/* Config Dialog */}
           {canOpenSettings && (
-            <ConfigDialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen} writable={configWritable} />
+            <ConfigDialog
+              open={isConfigDialogOpen}
+              onOpenChange={setIsConfigDialogOpen}
+              writable={configWritable}
+              focusCloudflare={cloudflareFocusNonce}
+            />
           )}
 
           {/* Server Control Dialog */}
