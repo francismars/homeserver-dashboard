@@ -26,9 +26,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Install su-exec for dropping privileges after fixing permissions
 RUN apk add --no-cache su-exec
 
-# Create non-root user
+# Create non-root user. The extra `homeserver` group mirrors the gid of the
+# homeserver wrapper image's user (first system group on alpine, gid 101):
+# the shared /app/homeserver-data bind mount is group-shared on that gid so
+# the dashboard can edit config.toml without world-writable modes (see
+# entrypoint.sh for the full uid/gid/mode matrix). su-exec applies
+# supplementary groups, so the running server inherits it.
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 nextjs && \
+    addgroup -g 101 homeserver && \
+    adduser nextjs homeserver
 
 # Copy built application from standalone output
 COPY --from=builder /app/public ./public

@@ -221,6 +221,17 @@ describe('server-config route', () => {
       expect(await fs.readFile(configPath, 'utf-8')).toBe(updated);
     });
 
+    it('preserves the file mode across a save (config.toml holds admin_password)', async () => {
+      await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+      await fs.chmod(configPath, 0o660);
+      const updated = VALID_CONFIG.replace('token_required', 'open');
+      const { POST } = await loadRoute();
+      const response = await POST(postRequest({ config_toml: updated, checksum: sha256(VALID_CONFIG) }));
+      expect(response.status).toBe(200);
+      const stat = await fs.stat(configPath);
+      expect(stat.mode & 0o777).toBe(0o660);
+    });
+
     it('redaction roundtrip: "********" in payload preserves the real on-disk secret', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       const { GET, POST } = await loadRoute();

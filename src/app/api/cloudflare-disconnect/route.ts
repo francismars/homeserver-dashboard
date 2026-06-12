@@ -83,6 +83,11 @@ export async function POST(request: NextRequest) {
       if (reset !== config) {
         const tmp = HOMESERVER_CONFIG() + '.tmp';
         await fs.writeFile(tmp, reset, 'utf-8');
+        // Preserve the original file's mode across the rename (the container
+        // entrypoint keeps config.toml at 0660 because it holds
+        // admin_password; a default-umask tmp file would widen it to 0644).
+        const prevStat = await fs.stat(HOMESERVER_CONFIG()).catch(() => null);
+        if (prevStat) await fs.chmod(tmp, prevStat.mode & 0o777);
         await fs.rename(tmp, HOMESERVER_CONFIG());
       }
       steps.push({ key: 'published_domain', status: 'done' });

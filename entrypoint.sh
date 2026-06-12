@@ -43,22 +43,49 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   rm -f "$CLOUDFLARE_DIR"/.flow-*.lock "$CLOUDFLARE_DIR/.connect-complete.lock" 2>/dev/null || true
 fi
 
-# Make the homeserver's config.toml writable by the dashboard process.
-# pubky-core writes the file as its own user (e.g. node:node mode 0644)
-# in a dir owned by that same user mode 0755, so without these chmods the
-# Save button in Settings cannot persist edits even though the bind mount
-# is rw. We need both:
-#   - 0777 on the directory so the dashboard can create config.toml.tmp
-#     (the POST handler uses a write-tmp + rename pattern for crash safety)
-#   - 0666 on config.toml so the dashboard can replace it via the rename
-# Idempotent; runs each container start; non-fatal if either does not
-# exist yet (first install before the homeserver has written them).
+# Make the homeserver's config.toml editable by the dashboard process
+# without world-writable modes (the file holds admin_password). Group-based
+# sharing, same approach as the cloudflare dir above.
+#
+# Who touches the shared /app/homeserver-data bind mount:
+#   homeserver wrapper image     uid 100, gid 101 ("homeserver", the first
+#                                alpine system user); its root-phase
+#                                entrypoint chowns the dir to 100:101 on
+#                                every app boot when ownership differs
+#   dashboard (this image)       uid 1001 ("nextjs") after su-exec, with
+#                                supplementary gid 101 (see Dockerfile);
+#                                needs: open config.toml r+ (writability
+#                                probe), create config.toml.tmp in the dir,
+#                                rename it over config.toml
+#
+# Matrix this block converges to (heals pre-existing 0777/0666 installs on
+# the next boot; idempotent; non-fatal when the file does not exist yet):
+#   /app/homeserver-data   100:101  2775  setgid: new files inherit gid 101
+#   config.toml            100:101  0660  owner+group rw, others nothing
+#
+# Sharing the WRAPPER's gid (101) instead of this image's nodejs gid is what
+# makes boot order irrelevant: the wrapper's chown -R homeserver:homeserver
+# is then a no-op for group access, so whichever container starts last, the
+# dashboard keeps dir write (group rwx) and file rw (group rw). The
+# server-config route preserves the file's mode on every save (and the
+# setgid bit keeps the group at 101), so a save never widens 0660 back to
+# the umask default.
+#
+# Residual gap (accepted, same window existed with the old 0666 chmod): when
+# the wrapper REWRITES config.toml (first generation, template migration,
+# admin_password reconcile) it chmods it 0644 and chowns it 100:101. Until
+# the next dashboard container start the Settings editor then degrades to
+# read-only (the r+ probe fails on group r--) and admin_password is
+# other-readable inside the containers that mount the dir. The next boot of
+# this container converges it back to 0660.
 HOMESERVER_DATA_DIR="/app/homeserver-data"
 if [ -d "$HOMESERVER_DATA_DIR" ]; then
-  chmod 0777 "$HOMESERVER_DATA_DIR" 2>/dev/null || true
+  chgrp 101 "$HOMESERVER_DATA_DIR" 2>/dev/null || true
+  chmod 2775 "$HOMESERVER_DATA_DIR" 2>/dev/null || true
 fi
 if [ -f "$HOMESERVER_DATA_DIR/config.toml" ]; then
-  chmod 0666 "$HOMESERVER_DATA_DIR/config.toml" 2>/dev/null || true
+  chgrp 101 "$HOMESERVER_DATA_DIR/config.toml" 2>/dev/null || true
+  chmod 0660 "$HOMESERVER_DATA_DIR/config.toml" 2>/dev/null || true
 fi
 
 # Switch to nextjs user and run the app

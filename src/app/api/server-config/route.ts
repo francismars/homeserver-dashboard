@@ -369,6 +369,12 @@ export async function POST(request: NextRequest) {
   const tmpPath = configPath + '.tmp';
   try {
     await fs.writeFile(tmpPath, merged, 'utf-8');
+    // Preserve the original file's mode across the rename. The container
+    // entrypoint deliberately keeps config.toml at 0660 (it holds
+    // admin_password); a default-umask tmp file would widen it to 0644
+    // (other-readable) and drop the group write bit on every save.
+    const prevStat = await fs.stat(configPath).catch(() => null);
+    if (prevStat) await fs.chmod(tmpPath, prevStat.mode & 0o777);
     await fs.rename(tmpPath, configPath);
   } catch (e) {
     try {
