@@ -46,6 +46,11 @@ export const PREVIEW_SERVICE_LOG = () => path.join(getConfigDir(), 'preview', 'q
 /** Handshake written by the config wrapper: the preview URL it actually
  * published into the homeserver config (removed when preview is off). */
 export const PREVIEW_PUBLISHED = () => path.join(getConfigDir(), 'preview', 'published');
+/** Touched whenever a preview teardown removes the marker: the deletion
+ * leaves no state file newer than the wrapper boot stamp, so restart
+ * detection needs this durable trace of it (transient files like locks and
+ * login logs must not count, which rules out the directory mtime). */
+export const PREVIEW_TEARDOWN_STAMP = () => path.join(getConfigDir(), '.preview-teardown-stamp');
 export const CONNECT_STATE = () => path.join(getConfigDir(), '.connect.json');
 export const CONNECT_LOG = () => path.join(getConfigDir(), '.connect.log');
 export const CERT_PATH = () => path.join(getConfigDir(), 'cert.pem');
