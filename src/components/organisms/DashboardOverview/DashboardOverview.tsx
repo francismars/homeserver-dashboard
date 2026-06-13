@@ -26,6 +26,10 @@ type DomainHealth = 'not_set_up' | 'checking' | 'reachable' | 'unreachable';
  * the cache only seeds the initial render and is silently refreshed.
  */
 const overviewStateCache: {
+  // The cached health verdict is keyed by the hostname it was measured for, so
+  // a domain change does not let a stale "reachable" mark the new hostname as
+  // reachable before its own probe runs.
+  domainHostname?: string | null;
   domainHealth?: DomainHealth;
   restartPending?: boolean;
   cloudflareMode?: string | null;
@@ -34,6 +38,7 @@ const overviewStateCache: {
 /** Test-only: the cache is module-scoped and persists across renders by design
  * (that is what survives tab switches), which leaks state between test cases. */
 export function __resetOverviewStateCache() {
+  overviewStateCache.domainHostname = undefined;
   overviewStateCache.domainHealth = undefined;
   overviewStateCache.restartPending = undefined;
   overviewStateCache.cloudflareMode = undefined;
@@ -169,7 +174,12 @@ export function DashboardOverview({
   // Live reachability of the published domain. One probe when the domain
   // becomes known (no polling - this is the landing view), manual re-check.
   const probeHostname = domainHostname(info?.pkarr_icann_domain);
-  const [domainHealth, setDomainHealth] = useState<DomainHealth>(overviewStateCache.domainHealth ?? 'not_set_up');
+  // Only seed from cache when it was measured for the SAME hostname; a domain
+  // change must re-probe from scratch, not inherit the old verdict.
+  const cacheMatchesHost = overviewStateCache.domainHostname === probeHostname;
+  const [domainHealth, setDomainHealth] = useState<DomainHealth>(
+    cacheMatchesHost ? (overviewStateCache.domainHealth ?? 'not_set_up') : 'not_set_up',
+  );
 
   const checkDomain = async (hostname: string, isCancelled: () => boolean = () => false, silent = false) => {
     // On a tab-return remount we already have a cached verdict; re-validate
@@ -187,6 +197,7 @@ export function DashboardOverview({
     // component unmounted must not write a stale verdict.
     if (!isCancelled()) {
       setDomainHealth(next);
+      overviewStateCache.domainHostname = hostname;
       overviewStateCache.domainHealth = next;
     }
   };
@@ -194,11 +205,16 @@ export function DashboardOverview({
   useEffect(() => {
     if (!probeHostname) {
       setDomainHealth('not_set_up');
+      overviewStateCache.domainHostname = null;
       overviewStateCache.domainHealth = 'not_set_up';
       return;
     }
     let cancelled = false;
-    void checkDomain(probeHostname, () => cancelled, overviewStateCache.domainHealth === 'reachable');
+    // Silence the probe (no "checking" flash) only when the cached verdict is
+    // for THIS hostname and was reachable.
+    const silent =
+      overviewStateCache.domainHostname === probeHostname && overviewStateCache.domainHealth === 'reachable';
+    void checkDomain(probeHostname, () => cancelled, silent);
     return () => {
       cancelled = true;
     };

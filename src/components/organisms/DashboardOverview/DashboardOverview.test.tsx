@@ -173,6 +173,28 @@ describe('DashboardOverview domain health', () => {
     rerender(<DashboardOverview info={baseInfo} isLoading={false} error={null} cloudflareRefreshKey={1} />);
     await waitFor(() => expect(screen.getByTestId('restart-callout')).toBeTruthy());
   });
+
+  it('a domain change does not inherit the previous hostname cached reachable verdict', async () => {
+    // First mount: old domain is reachable; this seeds the module cache.
+    mockBackend({ healthOk: true });
+    const { unmount } = render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    unmount();
+
+    // New domain, and now the probe says unreachable. The cache holds the OLD
+    // hostname's "reachable", which must NOT be shown for the new hostname.
+    mockBackend({ healthOk: false });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_icann_domain: 'different.example.com:443' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    // It must re-probe (show checking, then unreachable), never flash reachable.
+    expect(screen.queryByTestId('domain-health-reachable')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+  });
 });
 
 describe('DashboardOverview server identity', () => {
