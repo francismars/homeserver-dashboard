@@ -162,14 +162,13 @@ export async function POST(request: NextRequest) {
       try {
         // The marker gates the cloudflared-preview compose service (env_file)
         // and tells the config wrapper to publish the URL on the next start.
-        // The preview dir must be writable by the cloudflared-preview container
-        // (UID 65532) BEFORE it starts - cloudflared silently skips an
-        // uncreatable logfile instead of crashing (live finding), so a crash-loop
-        // cannot self-heal this. World-writable is acceptable: single-user
-        // device, the dir only ever holds the tunnel's own log (the URL in it is
-        // public by nature). chmod explicitly (mkdir mode is umask-clipped).
+        // The config wrapper (root, every boot, before cloudflared-preview)
+        // owns the preview dir's permissions and ownership (65532, world
+        // writable). This process is nextjs (uid 1001) and does NOT own that
+        // dir, so it must not chmod it - doing so throws EPERM and fails the
+        // whole enable. We only ensure the dir exists; the instant tunnel logs
+        // to the config-dir root (PREVIEW_INSTANT_LOG), not into preview/.
         await fs.mkdir(path.join(getConfigDir(), 'preview'), { recursive: true });
-        await fs.chmod(path.join(getConfigDir(), 'preview'), 0o777);
         await fs.writeFile(PREVIEW_ENV(), `TUNNEL_URL=${getPreviewInstantOrigin()}\n`, 'utf-8');
 
         // Instant tunnel so the user gets a working URL right away (uncapped;
