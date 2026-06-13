@@ -1,5 +1,22 @@
 import type { AdminInfoResponse } from '@/services/admin';
 
+/** Client-side mirror of /api/pkarr-health's response (the server type lives
+ * in a node-only module that client components must not import). */
+export type PkarrGate = 'match' | 'mismatch' | 'not_compared';
+export type PkarrVerdict = 'verified' | 'mismatch' | 'not_found' | 'invalid' | 'unavailable';
+
+export type PkarrRecordRow = { name: string; type: string; value: string; ttl: number };
+
+export type PkarrHealthResponse = {
+  verdict: PkarrVerdict;
+  gates: { address: PkarrGate; domain: PkarrGate };
+  published: { address: string | null; domain: string | null };
+  expected: { address: string | null; domain: string | null };
+  timestamp_ms: number | null;
+  packet_age_ms: number | null;
+  records: PkarrRecordRow[];
+};
+
 export type DashboardOverviewProps = {
   info: AdminInfoResponse | null;
   isLoading: boolean;

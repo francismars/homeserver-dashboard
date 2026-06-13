@@ -15,16 +15,58 @@ const baseInfo: AdminInfoResponse = {
   version: '0.9.1',
 };
 
-/** Routes the component's two fetches: the public-health probe and the
- * restart-pending + mode read from /api/cloudflare-config. */
-function mockBackend({ healthOk = true, restartPending = null as boolean | null, mode = null as string | null } = {}) {
+/** A well-formed /api/pkarr-health payload; gates/records track the verdict. */
+function pkarrPayload(verdict: string, overrides: Record<string, unknown> = {}) {
+  const found = verdict === 'verified' || verdict === 'mismatch' || verdict === 'invalid';
+  return {
+    verdict,
+    gates:
+      verdict === 'mismatch'
+        ? { address: 'match', domain: 'mismatch' }
+        : { address: found ? 'match' : 'not_compared', domain: found ? 'match' : 'not_compared' },
+    published: found
+      ? { address: '1.2.3.4:6287', domain: verdict === 'mismatch' ? 'old.example.org' : 'pubky.example.com' }
+      : { address: null, domain: null },
+    expected: { address: '1.2.3.4:6287', domain: 'pubky.example.com:443' },
+    timestamp_ms: found ? Date.now() - 60_000 : null,
+    packet_age_ms: found ? 60_000 : null,
+    records: found
+      ? [
+          { name: '@', type: 'HTTPS', value: '1 . port=6287 ipv4hint=1.2.3.4', ttl: 3600 },
+          { name: '@', type: 'A', value: '1.2.3.4', ttl: 3600 },
+        ]
+      : [],
+    ...overrides,
+  };
+}
+
+/** Routes the component's fetches: the public-health probe, the pkarr-health
+ * verification, and the restart-pending + mode read from /api/cloudflare-config. */
+function mockBackend({
+  healthOk = true,
+  restartPending = null as boolean | null,
+  mode = null as string | null,
+  pkarr = 'verified' as string,
+  pkarrOverrides = {} as Record<string, unknown>,
+} = {}) {
   vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
     const url = String(input);
+    if (url.startsWith('/api/pkarr-health') && pkarr === 'http-error') {
+      return new Response('upstream broke', { status: 502 });
+    }
     const json = url.startsWith('/api/cloudflare-config')
       ? { restart_pending: restartPending, mode }
-      : { ok: healthOk, status: healthOk ? 200 : 530 };
+      : url.startsWith('/api/pkarr-health')
+        ? pkarrPayload(pkarr, pkarrOverrides)
+        : { ok: healthOk, status: healthOk ? 200 : 530 };
     return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
+}
+
+function pkarrCalls() {
+  return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter((c) =>
+    String(c[0]).startsWith('/api/pkarr-health'),
+  );
 }
 
 function healthCalls() {
@@ -415,6 +457,161 @@ describe('DashboardOverview get-started checklist', () => {
       <DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} setupGuideDismissed={null} />,
     );
     expect(screen.queryByTestId('setup-guide')).toBeNull();
+  });
+});
+
+describe('DashboardOverview pkarr verification', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    __resetOverviewStateCache();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('auto-checks once with pubkey + both expectations and shows Published', async () => {
+    mockBackend({ pkarr: 'verified' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+    expect(pkarrCalls()).toHaveLength(1);
+    const url = String(pkarrCalls()[0][0]);
+    expect(url).toContain(`pubkey=${baseInfo.public_key}`);
+    expect(url).toContain(`expected_address=${encodeURIComponent('1.2.3.4:6287')}`);
+    expect(url).toContain(`expected_domain=${encodeURIComponent('pubky.example.com:443')}`);
+  });
+
+  it('localhost domain: still verifies, but expects no domain', async () => {
+    mockBackend({ pkarr: 'verified' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_icann_domain: 'localhost:6286' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    await waitFor(() => expect(pkarrCalls()).toHaveLength(1));
+    expect(String(pkarrCalls()[0][0])).not.toContain('expected_domain');
+  });
+
+  it('no pubkey: no row, no check', async () => {
+    mockBackend();
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, public_key: undefined, pubkey: undefined }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByText('Pubky network:')).toBeNull();
+    expect(pkarrCalls()).toHaveLength(0);
+  });
+
+  it('mismatch: amber chip, restartless hint absent, View shows the comparison', async () => {
+    mockBackend({ pkarr: 'mismatch' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-mismatch')).toBeTruthy());
+    expect(screen.queryByTestId('pkarr-health-restart-hint')).toBeNull();
+    fireEvent.click(screen.getByTestId('pkarr-view-record'));
+    await waitFor(() => expect(screen.getByTestId('pkarr-record-viewer')).toBeTruthy());
+    const mismatchBox = screen.getByTestId('pkarr-viewer-mismatch');
+    expect(mismatchBox.textContent).toContain('pubky.example.com:443'); // expected
+    expect(mismatchBox.textContent).toContain('old.example.org'); // published
+  });
+
+  it('mismatch while a restart is pending explains the record updates on restart', async () => {
+    mockBackend({ pkarr: 'mismatch', restartPending: true });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-restart-hint')).toBeTruthy());
+    expect(screen.getByTestId('pkarr-health-restart-hint').textContent).toContain('restarts');
+  });
+
+  it('not_found: "Not published" and no View button (nothing to view)', async () => {
+    mockBackend({ pkarr: 'not_found' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-not-found')).toBeTruthy());
+    expect(screen.queryByTestId('pkarr-view-record')).toBeNull();
+  });
+
+  it('unavailable: muted "Can\'t verify" copy that does not blame the server', async () => {
+    mockBackend({ pkarr: 'unavailable' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
+    expect(screen.getByTestId('pkarr-health-unavailable').getAttribute('title')).toContain(
+      'does not mean anything is wrong',
+    );
+  });
+
+  it('a route error degrades to unavailable, never a crash', async () => {
+    mockBackend({ pkarr: 'http-error' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
+  });
+
+  it('a malformed payload (no records array) degrades to unavailable', async () => {
+    mockBackend({ pkarr: 'verified', pkarrOverrides: { records: undefined } });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
+  });
+
+  it('re-check button verifies again', async () => {
+    mockBackend({ pkarr: 'verified' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('pkarr-health-recheck'));
+    await waitFor(() => expect(pkarrCalls()).toHaveLength(2));
+  });
+
+  it('viewer renders the records table, the age line, and the pkdns link', async () => {
+    mockBackend({ pkarr: 'verified' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-view-record')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('pkarr-view-record'));
+    await waitFor(() => expect(screen.getByTestId('pkarr-record-viewer')).toBeTruthy());
+    const records = screen.getByTestId('pkarr-viewer-records');
+    expect(records.textContent).toContain('HTTPS');
+    expect(records.textContent).toContain('port=6287');
+    expect(records.textContent).toContain('3600');
+    expect(screen.getByTestId('pkarr-viewer-age').textContent).toContain('1 minute ago');
+    expect(screen.queryByTestId('pkarr-viewer-mismatch')).toBeNull();
+    expect(screen.getByTestId('pkarr-viewer-pkdns-link').getAttribute('href')).toBe(
+      `https://pkdns.net/?id=${baseInfo.public_key}`,
+    );
+  });
+
+  it('a tab return reuses the cached verdict without flashing Checking…', async () => {
+    mockBackend({ pkarr: 'verified' });
+    const { unmount } = render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+    unmount();
+
+    mockBackend({ pkarr: 'verified' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    // Cached verdict shows immediately; the silent revalidation never
+    // surfaces a "Checking…" state.
+    expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy();
+    expect(screen.queryByTestId('pkarr-health-checking')).toBeNull();
+    // The spy is shared across both mounts (spyOn returns the existing spy):
+    // one check per mount = 2 cumulative, proving the remount revalidated.
+    await waitFor(() => expect(pkarrCalls()).toHaveLength(2));
+  });
+
+  it('a pubkey change does not inherit the previous cached verdict', async () => {
+    mockBackend({ pkarr: 'verified' });
+    const { unmount } = render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+    unmount();
+
+    mockBackend({ pkarr: 'not_found' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, public_key: 'o4dksfbqk85ogzdb5osziw6befigbuxmuxkuxq8434q89uj56uyy' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    expect(screen.queryByTestId('pkarr-health-verified')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-not-found')).toBeTruthy());
   });
 });
 
