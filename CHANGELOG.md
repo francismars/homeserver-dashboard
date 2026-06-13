@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.19]
+
+### Fixed
+
+- The Overview's "Make your homeserver reachable" step no longer briefly shows "Set up access" while the reachability check is still running. It now shows a "Checking…" spinner until the result is known, then either marks the step done or shows the set-up instruction — so an already-reachable server never flashes a misleading call to action on load. The published-address row likewise shows "Checking…" from the first render instead of momentarily reading "Not set up".
+
 ## [0.1.18]
 
 PKARR verification review follow-ups: correctness fix and hardening.

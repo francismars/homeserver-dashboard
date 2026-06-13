@@ -81,7 +81,12 @@ await runSpec(
     // even though the domain probe answered ok.
     await page1.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
     const stepState = (page, id) => page.getAttribute(`[data-testid="${id}"]`, 'data-state');
-    check((await stepState(page1, 'setup-step-reachable')) === 'pending', 'reachable step pending while mode is off');
+    // The reachable step is 'checking' until the Cloudflare mode and the probe
+    // settle; wait for the settled state instead of racing the loading window.
+    const waitStepState = (page, id, state) =>
+      page.waitForSelector(`[data-testid="${id}"][data-state="${state}"]`, { timeout: 30000 });
+    await waitStepState(page1, 'setup-step-reachable', 'pending');
+    check(true, 'reachable step settles to pending while mode is off');
     check((await stepState(page1, 'setup-step-invite')) === 'done', 'invite step done (num_signup_codes > 0)');
     check((await stepState(page1, 'setup-step-signup')) === 'done', 'signup step done (num_users > 0)');
 
@@ -99,7 +104,8 @@ await runSpec(
     });
     await pageFresh.goto(`${env.baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await pageFresh.waitForSelector('[data-testid="setup-guide"]', { timeout: 30000 });
-    check((await stepState(pageFresh, 'setup-step-reachable')) === 'pending', 'fresh install: reachable pending');
+    await waitStepState(pageFresh, 'setup-step-reachable', 'pending');
+    check(true, 'fresh install: reachable settles to pending');
     check((await stepState(pageFresh, 'setup-step-invite')) === 'pending', 'fresh install: invite pending');
     check((await stepState(pageFresh, 'setup-step-signup')) === 'pending', 'fresh install: signup pending');
     check(

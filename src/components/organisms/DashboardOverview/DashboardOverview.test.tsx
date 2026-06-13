@@ -398,6 +398,38 @@ describe('DashboardOverview get-started checklist', () => {
     expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
   });
 
+  it('while the checks are still loading, the reachable step shows "checking", not a premature Set up CTA', async () => {
+    // freshInstall has a real (probeable) domain, so a probe runs. On the
+    // first render the cloudflare-config fetch and the probe are both in
+    // flight: the step must be a spinner, not "Set up access".
+    mockBackend({ healthOk: true, mode: 'token' });
+    render(<DashboardOverview info={freshInstall} isLoading={false} error={null} {...wiring} />);
+    // Synchronous first render (effects have run, but the fetches have not
+    // resolved): checking, with no instruction and no CTA.
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('checking');
+    expect(screen.queryByTestId('setup-step-reachable-cta')).toBeNull();
+    expect(screen.queryByText(/Connect a domain through Cloudflare/)).toBeNull();
+    // It resolves to done once the mode and probe land - never flashing the CTA.
+    await waitFor(() => expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('done'));
+  });
+
+  it('localhost (no domain): after the config loads, the reachable step is a real "todo" with the Set up CTA', async () => {
+    mockBackend({ healthOk: true, mode: 'off' });
+    render(
+      <DashboardOverview
+        info={{ ...freshInstall, pkarr_icann_domain: 'localhost:6286' }}
+        isLoading={false}
+        error={null}
+        {...wiring}
+        onFixCloudflare={() => {}}
+      />,
+    );
+    // No probe runs for localhost, so the step settles to todo once the
+    // cloudflare-config fetch confirms mode 'off'.
+    await waitFor(() => expect(screen.getByTestId('setup-step-reachable-cta')).toBeTruthy());
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
   it('/info signals drive the invite and signup steps', async () => {
     mockBackend({ healthOk: false, mode: 'off' });
     render(
@@ -441,6 +473,9 @@ describe('DashboardOverview get-started checklist', () => {
         onGoToInvites={onGoToInvites}
       />,
     );
+    // The reachable CTA appears only after the checks settle (probe says
+    // unreachable, mode is off) - it is not shown during the checking window.
+    await waitFor(() => expect(screen.getByTestId('setup-step-reachable-cta')).toBeTruthy());
     fireEvent.click(screen.getByTestId('setup-step-reachable-cta'));
     expect(onFixCloudflare).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId('setup-step-invite-cta'));
