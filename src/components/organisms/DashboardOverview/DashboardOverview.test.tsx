@@ -563,6 +563,17 @@ describe('DashboardOverview pkarr verification', () => {
     await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
   });
 
+  it('an out-of-allowlist or missing verdict degrades to unavailable', async () => {
+    mockBackend({ pkarr: 'verified', pkarrOverrides: { verdict: 'bogus' } });
+    const { unmount } = render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
+    unmount();
+    __resetOverviewStateCache();
+    mockBackend({ pkarr: 'verified', pkarrOverrides: { verdict: undefined } });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-unavailable')).toBeTruthy());
+  });
+
   it('re-check button verifies again', async () => {
     mockBackend({ pkarr: 'verified' });
     render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
@@ -620,6 +631,29 @@ describe('DashboardOverview pkarr verification', () => {
       />,
     );
     expect(screen.queryByTestId('pkarr-health-verified')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-not-found')).toBeTruthy());
+  });
+
+  it('an in-place pubkey change (live refetch, no remount) never shows the old record', async () => {
+    // First verdict for pubkey A, with an open viewer.
+    mockBackend({ pkarr: 'verified' });
+    const { rerender } = render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('pkarr-view-record')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('pkarr-view-record'));
+    await waitFor(() => expect(screen.getByTestId('pkarr-record-viewer')).toBeTruthy());
+    expect(screen.getByTestId('pkarr-viewer-pkdns-link').getAttribute('href')).toContain(baseInfo.public_key);
+
+    // A live refetch swaps the pubkey WHILE mounted (the bug case: useState
+    // seeds don't re-run, so the old result/verdict linger in state).
+    const newKey = 'o4dksfbqk85ogzdb5osziw6befigbuxmuxkuxq8434q89uj56uyy';
+    mockBackend({ pkarr: 'not_found' });
+    rerender(<DashboardOverview info={{ ...baseInfo, public_key: newKey }} isLoading={false} error={null} />);
+    // Immediately after the prop change: must NOT still show pubkey A's
+    // verdict, View button, or open viewer (which carried A's pkdns link).
+    expect(screen.queryByTestId('pkarr-health-verified')).toBeNull();
+    expect(screen.queryByTestId('pkarr-view-record')).toBeNull();
+    expect(screen.queryByTestId('pkarr-record-viewer')).toBeNull();
+    // Then it resolves to the new pubkey's verdict.
     await waitFor(() => expect(screen.getByTestId('pkarr-health-not-found')).toBeTruthy());
   });
 });
