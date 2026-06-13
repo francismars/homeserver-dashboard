@@ -9,6 +9,7 @@
 **Tech Stack:** Next.js 16 route handlers, `@synonymdev/pkarr` 0.1.4 (WASM, CJS, loaded natively via `serverExternalPackages`), vitest, existing e2e harness.
 
 **Spike facts this plan relies on (verified in this repo today):**
+
 - `require('@synonymdev/pkarr')` and Node ESM `import` both load fine; only bundlers break it → `serverExternalPackages` required.
 - `SignedPacket.builder()` + `Keypair` build real signed fixtures; records come back as `{name: '<52-char pubkey>' | '_x.<pubkey>', ttl, rdata: {type:'HTTPS', priority, target:''|'host', params:{port?:'6287', ipv4hint?:'1.2.3.4'}} | {type:'A', address}}`.
 - `packet.timestampMs` is MICROSECONDS. `Keypair` methods are snake_case (`public_key_string()`).
@@ -19,6 +20,7 @@
 ### Task 1: Verdict module with pure logic + tests
 
 **Files:**
+
 - Create: `src/lib/server/pkarr-verify.ts`
 - Test: `src/lib/server/pkarr-verify.test.ts`
 
@@ -52,6 +54,7 @@ Gate semantics (user-approved deviation refined): with a packet found, an expect
 ### Task 2: `/api/pkarr-health` route + tests
 
 **Files:**
+
 - Create: `src/app/api/pkarr-health/route.ts`, `src/app/api/pkarr-health/route.test.ts`
 - Modify: `next.config.mjs` (add `serverExternalPackages: ['@synonymdev/pkarr']`)
 
@@ -61,6 +64,7 @@ Gate semantics (user-approved deviation refined): with a packet found, an expect
 ### Task 3: Overview chip row + viewer dialog + cache
 
 **Files:**
+
 - Modify: `src/components/organisms/DashboardOverview/DashboardOverview.tsx`
 - Test: `src/components/organisms/DashboardOverview/DashboardOverview.test.tsx`
 
@@ -72,6 +76,7 @@ Gate semantics (user-approved deviation refined): with a packet found, an expect
 ### Task 4: E2E mock relay + spec
 
 **Files:**
+
 - Create: `scripts/e2e/lib/mock-pkarr-relay.mjs`, `scripts/e2e/pkarr-verify.spec.mjs`
 - Modify: `scripts/e2e/lib/harness.mjs` (start mock relay, export PKARR_RELAYS, expose fixture pubkey + expectations via the mock homeserver `/info`)
 

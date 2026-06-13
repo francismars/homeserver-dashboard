@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RouteError, errorResponse } from '@/lib/server/errors';
-import {
-  Z32_PUBKEY_RE,
-  computePkarrVerdict,
-  resolvePkarr,
-  type PkarrCheckResult,
-} from '@/lib/server/pkarr-verify';
+import { Z32_PUBKEY_RE, computePkarrVerdict, resolvePkarr, type PkarrCheckResult } from '@/lib/server/pkarr-verify';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/pkarr-health';

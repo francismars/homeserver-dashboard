@@ -483,11 +483,7 @@ describe('DashboardOverview pkarr verification', () => {
   it('localhost domain: still verifies, but expects no domain', async () => {
     mockBackend({ pkarr: 'verified' });
     render(
-      <DashboardOverview
-        info={{ ...baseInfo, pkarr_icann_domain: 'localhost:6286' }}
-        isLoading={false}
-        error={null}
-      />,
+      <DashboardOverview info={{ ...baseInfo, pkarr_icann_domain: 'localhost:6286' }} isLoading={false} error={null} />,
     );
     await waitFor(() => expect(pkarrCalls()).toHaveLength(1));
     expect(String(pkarrCalls()[0][0])).not.toContain('expected_domain');

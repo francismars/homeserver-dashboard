@@ -102,10 +102,10 @@ Response shape:
   "verdict": "verified",
   "gates": { "address": "match", "domain": "match" },
   "published": { "address": "1.2.3.4:6287", "domain": "pubky.example.com" },
-  "expected":  { "address": "1.2.3.4:6287", "domain": "pubky.example.com" },
+  "expected": { "address": "1.2.3.4:6287", "domain": "pubky.example.com" },
   "packet_age_ms": 123456,
   "timestamp_ms": 1765432100000,
-  "records": [ { "name": ".", "type": "HTTPS", "value": "1 . port=6287 ipv4hint=1.2.3.4", "ttl": 3600 } ],
+  "records": [{ "name": ".", "type": "HTTPS", "value": "1 . port=6287 ipv4hint=1.2.3.4", "ttl": 3600 }],
   "requestId": "..."
 }
 ```
