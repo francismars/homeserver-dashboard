@@ -76,13 +76,19 @@ const DEFAULT_RELAYS = ['https://pkarr.pubky.app', 'https://pkarr.pubky.org', 'h
 /** Bounds both the WASM client's resolve and the classification fetches. */
 const RESOLVE_TIMEOUT_MS = 8000;
 
+/** A relay payload is at most 64 (sig) + 8 (timestamp) + 1000 (DNS) bytes per
+ * the pkarr relay spec; a generous cap rejects a buggy/hostile relay trying
+ * to stream a large body without affecting any real record. */
+const MAX_RELAY_PAYLOAD_BYTES = 2048;
+
 /** Relay list override for tests/e2e (comma-separated). Read lazily per
- * call, like every other env read in this codebase. */
+ * call, like every other env read in this codebase. Only http(s) URLs are
+ * accepted, since each entry is used as a fetch base. */
 export function getPkarrRelays(): string[] {
   const env = (process.env.PKARR_RELAYS ?? '')
     .split(',')
     .map((s) => s.trim().replace(/\/+$/, ''))
-    .filter(Boolean);
+    .filter((s) => /^https?:\/\//.test(s));
   return env.length > 0 ? env : DEFAULT_RELAYS;
 }
 
@@ -405,13 +411,19 @@ export async function resolvePkarr(pubkey: string): Promise<PkarrResolveOutcome>
       fetch(`${relay}/${pubkey}`, {
         signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
         headers: { 'User-Agent': 'Pubky-Homeserver-Dashboard/1' },
+        // A relay is semi-trusted: do not follow a redirect to an internal
+        // address (the project hardened the upstream proxies the same way).
+        // A 3xx is treated as "no usable answer here" and falls through.
+        redirect: 'error',
       }),
     ),
   );
   for (const probe of probes) {
     if (probe.status !== 'fulfilled' || probe.value.status !== 200) continue;
     try {
-      const payload = new Uint8Array(await probe.value.arrayBuffer());
+      const buf = await probe.value.arrayBuffer();
+      if (buf.byteLength > MAX_RELAY_PAYLOAD_BYTES) continue; // oversized: not a real record
+      const payload = new Uint8Array(buf);
       return { status: 'found', facts: packetFacts(packetFromRelayPayload(pubkey, payload), pubkey) };
     } catch {
       // malformed payload from this relay; let the others classify

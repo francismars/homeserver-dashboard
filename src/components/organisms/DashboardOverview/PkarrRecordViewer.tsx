@@ -82,7 +82,7 @@ export function PkarrRecordViewer({
           {mismatches.length > 0 && (
             <div className="rounded-md border border-amber-400/40 p-2" data-testid="pkarr-viewer-mismatch">
               <p className="mb-1 font-medium text-amber-400">Configured vs published</p>
-              <table className="w-full text-left">
+              <table className="w-full text-left" aria-label="Configured versus published">
                 <tbody>
                   {mismatches.map(([label, gate]) => (
                     <tr key={gate}>
@@ -103,7 +103,11 @@ export function PkarrRecordViewer({
 
           {result.records.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full text-left" data-testid="pkarr-viewer-records">
+              <table
+                className="w-full text-left"
+                aria-label="Published PKARR records"
+                data-testid="pkarr-viewer-records"
+              >
                 <thead>
                   <tr className="text-muted-foreground">
                     <th className="pr-3 font-medium">Type</th>

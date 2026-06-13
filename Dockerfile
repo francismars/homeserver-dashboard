@@ -42,6 +42,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Belt-and-suspenders for the PKARR verification route: @synonymdev/pkarr is a
+# CJS+WASM package loaded natively (serverExternalPackages). Next's file
+# tracing currently carries pkarr_js_bg.wasm into .next/standalone, but a
+# future Next/nft change could silently drop it - and that would only surface
+# at runtime in the container (next dev and the unit tests load it from the
+# top-level node_modules, so CI would stay green). Copy it explicitly so the
+# runtime never depends on tracing for it.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@synonymdev/pkarr ./node_modules/@synonymdev/pkarr
+
 # Embed cloudflared for the Connect (browser-auth) and Test-drive (quick
 # tunnel) setup flows. Pinned by digest, copied from the official image -
 # same supply-chain posture as the runtime cloudflared container. Static Go

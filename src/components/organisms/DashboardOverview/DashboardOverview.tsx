@@ -253,6 +253,13 @@ export function DashboardOverview({
   const [pkarrResult, setPkarrResult] = useState<PkarrHealthResponse | null>(
     pkarrCacheMatches ? (overviewStateCache.pkarrResult ?? null) : null,
   );
+  // Which pkarrKey the two states above belong to. When `info` changes the
+  // pubkey/expectations WHILE mounted (a live refetch, not a remount), the
+  // useState seeds do not re-run, so the old verdict and old record object
+  // linger in state until the effect's async check resolves. Tracking the
+  // owning key lets the render discard a stale result instead of showing one
+  // pubkey's record (and pkdns link) under another's.
+  const [pkarrStateKey, setPkarrStateKey] = useState<string | null>(pkarrCacheMatches ? pkarrKey : null);
   const [pkarrViewerOpen, setPkarrViewerOpen] = useState(false);
 
   const checkPkarr = async (isCancelled: () => boolean = () => false, silent = false) => {
@@ -283,6 +290,7 @@ export function DashboardOverview({
     if (!isCancelled()) {
       setPkarrHealth(health);
       setPkarrResult(result);
+      setPkarrStateKey(pkarrKey);
       overviewStateCache.pkarrKey = pkarrKey;
       overviewStateCache.pkarrHealth = health;
       overviewStateCache.pkarrResult = result;
@@ -293,11 +301,15 @@ export function DashboardOverview({
     if (!pkarrKey) {
       setPkarrHealth('unknown');
       setPkarrResult(null);
+      setPkarrStateKey(null);
       overviewStateCache.pkarrKey = null;
       overviewStateCache.pkarrHealth = 'unknown';
       overviewStateCache.pkarrResult = null;
       return;
     }
+    // A key change means a different record: close any open viewer so it
+    // cannot linger showing the previous pubkey's record.
+    setPkarrViewerOpen(false);
     let cancelled = false;
     // Any settled cached verdict for THIS key revalidates silently - a tab
     // return must not flash "Checking…" over a known verdict.
@@ -399,6 +411,16 @@ export function DashboardOverview({
   // fallback values: a made-up pubkey gets copied into pkdns and shared.
   const homeserverPubkey = info.public_key ?? info.pubkey ?? null;
   const homeserverVersion = info.version ?? null;
+
+  // Render the pkarr verdict/record only when the state actually belongs to
+  // the current key. On an in-place key change the stale state lingers for a
+  // render before the effect refreshes it; treat that as "checking" with no
+  // result so the chip never shows another pubkey's verdict and the viewer
+  // (gated on shownPkarrResult below) unmounts rather than showing a record
+  // under the wrong pkdns link.
+  const pkarrStateFresh = pkarrStateKey === pkarrKey;
+  const shownPkarrHealth: PkarrHealth = pkarrStateFresh ? pkarrHealth : 'checking';
+  const shownPkarrResult = pkarrStateFresh ? pkarrResult : null;
 
   return (
     <div className="space-y-4">
@@ -607,7 +629,7 @@ export function DashboardOverview({
                     <span className="text-xs text-muted-foreground/70">The record published to the DHT</span>
                   </div>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {pkarrHealth === 'checking' && (
+                    {shownPkarrHealth === 'checking' && (
                       <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
                         data-testid="pkarr-health-checking"
@@ -615,7 +637,7 @@ export function DashboardOverview({
                         <RefreshCw className="h-3 w-3 animate-spin" /> Checking…
                       </span>
                     )}
-                    {pkarrHealth === 'verified' && (
+                    {shownPkarrHealth === 'verified' && (
                       <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand"
                         data-testid="pkarr-health-verified"
@@ -624,7 +646,7 @@ export function DashboardOverview({
                         <CircleCheckBig className="h-3 w-3" /> Published
                       </span>
                     )}
-                    {pkarrHealth === 'mismatch' && (
+                    {shownPkarrHealth === 'mismatch' && (
                       <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
                         data-testid="pkarr-health-mismatch"
@@ -633,7 +655,7 @@ export function DashboardOverview({
                         <AlertCircle className="h-3 w-3" /> Doesn&apos;t match config
                       </span>
                     )}
-                    {pkarrHealth === 'invalid' && (
+                    {shownPkarrHealth === 'invalid' && (
                       <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
                         data-testid="pkarr-health-invalid"
@@ -642,7 +664,7 @@ export function DashboardOverview({
                         <AlertCircle className="h-3 w-3" /> Invalid record
                       </span>
                     )}
-                    {pkarrHealth === 'not_found' && (
+                    {shownPkarrHealth === 'not_found' && (
                       <span
                         className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
                         data-testid="pkarr-health-not-found"
@@ -651,7 +673,7 @@ export function DashboardOverview({
                         <AlertCircle className="h-3 w-3" /> Not published
                       </span>
                     )}
-                    {pkarrHealth === 'unavailable' && (
+                    {shownPkarrHealth === 'unavailable' && (
                       <span
                         className="shrink-0 text-xs text-muted-foreground"
                         data-testid="pkarr-health-unavailable"
@@ -660,7 +682,7 @@ export function DashboardOverview({
                         Can&apos;t verify right now
                       </span>
                     )}
-                    {pkarrHealth !== 'checking' && (
+                    {shownPkarrHealth !== 'checking' && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -672,7 +694,7 @@ export function DashboardOverview({
                         <RefreshCw className="h-3 w-3" />
                       </Button>
                     )}
-                    {pkarrResult && pkarrResult.records.length > 0 && (
+                    {shownPkarrResult && shownPkarrResult.records.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -685,7 +707,7 @@ export function DashboardOverview({
                     )}
                     {/* Right after a setup change the old record is expected
                         on the relays until the app restarts and republishes. */}
-                    {(pkarrHealth === 'mismatch' || pkarrHealth === 'not_found') && restartPending && (
+                    {(shownPkarrHealth === 'mismatch' || shownPkarrHealth === 'not_found') && restartPending && (
                       <span className="w-full text-xs text-muted-foreground" data-testid="pkarr-health-restart-hint">
                         The record updates when the app restarts.
                       </span>
@@ -701,11 +723,11 @@ export function DashboardOverview({
         </Card>
       </div>
 
-      {pkarrPubkey && pkarrResult && (
+      {pkarrPubkey && shownPkarrResult && (
         <PkarrRecordViewer
           open={pkarrViewerOpen}
           onOpenChange={setPkarrViewerOpen}
-          result={pkarrResult}
+          result={shownPkarrResult}
           pubkey={pkarrPubkey}
         />
       )}
