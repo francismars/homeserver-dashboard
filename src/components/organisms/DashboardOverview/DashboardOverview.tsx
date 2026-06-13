@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CircleCheckBig, AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { CircleCheckBig, AlertCircle, Copy, RefreshCw, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
@@ -16,6 +16,28 @@ import { GetStartedChecklist } from './GetStartedChecklist';
 import type { DashboardOverviewProps } from './DashboardOverview.types';
 
 type DomainHealth = 'not_set_up' | 'checking' | 'reachable' | 'unreachable';
+
+/**
+ * Last-known Overview state, cached at module scope (lives for the page's
+ * lifetime). The dashboard's tabs unmount inactive content, so without this a
+ * tab switch and return would reset domain health and Cloudflare mode to their
+ * defaults and flash the get-started checklist back to "incomplete" for the
+ * ~1s the refetch/probe takes. The effects still re-validate on every mount;
+ * the cache only seeds the initial render and is silently refreshed.
+ */
+const overviewStateCache: {
+  domainHealth?: DomainHealth;
+  restartPending?: boolean;
+  cloudflareMode?: string | null;
+} = {};
+
+/** Test-only: the cache is module-scoped and persists across renders by design
+ * (that is what survives tab switches), which leaks state between test cases. */
+export function __resetOverviewStateCache() {
+  overviewStateCache.domainHealth = undefined;
+  overviewStateCache.restartPending = undefined;
+  overviewStateCache.cloudflareMode = undefined;
+}
 
 /** "localhost:6286" / missing -> the operator never set up public access. */
 function domainHostname(pkarrIcannDomain: string | undefined): string | null {
@@ -147,10 +169,12 @@ export function DashboardOverview({
   // Live reachability of the published domain. One probe when the domain
   // becomes known (no polling - this is the landing view), manual re-check.
   const probeHostname = domainHostname(info?.pkarr_icann_domain);
-  const [domainHealth, setDomainHealth] = useState<DomainHealth>('not_set_up');
+  const [domainHealth, setDomainHealth] = useState<DomainHealth>(overviewStateCache.domainHealth ?? 'not_set_up');
 
-  const checkDomain = async (hostname: string, isCancelled: () => boolean = () => false) => {
-    setDomainHealth('checking');
+  const checkDomain = async (hostname: string, isCancelled: () => boolean = () => false, silent = false) => {
+    // On a tab-return remount we already have a cached verdict; re-validate
+    // silently so the checklist does not flash back to "checking"/incomplete.
+    if (!silent) setDomainHealth('checking');
     let next: DomainHealth;
     try {
       const res = await fetch(`/api/public-health?domain=${encodeURIComponent(hostname)}`, { cache: 'no-store' });
@@ -161,16 +185,20 @@ export function DashboardOverview({
     }
     // A response that lands after the effect re-ran (domain changed) or the
     // component unmounted must not write a stale verdict.
-    if (!isCancelled()) setDomainHealth(next);
+    if (!isCancelled()) {
+      setDomainHealth(next);
+      overviewStateCache.domainHealth = next;
+    }
   };
 
   useEffect(() => {
     if (!probeHostname) {
       setDomainHealth('not_set_up');
+      overviewStateCache.domainHealth = 'not_set_up';
       return;
     }
     let cancelled = false;
-    void checkDomain(probeHostname, () => cancelled);
+    void checkDomain(probeHostname, () => cancelled, overviewStateCache.domainHealth === 'reachable');
     return () => {
       cancelled = true;
     };
@@ -181,8 +209,8 @@ export function DashboardOverview({
   // state. Reachability cannot stand in for it - the tunnel reconnects
   // without a restart, the pkarr publication does not. The same read carries
   // the server-derived Cloudflare mode, which drives the get-started step.
-  const [restartPending, setRestartPending] = useState(false);
-  const [cloudflareMode, setCloudflareMode] = useState<string | null>(null);
+  const [restartPending, setRestartPending] = useState(overviewStateCache.restartPending ?? false);
+  const [cloudflareMode, setCloudflareMode] = useState<string | null>(overviewStateCache.cloudflareMode ?? null);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -190,8 +218,12 @@ export function DashboardOverview({
         const res = await fetch('/api/cloudflare-config', { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled) {
-          setRestartPending(data.restart_pending === true);
-          setCloudflareMode(typeof data.mode === 'string' ? data.mode : null);
+          const pending = data.restart_pending === true;
+          const mode = typeof data.mode === 'string' ? data.mode : null;
+          setRestartPending(pending);
+          setCloudflareMode(mode);
+          overviewStateCache.restartPending = pending;
+          overviewStateCache.cloudflareMode = mode;
         }
       } catch {
         // unknown: keep the callout hidden
@@ -327,9 +359,22 @@ export function DashboardOverview({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Homeserver Pubkey:</span>
                 {homeserverPubkey ? (
-                  <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-                    <span className="font-mono text-xs break-all text-foreground sm:text-sm">{homeserverPubkey}</span>
-                    <CopyValueButton value={homeserverPubkey} label="Copy pubkey" />
+                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-initial sm:items-end">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-xs break-all text-foreground sm:text-sm">{homeserverPubkey}</span>
+                      <CopyValueButton value={homeserverPubkey} label="Copy pubkey" />
+                    </div>
+                    <a
+                      href={`https://pkdns.net/?id=${encodeURIComponent(homeserverPubkey)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                      title="Open pkdns.net to see the PKARR record published for this homeserver on the Pubky DHT (its address, domain, and port)"
+                      data-testid="pkdns-verify-link"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Verify on the DHT
+                    </a>
                   </div>
                 ) : (
                   <NotAvailable />

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DashboardOverview } from './DashboardOverview';
+import { DashboardOverview, __resetOverviewStateCache } from './DashboardOverview';
 import type { AdminInfoResponse } from '@/services/admin';
 
 const baseInfo: AdminInfoResponse = {
@@ -42,6 +42,7 @@ function mockClipboard() {
 describe('DashboardOverview domain health', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -177,6 +178,7 @@ describe('DashboardOverview domain health', () => {
 describe('DashboardOverview server identity', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -227,6 +229,7 @@ describe('DashboardOverview server identity', () => {
 describe('DashboardOverview address scope badge', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -296,6 +299,7 @@ describe('DashboardOverview address scope badge', () => {
 describe('DashboardOverview get-started checklist', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -395,6 +399,7 @@ describe('DashboardOverview get-started checklist', () => {
 describe('DashboardOverview backup note', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -414,6 +419,7 @@ describe('DashboardOverview backup note', () => {
 describe('DashboardOverview connection error', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetOverviewStateCache();
   });
   afterEach(() => {
     vi.restoreAllMocks();

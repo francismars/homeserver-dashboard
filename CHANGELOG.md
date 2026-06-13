@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.16]
+
+Preview-mode fix and Overview polish.
+
+### Fixed
+
+- Preview mode failed to enable on a real Umbrel install ("Failed to enable preview mode"). The enable path tried to chmod the preview directory, which the config wrapper owns as uid 65532 while the dashboard runs as uid 1001, so the chmod raised EPERM and the whole flow 500'd. The dashboard no longer touches that directory's permissions (the wrapper owns them); verified by spawning the real embedded cloudflared as uid 1001 inside the container and getting a live tunnel URL.
+- The get-started checklist no longer flashes back to "incomplete" for a second when you switch tabs and return. Domain reachability and Cloudflare mode are now cached across the tab unmount and re-validated silently.
+
+### Changed
+
+- "Make your homeserver reachable" copy no longer says "phones": it now explains that Pubky apps and web browsers can reach the server from anywhere, even behind your router, with no port forwarding.
+- The Overview links the homeserver pubkey to its pkdns.net record ("Verify on the DHT"), so you can confirm the address, domain, and port published to the Pubky network.
+
 ## [0.1.15]
 
 Technical-debt payoff: broken features fixed or removed, honest test gates, tighter permissions.

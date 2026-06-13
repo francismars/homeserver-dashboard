@@ -100,6 +100,28 @@ describe('cloudflare-preview route', () => {
     expect(spawnArgs).toContain('--url');
   });
 
+  it('enable succeeds when the preview dir is not owned by this process (real-container EPERM)', async () => {
+    // On Umbrel the config wrapper (root) owns the preview dir as uid 65532;
+    // the dashboard runs as nextjs (1001) and cannot chmod it. Enable must not
+    // attempt that chmod, or it throws EPERM and the whole flow 500s.
+    const { lib, POST } = await routes();
+    await fs.mkdir(path.join(tmpDir, 'preview'), { recursive: true });
+    const chmodSpy = vi.spyOn(fs, 'chmod').mockImplementation(async (p) => {
+      if (String(p).endsWith('/preview')) {
+        const err = new Error('EPERM: operation not permitted, chmod') as NodeJS.ErrnoException;
+        err.code = 'EPERM';
+        throw err;
+      }
+    });
+    const res = await post(POST, { action: 'enable' });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.enabled).toBe(true);
+    // The fix: enable never chmods the preview dir.
+    expect(chmodSpy.mock.calls.some((c) => String(c[0]).endsWith('/preview'))).toBe(false);
+    expect(lib.spawnDetached as Mock).toHaveBeenCalled();
+  });
+
   it('enable is refused while a permanent token-mode setup exists', async () => {
     const { lib, POST } = await routes();
     await fs.writeFile(path.join(tmpDir, 'domain'), 'real.example.com', 'utf-8');

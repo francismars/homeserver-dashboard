@@ -169,7 +169,8 @@ export function GetStartedChecklist({
               )
             }
           >
-            Connect a domain through Cloudflare so phones outside your home network can reach this server.
+            Connect a domain through Cloudflare so Pubky apps and web browsers can reach this server from anywhere, even
+            behind your router (no port forwarding needed).
           </StepRow>
           <StepRow
             done={inviteDone}
