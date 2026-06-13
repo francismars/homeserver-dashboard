@@ -13,9 +13,14 @@ import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallo
 import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
 import { GetStartedChecklist } from './GetStartedChecklist';
-import type { DashboardOverviewProps } from './DashboardOverview.types';
+import { PkarrRecordViewer } from './PkarrRecordViewer';
+import type { DashboardOverviewProps, PkarrHealthResponse, PkarrVerdict } from './DashboardOverview.types';
 
 type DomainHealth = 'not_set_up' | 'checking' | 'reachable' | 'unreachable';
+
+/** 'unknown' = no pubkey yet / nothing to check. The rest mirror the
+ * /api/pkarr-health verdicts one-to-one. */
+type PkarrHealth = 'unknown' | 'checking' | PkarrVerdict;
 
 /**
  * Last-known Overview state, cached at module scope (lives for the page's
@@ -33,6 +38,11 @@ const overviewStateCache: {
   domainHealth?: DomainHealth;
   restartPending?: boolean;
   cloudflareMode?: string | null;
+  // Keyed by pubkey + both expectations: any of them changing re-verifies
+  // from scratch instead of inheriting the old verdict.
+  pkarrKey?: string | null;
+  pkarrHealth?: PkarrHealth;
+  pkarrResult?: PkarrHealthResponse | null;
 } = {};
 
 /** Test-only: the cache is module-scoped and persists across renders by design
@@ -42,6 +52,9 @@ export function __resetOverviewStateCache() {
   overviewStateCache.domainHealth = undefined;
   overviewStateCache.restartPending = undefined;
   overviewStateCache.cloudflareMode = undefined;
+  overviewStateCache.pkarrKey = undefined;
+  overviewStateCache.pkarrHealth = undefined;
+  overviewStateCache.pkarrResult = undefined;
 }
 
 /** "localhost:6286" / missing -> the operator never set up public access. */
@@ -219,6 +232,83 @@ export function DashboardOverview({
       cancelled = true;
     };
   }, [probeHostname]);
+
+  // PKARR record verification: does the record on the Pubky DHT/relays match
+  // what this homeserver is configured to publish? One auto-check when the
+  // pubkey and expectations are known (same no-polling rule as the domain
+  // probe), manual re-check, verdict + parsed record cached across tab
+  // switches with silent revalidation.
+  const pkarrPubkey = info?.public_key ?? info?.pubkey ?? null;
+  // Current homeservers report "ip:port"; some older ones reported a
+  // pubky:// URI, which is an identifier, not an address expectation.
+  const rawPkarrAddress = info?.pkarr_pubky_address?.trim() || null;
+  const pkarrExpectedAddress = rawPkarrAddress && !rawPkarrAddress.includes('/') ? rawPkarrAddress : null;
+  // The localhost default means "never set up": expect no domain then.
+  const pkarrExpectedDomain = domainHostname(info?.pkarr_icann_domain) ? (info?.pkarr_icann_domain ?? null) : null;
+  const pkarrKey = pkarrPubkey ? `${pkarrPubkey}|${pkarrExpectedAddress ?? ''}|${pkarrExpectedDomain ?? ''}` : null;
+  const pkarrCacheMatches = pkarrKey !== null && overviewStateCache.pkarrKey === pkarrKey;
+  const [pkarrHealth, setPkarrHealth] = useState<PkarrHealth>(
+    pkarrCacheMatches ? (overviewStateCache.pkarrHealth ?? 'unknown') : 'unknown',
+  );
+  const [pkarrResult, setPkarrResult] = useState<PkarrHealthResponse | null>(
+    pkarrCacheMatches ? (overviewStateCache.pkarrResult ?? null) : null,
+  );
+  const [pkarrViewerOpen, setPkarrViewerOpen] = useState(false);
+
+  const checkPkarr = async (isCancelled: () => boolean = () => false, silent = false) => {
+    if (!pkarrKey || !pkarrPubkey) return;
+    if (!silent) setPkarrHealth('checking');
+    let health: PkarrHealth;
+    let result: PkarrHealthResponse | null = null;
+    try {
+      const params = new URLSearchParams({ pubkey: pkarrPubkey });
+      if (pkarrExpectedAddress) params.set('expected_address', pkarrExpectedAddress);
+      if (pkarrExpectedDomain) params.set('expected_domain', pkarrExpectedDomain);
+      const res = await fetch(`/api/pkarr-health?${params.toString()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`pkarr-health ${res.status}`);
+      const data = (await res.json()) as Partial<PkarrHealthResponse>;
+      // Anything that is not a well-formed verdict payload (a proxy error
+      // page, a stale mock, an old server) proves nothing about the record.
+      const verdicts: PkarrHealth[] = ['verified', 'mismatch', 'not_found', 'invalid', 'unavailable'];
+      if (!data.verdict || !verdicts.includes(data.verdict) || !Array.isArray(data.records)) {
+        throw new Error('malformed pkarr-health response');
+      }
+      result = data as PkarrHealthResponse;
+      health = result.verdict;
+    } catch {
+      // A failed probe says nothing about the record - same bucket as
+      // "relays unreachable".
+      health = 'unavailable';
+    }
+    if (!isCancelled()) {
+      setPkarrHealth(health);
+      setPkarrResult(result);
+      overviewStateCache.pkarrKey = pkarrKey;
+      overviewStateCache.pkarrHealth = health;
+      overviewStateCache.pkarrResult = result;
+    }
+  };
+
+  useEffect(() => {
+    if (!pkarrKey) {
+      setPkarrHealth('unknown');
+      setPkarrResult(null);
+      overviewStateCache.pkarrKey = null;
+      overviewStateCache.pkarrHealth = 'unknown';
+      overviewStateCache.pkarrResult = null;
+      return;
+    }
+    let cancelled = false;
+    // Any settled cached verdict for THIS key revalidates silently - a tab
+    // return must not flash "Checking…" over a known verdict.
+    const cached = overviewStateCache.pkarrKey === pkarrKey ? overviewStateCache.pkarrHealth : undefined;
+    const silent = cached !== undefined && cached !== 'unknown' && cached !== 'checking';
+    void checkPkarr(() => cancelled, silent);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pkarrKey derives the other inputs
+  }, [pkarrKey]);
 
   // Durable restart-pending signal (boot stamp vs state mtimes, server
   // derived): survives page reloads, unlike the Settings dialog's session
@@ -506,6 +596,103 @@ export function DashboardOverview({
                   )}
                 </div>
               </div>
+
+              {/* PKARR record verification: is the record on the Pubky
+                  DHT/relays signed by this key and advertising the configured
+                  address? Rendered only when the pubkey is known. */}
+              {pkarrPubkey && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">Pubky network:</span>
+                    <span className="text-xs text-muted-foreground/70">The record published to the DHT</span>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {pkarrHealth === 'checking' && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
+                        data-testid="pkarr-health-checking"
+                      >
+                        <RefreshCw className="h-3 w-3 animate-spin" /> Checking…
+                      </span>
+                    )}
+                    {pkarrHealth === 'verified' && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand"
+                        data-testid="pkarr-health-verified"
+                        title="A record signed by this homeserver's key exists on the Pubky relays and matches its configuration."
+                      >
+                        <CircleCheckBig className="h-3 w-3" /> Published
+                      </span>
+                    )}
+                    {pkarrHealth === 'mismatch' && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                        data-testid="pkarr-health-mismatch"
+                        title="The published record does not match this homeserver's configured address or domain. Open View for the comparison."
+                      >
+                        <AlertCircle className="h-3 w-3" /> Doesn&apos;t match config
+                      </span>
+                    )}
+                    {pkarrHealth === 'invalid' && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                        data-testid="pkarr-health-invalid"
+                        title="The record found on the relays failed signature verification."
+                      >
+                        <AlertCircle className="h-3 w-3" /> Invalid record
+                      </span>
+                    )}
+                    {pkarrHealth === 'not_found' && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 text-xs text-amber-400"
+                        data-testid="pkarr-health-not-found"
+                        title="No record was found on the Pubky relays for this homeserver's key, so Pubky apps cannot discover this server."
+                      >
+                        <AlertCircle className="h-3 w-3" /> Not published
+                      </span>
+                    )}
+                    {pkarrHealth === 'unavailable' && (
+                      <span
+                        className="shrink-0 text-xs text-muted-foreground"
+                        data-testid="pkarr-health-unavailable"
+                        title="The Pubky relays could not be reached from here - nothing is known about the record right now. This does not mean anything is wrong with your server."
+                      >
+                        Can&apos;t verify right now
+                      </span>
+                    )}
+                    {pkarrHealth !== 'checking' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 shrink-0 px-1.5"
+                        onClick={() => void checkPkarr()}
+                        aria-label="Re-check the published PKARR record"
+                        data-testid="pkarr-health-recheck"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {pkarrResult && pkarrResult.records.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 shrink-0 px-2 text-xs"
+                        onClick={() => setPkarrViewerOpen(true)}
+                        data-testid="pkarr-view-record"
+                      >
+                        View
+                      </Button>
+                    )}
+                    {/* Right after a setup change the old record is expected
+                        on the relays until the app restarts and republishes. */}
+                    {(pkarrHealth === 'mismatch' || pkarrHealth === 'not_found') && restartPending && (
+                      <span className="w-full text-xs text-muted-foreground" data-testid="pkarr-health-restart-hint">
+                        The record updates when the app restarts.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Durable restart signal next to the reachability/"Fix it" area */}
@@ -513,6 +700,15 @@ export function DashboardOverview({
           </CardContent>
         </Card>
       </div>
+
+      {pkarrPubkey && pkarrResult && (
+        <PkarrRecordViewer
+          open={pkarrViewerOpen}
+          onOpenChange={setPkarrViewerOpen}
+          result={pkarrResult}
+          pubkey={pkarrPubkey}
+        />
+      )}
 
       {/* Where the data actually lives; the dashboard offers no export, so
           this is the one place the backup story is told. */}

@@ -15,6 +15,7 @@ const SPECS = [
   'preview.spec.mjs',
   'disconnect.spec.mjs',
   'overview-health.spec.mjs',
+  'pkarr-verify.spec.mjs',
   'connect-authorized.spec.mjs',
   'preview-supersede.spec.mjs',
 ];

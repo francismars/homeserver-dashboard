@@ -14,6 +14,7 @@ import { promises as fs, openSync, closeSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright-core';
 import { startMockCf, VALID_TOKEN } from './mock-cf-server.mjs';
+import { startMockPkarrRelay } from './mock-pkarr-relay.mjs';
 
 export { VALID_TOKEN };
 
@@ -228,6 +229,9 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
 
   const cf = await startMockCf(0, { quiet: true });
   const admin = await startMockAdmin({ ...MOCK_INFO_DEFAULTS, pkarr_icann_domain: infoDomain });
+  // Always-on so the Overview's auto pkarr check hits a fast deterministic
+  // 404 instead of the real relays (which take ~7s to 404 unknown keys).
+  const pkarrRelay = await startMockPkarrRelay();
   const client = await startMockTextServer({
     'GET /': { type: 'text/plain', body: 'pubky homeserver e2e client' },
   });
@@ -254,6 +258,7 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       CLIENT_BASE_URL: client.url,
       METRICS_BASE_URL: metrics.url,
       CF_API_BASE: cf.url,
+      PKARR_RELAYS: pkarrRelay.url,
     },
   });
   closeSync(out);
@@ -295,6 +300,7 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
     hsConfigPath,
     cf,
     admin,
+    pkarrRelay,
     cloudflaredBin,
     nextLog,
     /** Read a file under the Cloudflare config dir ('' on absence). */
@@ -340,6 +346,7 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       });
       await cf.close();
       await admin.close();
+      await pkarrRelay.close();
       await client.close();
       await metrics.close();
       await fs.rm(root, { recursive: true, force: true });

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.17]
+
+PKARR record verification on the Overview.
+
+### Added
+
+- The Overview's new "Pubky network" row verifies the record this homeserver published to the Pubky network (Mainline DHT), not just whether the HTTPS endpoint answers. The dashboard fetches the record from the pkarr relays, checks its ed25519 signature against the homeserver's key, and reconciles the published address and domain against what the homeserver reports it published. It shows Published (verified), Doesn't match config (with a configured-vs-published comparison), Not published, or Can't verify (relays unreachable - which never blames the server).
+- A "View" dialog shows the parsed record (each DNS record's type, name, value, and TTL), when it was published, and an independent pkdns.net link. The packet age is shown for information only and never downgrades a matching record: an old-but-correct record is healthy.
+
+### Notes
+
+- Verification is done server-side with the official @synonymdev/pkarr client. The dashboard verifies the relay payload's signature itself rather than trusting the relay, so a misbehaving relay cannot make another key's record appear as this homeserver's.
+
 ## [0.1.16]
 
 Preview-mode fix and Overview polish.
