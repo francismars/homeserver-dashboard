@@ -239,7 +239,10 @@ export function DashboardOverview({
   // probe), manual re-check, verdict + parsed record cached across tab
   // switches with silent revalidation.
   const pkarrPubkey = info?.public_key ?? info?.pubkey ?? null;
-  const pkarrExpectedAddress = info?.pkarr_pubky_address?.trim() || null;
+  // Current homeservers report "ip:port"; some older ones reported a
+  // pubky:// URI, which is an identifier, not an address expectation.
+  const rawPkarrAddress = info?.pkarr_pubky_address?.trim() || null;
+  const pkarrExpectedAddress = rawPkarrAddress && !rawPkarrAddress.includes('/') ? rawPkarrAddress : null;
   // The localhost default means "never set up": expect no domain then.
   const pkarrExpectedDomain = domainHostname(info?.pkarr_icann_domain) ? (info?.pkarr_icann_domain ?? null) : null;
   const pkarrKey = pkarrPubkey ? `${pkarrPubkey}|${pkarrExpectedAddress ?? ''}|${pkarrExpectedDomain ?? ''}` : null;

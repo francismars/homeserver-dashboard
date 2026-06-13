@@ -493,6 +493,19 @@ describe('DashboardOverview pkarr verification', () => {
     expect(String(pkarrCalls()[0][0])).not.toContain('expected_domain');
   });
 
+  it('a legacy pubky:// address is an identifier, not an expectation: omitted from the check', async () => {
+    mockBackend({ pkarr: 'verified' });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_pubky_address: `pubky://${baseInfo.public_key}` }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    await waitFor(() => expect(pkarrCalls()).toHaveLength(1));
+    expect(String(pkarrCalls()[0][0])).not.toContain('expected_address');
+  });
+
   it('no pubkey: no row, no check', async () => {
     mockBackend();
     render(
