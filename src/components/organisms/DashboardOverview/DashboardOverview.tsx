@@ -191,7 +191,12 @@ export function DashboardOverview({
   // change must re-probe from scratch, not inherit the old verdict.
   const cacheMatchesHost = overviewStateCache.domainHostname === probeHostname;
   const [domainHealth, setDomainHealth] = useState<DomainHealth>(
-    cacheMatchesHost ? (overviewStateCache.domainHealth ?? 'not_set_up') : 'not_set_up',
+    // Seed from cache on a tab return; otherwise start at 'checking' when a
+    // probe is about to run (effects fire after the first paint, so a
+    // 'not_set_up' seed would flash "Not set up"/"Set up" for a real domain
+    // before the probe begins). 'not_set_up' stays only for the genuine
+    // localhost/no-domain case, where no probe runs.
+    cacheMatchesHost ? (overviewStateCache.domainHealth ?? 'not_set_up') : probeHostname ? 'checking' : 'not_set_up',
   );
 
   const checkDomain = async (hostname: string, isCancelled: () => boolean = () => false, silent = false) => {
@@ -428,7 +433,17 @@ export function DashboardOverview({
           (onDismissSetupGuide) and the user has not dismissed it. */}
       {onDismissSetupGuide && setupGuideDismissed === false && (
         <GetStartedChecklist
-          reachableDone={cloudflareMode !== null && cloudflareMode !== 'off' && domainHealth === 'reachable'}
+          // 'done' once the mode is active and the probe answered; 'checking'
+          // while the Cloudflare mode or the probe is still loading (so the
+          // step shows a spinner, not a premature "Set up access"); otherwise
+          // 'todo'.
+          reachableStatus={
+            cloudflareMode !== null && cloudflareMode !== 'off' && domainHealth === 'reachable'
+              ? 'done'
+              : cloudflareMode === null || domainHealth === 'checking'
+                ? 'checking'
+                : 'todo'
+          }
           inviteDone={info.num_signup_codes > 0}
           signupDone={info.num_users > 0}
           onSetUpAccess={onFixCloudflare}

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GetStartedChecklist, useSetupGuideDismissal } from './GetStartedChecklist';
 
 const baseProps = {
-  reachableDone: false,
+  reachableStatus: 'todo' as const,
   inviteDone: false,
   signupDone: false,
   onDismiss: () => {},
@@ -21,15 +21,38 @@ describe('GetStartedChecklist steps', () => {
     expect(screen.getByText('Sign up from Pubky Ring')).toBeTruthy();
   });
 
+  it('reachable done marks only its own step done', () => {
+    render(<GetStartedChecklist {...baseProps} reachableStatus="done" />);
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('done');
+    expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('pending');
+    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('pending');
+  });
+
   it.each([
-    ['reachableDone', 'setup-step-reachable'],
     ['inviteDone', 'setup-step-invite'],
     ['signupDone', 'setup-step-signup'],
   ] as const)('%s marks only its own step done', (prop, testId) => {
     render(<GetStartedChecklist {...baseProps} {...{ [prop]: true }} />);
-    for (const id of ['setup-step-reachable', 'setup-step-invite', 'setup-step-signup']) {
+    for (const id of ['setup-step-invite', 'setup-step-signup']) {
       expect(screen.getByTestId(id).getAttribute('data-state')).toBe(id === testId ? 'done' : 'pending');
     }
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+  });
+
+  it('reachable "checking": spinner state, helper-copy replaced, and NO "Set up access" CTA', () => {
+    render(<GetStartedChecklist {...baseProps} reachableStatus="checking" onSetUpAccess={() => {}} />);
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('checking');
+    expect(screen.getByText(/Checking whether your homeserver is reachable/)).toBeTruthy();
+    // The instruction and the CTA must not appear while we are still checking.
+    expect(screen.queryByTestId('setup-step-reachable-cta')).toBeNull();
+    expect(screen.queryByText(/Connect a domain through Cloudflare/)).toBeNull();
+  });
+
+  it('reachable "todo": shows the instruction and the CTA', () => {
+    render(<GetStartedChecklist {...baseProps} reachableStatus="todo" onSetUpAccess={() => {}} />);
+    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+    expect(screen.getByText(/Connect a domain through Cloudflare/)).toBeTruthy();
+    expect(screen.getByTestId('setup-step-reachable-cta')).toBeTruthy();
   });
 
   it('pending invite step explains the first invite is for your own account', () => {
@@ -62,12 +85,18 @@ describe('GetStartedChecklist steps', () => {
 
   it('all steps done: collapses to the slim all-set state, still dismissible', () => {
     const onDismiss = vi.fn();
-    render(<GetStartedChecklist reachableDone inviteDone signupDone onDismiss={onDismiss} />);
+    render(<GetStartedChecklist reachableStatus="done" inviteDone signupDone onDismiss={onDismiss} />);
     expect(screen.queryByTestId('setup-guide')).toBeNull();
     expect(screen.getByTestId('setup-guide-allset')).toBeTruthy();
     expect(screen.getByText(/All set/)).toBeTruthy();
     fireEvent.click(screen.getByTestId('setup-guide-dismiss'));
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('reachable "checking" does not collapse to all-set even when invite and signup are done', () => {
+    render(<GetStartedChecklist {...baseProps} reachableStatus="checking" inviteDone signupDone />);
+    expect(screen.queryByTestId('setup-guide-allset')).toBeNull();
+    expect(screen.getByTestId('setup-guide')).toBeTruthy();
   });
 });
 

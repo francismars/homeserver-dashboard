@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Circle, CircleCheckBig, X } from 'lucide-react';
+import { Circle, CircleCheckBig, RefreshCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+/** A checklist step is done, still being determined (async signal in flight),
+ * or outstanding. 'checking' suppresses the call-to-action so the user is not
+ * told to fix something we have not finished evaluating. */
+export type StepStatus = 'done' | 'checking' | 'todo';
 
 const STORAGE_KEY = 'setup-guide-dismissed';
 
@@ -47,8 +52,10 @@ export function useSetupGuideDismissal() {
 }
 
 export type GetStartedChecklistProps = {
-  /** Cloudflare mode is active (not 'off') AND the public domain answered the probe. */
-  reachableDone: boolean;
+  /** Reachability of the public domain: 'done' (mode active AND the domain
+   * answered the probe), 'checking' (the Cloudflare mode or the probe is
+   * still loading - do not yet tell the user to set anything up), or 'todo'. */
+  reachableStatus: StepStatus;
   /** At least one signup code exists. */
   inviteDone: boolean;
   /** At least one user account exists. */
@@ -61,30 +68,47 @@ export type GetStartedChecklistProps = {
 };
 
 function StepRow({
-  done,
+  status,
   testId,
   title,
   children,
   action,
+  checkingLabel = 'Checking…',
 }: {
-  done: boolean;
+  status: StepStatus;
   testId: string;
   title: string;
   children?: React.ReactNode;
   action?: React.ReactNode;
+  /** Subtext shown in place of `children` while the step is being evaluated. */
+  checkingLabel?: string;
 }) {
+  const done = status === 'done';
+  const checking = status === 'checking';
   return (
-    <li className="flex items-start gap-3" data-testid={testId} data-state={done ? 'done' : 'pending'}>
+    <li
+      className="flex items-start gap-3"
+      data-testid={testId}
+      data-state={status === 'done' ? 'done' : status === 'checking' ? 'checking' : 'pending'}
+    >
       {done ? (
         <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+      ) : checking ? (
+        <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground/60" />
       ) : (
         <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
       )}
       <div className="min-w-0 flex-1">
         <p className={cn('text-sm font-medium', done ? 'text-muted-foreground' : 'text-foreground')}>{title}</p>
-        {!done && children && <div className="mt-0.5 text-xs text-muted-foreground">{children}</div>}
+        {checking ? (
+          <div className="mt-0.5 text-xs text-muted-foreground">{checkingLabel}</div>
+        ) : (
+          !done && children && <div className="mt-0.5 text-xs text-muted-foreground">{children}</div>
+        )}
       </div>
-      {!done && action && <div className="shrink-0">{action}</div>}
+      {/* No call-to-action while checking: do not prompt a fix we have not
+          finished evaluating. */}
+      {status === 'todo' && action && <div className="shrink-0">{action}</div>}
     </li>
   );
 }
@@ -111,14 +135,14 @@ function DismissButton({ onDismiss }: { onDismiss: () => void }) {
  * has; collapses to a slim "all set" line once every step is done.
  */
 export function GetStartedChecklist({
-  reachableDone,
+  reachableStatus,
   inviteDone,
   signupDone,
   onSetUpAccess,
   onCreateInvite,
   onDismiss,
 }: GetStartedChecklistProps) {
-  const allDone = reachableDone && inviteDone && signupDone;
+  const allDone = reachableStatus === 'done' && inviteDone && signupDone;
 
   if (allDone) {
     return (
@@ -151,9 +175,10 @@ export function GetStartedChecklist({
       <CardContent className="pt-4">
         <ul className="space-y-4">
           <StepRow
-            done={reachableDone}
+            status={reachableStatus}
             testId="setup-step-reachable"
             title="Make your homeserver reachable"
+            checkingLabel="Checking whether your homeserver is reachable…"
             action={
               onSetUpAccess && (
                 <Button
@@ -173,7 +198,7 @@ export function GetStartedChecklist({
             behind your router (no port forwarding needed).
           </StepRow>
           <StepRow
-            done={inviteDone}
+            status={inviteDone ? 'done' : 'todo'}
             testId="setup-step-invite"
             title="Create your first invite"
             action={
@@ -193,7 +218,7 @@ export function GetStartedChecklist({
           >
             Your first invite is for your own account.
           </StepRow>
-          <StepRow done={signupDone} testId="setup-step-signup" title="Sign up from Pubky Ring">
+          <StepRow status={signupDone ? 'done' : 'todo'} testId="setup-step-signup" title="Sign up from Pubky Ring">
             Install Pubky Ring on your phone (get it at{' '}
             <a
               href="https://pubky.org"
