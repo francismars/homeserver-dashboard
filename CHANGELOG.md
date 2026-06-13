@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.18]
+
+PKARR verification review follow-ups: correctness fix and hardening.
+
+### Fixed
+
+- The Pubky-network row could briefly show one homeserver's record (and its pkdns.net link) under a different homeserver's key if the dashboard switched identity while staying on the page. The verdict and record are now tied to the key they were fetched for and discarded the moment the key changes.
+
+### Changed
+
+- Hardened the relay fetch: it no longer follows redirects, caps the response size, and only accepts http(s) relay URLs. The PKARR package's WebAssembly file is now copied explicitly into the runtime image so the feature cannot silently break in a future build. Added test coverage for the relay classification and signature-verification paths.
+
 ## [0.1.17]
 
 PKARR record verification on the Overview.
