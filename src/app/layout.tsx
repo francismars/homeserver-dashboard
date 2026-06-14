@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import './globals.css';
+import { getPlatform } from '@/lib/server/platform';
+import { PlatformProvider } from '@/components/providers/PlatformProvider';
 
 export const metadata = {
   title: 'Homeserver Dashboard',
@@ -12,7 +14,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <PlatformProvider platform={getPlatform()}>{children}</PlatformProvider>
+      </body>
     </html>
   );
 }
