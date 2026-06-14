@@ -18,6 +18,7 @@ const SPECS = [
   'pkarr-verify.spec.mjs',
   'connect-authorized.spec.mjs',
   'preview-supersede.spec.mjs',
+  'standalone.spec.mjs',
 ];
 
 const filters = process.argv.slice(2);

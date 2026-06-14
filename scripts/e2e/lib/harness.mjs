@@ -210,7 +210,14 @@ const HOMESERVER_CONFIG_TEMPLATE = (icannDomain, withPort) =>
  *   baseUrl, root, configDir, hsConfigPath, cf (mock CF handle),
  *   admin (mock admin handle), file(...) helpers, stop().
  */
-export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain = 'localhost', hsPort = false } = {}) {
+export async function startDashboard({
+  infoDomain = 'localhost:6286',
+  hsDomain = 'localhost',
+  hsPort = false,
+  // Default to the Umbrel experience so every existing spec keeps exercising
+  // the Cloudflare flows; the standalone spec overrides this to 'standalone'.
+  platform = 'umbrel',
+} = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hsdash-e2e-'));
   const configDir = path.join(root, 'cloudflare-config');
   const hsDir = path.join(root, 'homeserver-data');
@@ -259,6 +266,7 @@ export async function startDashboard({ infoDomain = 'localhost:6286', hsDomain =
       METRICS_BASE_URL: metrics.url,
       CF_API_BASE: cf.url,
       PKARR_RELAYS: pkarrRelay.url,
+      PLATFORM: platform,
     },
   });
   closeSync(out);
@@ -371,7 +379,7 @@ export async function gotoDashboard(page, baseUrl) {
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
 }
 
-async function openSettingsDialog(page) {
+export async function openSettingsDialog(page) {
   await page.waitForSelector('[aria-label="Settings"]', { timeout: 60_000 });
   for (let i = 0; i < 20; i++) {
     await page.click('[aria-label="Settings"]', { timeout: 10_000 }).catch(() => {});
