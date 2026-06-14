@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.21]
+
+### Added
+
+- **Standalone deployment support.** The dashboard now adapts to where it runs (via a `PLATFORM` env var). Outside Umbrel, the Cloudflare setup flows — which depend on the Umbrel app's tunnel containers and cannot work standalone — are hidden, the Cloudflare setup API routes refuse with a clear error, and the restart/backup copy drops Umbrel-specific wording. The read-only status views (public address, reachability, the Pubky-network/pkarr check) remain, so a standalone operator running their own reverse proxy or tunnel can still see whether their server is reachable and correctly published.
+- A "Preview mode" badge on the Overview's public address when it's a temporary `*.trycloudflare.com` Quick Tunnel, with a hover note explaining its limits (brief outages on restart, the `/events` SSE stream doesn't work through it so Pubky indexers may miss content, use a permanent domain for full support).
+- The "All set" get-started card can be expanded to review the steps that were verified.
+
 ## [0.1.20]
 
 ### Changed
