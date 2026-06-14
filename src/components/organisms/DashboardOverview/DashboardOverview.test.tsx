@@ -763,6 +763,25 @@ describe('DashboardOverview standalone (no Umbrel)', () => {
     expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
   });
 
+  it('all-set copy does not claim reachability when the reachable step is hidden', async () => {
+    // Invite + first user done, but standalone never verifies reachability, so
+    // the all-set card must not assert the homeserver "is reachable".
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview
+          info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+          isLoading={false}
+          error={null}
+          {...wiring}
+        />
+      </PlatformProvider>,
+    );
+    const card = await screen.findByTestId('setup-guide-allset');
+    expect(card.textContent).toContain('invites work');
+    expect(card.textContent).not.toContain('is reachable');
+  });
+
   it('keeps the pkarr "Pubky network" row standalone', async () => {
     mockBackend({ healthOk: true, pkarr: 'verified' });
     render(

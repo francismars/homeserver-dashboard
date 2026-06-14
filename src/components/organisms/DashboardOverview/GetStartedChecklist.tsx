@@ -159,7 +159,9 @@ export function GetStartedChecklist({
           <div className="flex items-center gap-3">
             <CircleCheckBig className="h-4 w-4 shrink-0 text-brand" />
             <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-              All set: your homeserver is reachable, invites work, and your first account is in.
+              {showReachableStep
+                ? 'All set: your homeserver is reachable, invites work, and your first account is in.'
+                : 'All set: invites work, and your first account is in.'}
             </p>
             <Button
               type="button"
