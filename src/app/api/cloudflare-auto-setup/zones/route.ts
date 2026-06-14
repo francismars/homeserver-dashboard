@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { CfApiError, listZones } from '@/lib/server/cloudflare-api';
+import { getPlatform } from '@/lib/server/platform';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup/zones';
@@ -17,6 +18,14 @@ const ROUTE_NAME = '/api/cloudflare-auto-setup/zones';
  */
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
+  // Part of the Cloudflare auto-setup flow (Umbrel-only); refuse before
+  // proxying the operator's API token to Cloudflare on standalone.
+  if (getPlatform() !== 'umbrel') {
+    return errorResponse(
+      new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+      requestId,
+    );
+  }
   const startedAt = Date.now();
 
   let body: { api_token?: unknown };

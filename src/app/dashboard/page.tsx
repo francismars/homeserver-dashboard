@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminInfo, useAdminActions, useDisabledUsers } from '@/hooks/admin';
+import { usePlatform } from '@/components/providers/PlatformProvider';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
 import { DashboardOverview, useSetupGuideDismissal } from '@/components/organisms/DashboardOverview';
 import { ApiExplorer } from '@/components/organisms/ApiExplorer';
@@ -51,6 +52,7 @@ function TabUnavailableNotice() {
 }
 
 export default function DashboardPage() {
+  const platform = usePlatform();
   const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
   const {
     disableUser,
@@ -410,13 +412,15 @@ export default function DashboardPage() {
                 <BookOpen className="h-3.5 w-3.5" />
                 <span>Documentation</span>
               </Link>
-              <Link
-                href="/cloudflare-guide"
-                className="flex items-center gap-1.5 transition-colors hover:text-foreground"
-              >
-                <Cloud className="h-3.5 w-3.5" />
-                <span>Cloudflare Tunnel guide</span>
-              </Link>
+              {platform === 'umbrel' && (
+                <Link
+                  href="/cloudflare-guide"
+                  className="flex items-center gap-1.5 transition-colors hover:text-foreground"
+                >
+                  <Cloud className="h-3.5 w-3.5" />
+                  <span>Cloudflare Tunnel guide</span>
+                </Link>
+              )}
               <Link
                 href="https://github.com/pubky/umbrel-app-store/issues"
                 target="_blank"

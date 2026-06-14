@@ -10,7 +10,8 @@ import { CircleCheckBig, AlertCircle, Copy, RefreshCw, ExternalLink } from 'luci
 import { cn } from '@/lib/utils';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { useRestartSentence } from '@/hooks/useRestartSentence';
+import { usePlatform } from '@/components/providers/PlatformProvider';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import { PkarrRecordViewer } from './PkarrRecordViewer';
@@ -68,12 +69,13 @@ function domainHostname(pkarrIcannDomain: string | undefined): string | null {
  * .env.local to fix); the env-var checklist only matters to developers and
  * lives behind a collapsed disclosure. */
 function ConnectionErrorAlert({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const restartSentence = useRestartSentence();
   return (
     <Alert variant="destructive" data-testid="connection-error">
       <AlertTitle>Connection Error</AlertTitle>
       <AlertDescription className="text-xs">
         <p>Your homeserver may still be starting. Wait a minute - this page retries automatically.</p>
-        <p className="mt-1">If this persists: {RESTART_APP_SENTENCE}</p>
+        <p className="mt-1">If this persists: {restartSentence}</p>
         {onRetry && (
           <Button
             type="button"
@@ -154,6 +156,22 @@ function AddressScopeBadge({ address }: { address: string }) {
   );
 }
 
+/** Flags the published address as a throwaway Preview tunnel so the operator
+ * knows its limits (a *.trycloudflare.com Quick Tunnel, or the dashboard's
+ * own preview mode). The hover text spells out why it is not a full setup. */
+function PreviewModeBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 border-amber-400/40 text-amber-400"
+      title="Preview mode - a temporary Cloudflare Quick Tunnel. Expect brief outages when the app restarts, and the server-sent-events stream (/events) does not work through it, so Pubky indexers may not pick up your content. Set up a permanent Cloudflare domain for full support."
+      data-testid="preview-mode-badge"
+    >
+      Preview mode
+    </Badge>
+  );
+}
+
 function CopyValueButton({ value, label }: { value: string; label: string }) {
   const { copiedKey, copy } = useCopyFeedback();
   return (
@@ -181,6 +199,10 @@ export function DashboardOverview({
   onDismissSetupGuide,
   cloudflareRefreshKey,
 }: DashboardOverviewProps) {
+  const restartSentence = useRestartSentence();
+  // Cloudflare setup is Umbrel-only; on standalone, hide its CTAs and the
+  // get-started reachable step (reachability is set up outside the dashboard).
+  const platform = usePlatform();
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
@@ -427,6 +449,11 @@ export function DashboardOverview({
   const shownPkarrHealth: PkarrHealth = pkarrStateFresh ? pkarrHealth : 'checking';
   const shownPkarrResult = pkarrStateFresh ? pkarrResult : null;
 
+  // The published address is a throwaway Preview tunnel when it is a
+  // *.trycloudflare.com Quick Tunnel, or when the dashboard's own mode says
+  // preview. Either signal flags the row so the operator knows its limits.
+  const isPreviewAddress = (probeHostname?.endsWith('.trycloudflare.com') ?? false) || cloudflareMode === 'preview';
+
   return (
     <div className="space-y-4">
       {/* Get-started checklist: rendered only when its wiring is present
@@ -446,6 +473,7 @@ export function DashboardOverview({
           }
           inviteDone={info.num_signup_codes > 0}
           signupDone={info.num_users > 0}
+          showReachableStep={platform === 'umbrel'}
           onSetUpAccess={onFixCloudflare}
           onCreateInvite={onGoToInvites}
           onDismiss={onDismissSetupGuide}
@@ -568,6 +596,7 @@ export function DashboardOverview({
                         {info.pkarr_icann_domain}
                       </code>
                       <CopyValueButton value={info.pkarr_icann_domain} label="Copy public address" />
+                      {isPreviewAddress && <PreviewModeBadge />}
                     </>
                   )}
                   {domainHealth === 'checking' && (
@@ -615,6 +644,7 @@ export function DashboardOverview({
                       until the app restarts; "Fix it" would point at a
                       non-problem. */}
                   {((domainHealth === 'unreachable' && !restartPending) || domainHealth === 'not_set_up') &&
+                    platform === 'umbrel' &&
                     onFixCloudflare && (
                       <Button
                         variant="outline"
@@ -628,7 +658,7 @@ export function DashboardOverview({
                     )}
                   {domainHealth === 'unreachable' && restartPending && (
                     <span className="w-full text-xs text-muted-foreground" data-testid="domain-health-restart-hint">
-                      To finish setup: {RESTART_APP_SENTENCE}
+                      To finish setup: {restartSentence}
                     </span>
                   )}
                 </div>
@@ -748,11 +778,21 @@ export function DashboardOverview({
       )}
 
       {/* Where the data actually lives; the dashboard offers no export, so
-          this is the one place the backup story is told. */}
+          this is the one place the backup story is told. The umbrelOS backup
+          guidance only applies on Umbrel. */}
       <p className="px-1 text-xs text-muted-foreground/70" data-testid="backup-note">
-        Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory, and umbrelOS
-        1.5+ built-in backups include app data automatically. Just don&apos;t exclude this app in your backup settings;
-        losing this data means losing this server&apos;s identity.
+        {platform === 'umbrel' ? (
+          <>
+            Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory, and
+            umbrelOS 1.5+ built-in backups include app data automatically. Just don&apos;t exclude this app in your
+            backup settings; losing this data means losing this server&apos;s identity.
+          </>
+        ) : (
+          <>
+            Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory. Back it
+            up regularly — losing this data means losing this server&apos;s identity.
+          </>
+        )}
       </p>
     </div>
   );

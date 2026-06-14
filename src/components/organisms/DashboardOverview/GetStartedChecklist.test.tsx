@@ -93,10 +93,55 @@ describe('GetStartedChecklist steps', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('all-set: the chevron expands to the three verified (done) steps and collapses again', () => {
+    render(<GetStartedChecklist reachableStatus="done" inviteDone signupDone onDismiss={() => {}} />);
+    const toggle = screen.getByTestId('setup-guide-allset-toggle');
+    // Collapsed by default: steps hidden, label invites showing them.
+    expect(screen.queryByTestId('setup-guide-allset-steps')).toBeNull();
+    expect(toggle.getAttribute('aria-label')).toBe('Show completed steps');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle);
+    const steps = screen.getByTestId('setup-guide-allset-steps');
+    expect(steps).toBeTruthy();
+    // All three render as done.
+    for (const id of ['setup-step-reachable', 'setup-step-invite', 'setup-step-signup']) {
+      expect(screen.getByTestId(id).getAttribute('data-state')).toBe('done');
+    }
+    expect(toggle.getAttribute('aria-label')).toBe('Hide completed steps');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId('setup-guide-allset-steps')).toBeNull();
+  });
+
   it('reachable "checking" does not collapse to all-set even when invite and signup are done', () => {
     render(<GetStartedChecklist {...baseProps} reachableStatus="checking" inviteDone signupDone />);
     expect(screen.queryByTestId('setup-guide-allset')).toBeNull();
     expect(screen.getByTestId('setup-guide')).toBeTruthy();
+  });
+
+  it('showReachableStep=false (standalone): the reachable step is gone; checklist is invite + signup', () => {
+    render(
+      <GetStartedChecklist {...baseProps} showReachableStep={false} reachableStatus="todo" onSetUpAccess={() => {}} />,
+    );
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    expect(screen.queryByTestId('setup-step-reachable-cta')).toBeNull();
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
+    expect(screen.getByText(/Two steps/)).toBeTruthy();
+  });
+
+  it('showReachableStep=false: all-set once invite + signup are done, ignoring reachable status', () => {
+    render(
+      <GetStartedChecklist {...baseProps} showReachableStep={false} reachableStatus="todo" inviteDone signupDone />,
+    );
+    expect(screen.getByTestId('setup-guide-allset')).toBeTruthy();
+    // Expanding the all-set list shows only invite + signup, no reachable.
+    fireEvent.click(screen.getByTestId('setup-guide-allset-toggle'));
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
   });
 });
 

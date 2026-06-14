@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RouteError } from '@/lib/server/errors';
+import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import {
   AlreadyRunningError,
@@ -28,7 +28,8 @@ import {
   updateDnsRecord,
 } from '@/lib/server/cloudflare-api';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup';
 
@@ -60,6 +61,12 @@ type Step = { key: StepKey; status: StepStatus; detail?: string };
  */
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
+  if (getPlatform() !== 'umbrel') {
+    return errorResponse(
+      new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+      requestId,
+    );
+  }
   const startedAt = Date.now();
   const steps: Step[] = [];
 
@@ -309,8 +316,8 @@ export async function POST(request: NextRequest) {
     });
     const message =
       priorMode !== 'off'
-        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${RESTART_APP_SENTENCE} The restart also publishes your public address to the Pubky network.`
-        : `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
+        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${restartAppSentence(getPlatform())} The restart also publishes your public address to the Pubky network.`
+        : `Tunnel configured. The tunnel connects within a minute. ${restartAppSentence(getPlatform())} The restart publishes your public address to the Pubky network.`;
     return NextResponse.json(
       {
         ok: true,

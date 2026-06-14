@@ -31,6 +31,7 @@ describe('cloudflare-preview route', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-preview-test-'));
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.PLATFORM = 'umbrel'; // these flows are Umbrel-only; keep happy-paths on umbrel
   });
 
   afterEach(async () => {
@@ -75,6 +76,13 @@ describe('cloudflare-preview route', () => {
       }),
     );
 
+  it('POST refuses on standalone with 404 not_supported', async () => {
+    process.env.PLATFORM = 'standalone';
+    const { POST } = await routes();
+    const res = await post(POST, { action: 'enable' });
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+  });
   it('GET: disabled initially', async () => {
     const { GET } = await routes();
     const data = await (await get(GET)).json();

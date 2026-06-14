@@ -589,8 +589,20 @@ async function acquireFlowLock(file: string, maxAgeMs: number, name: string): Pr
       try {
         const stolen = `${file}.stale-${randomUUID()}`;
         await fs.rename(file, stolen);
-        await fs.rm(stolen, { force: true });
-      } catch {
+        // We won the rename, but the staleness check above raced our claim: a
+        // delayed loser can rename away a *fresh* lock that a concurrent winner
+        // already published, then proceed and double-acquire. Re-check what we
+        // actually grabbed. If it is live, restore it - via link() so we never
+        // clobber a third racer that took the freed slot - and back off.
+        if (await isLockStale(stolen, maxAgeMs)) {
+          await fs.rm(stolen, { force: true });
+        } else {
+          await fs.link(stolen, file).catch(() => {});
+          await fs.rm(stolen, { force: true });
+          throw new AlreadyRunningError(name);
+        }
+      } catch (e) {
+        if (e instanceof AlreadyRunningError) throw e;
         throw new AlreadyRunningError(name);
       }
     }

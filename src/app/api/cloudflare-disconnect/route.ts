@@ -20,7 +20,8 @@ import {
   withFlowLock,
 } from '@/lib/server/cloudflared-process';
 import { teardownPreview } from '@/lib/server/preview-teardown';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-disconnect';
@@ -45,6 +46,12 @@ const HOMESERVER_CONFIG = () => process.env.HOMESERVER_CONFIG_PATH || '/app/home
  */
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
+  if (getPlatform() !== 'umbrel') {
+    return errorResponse(
+      new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+      requestId,
+    );
+  }
   const startedAt = Date.now();
   const steps: Array<{ key: string; status: 'done' | 'skipped' }> = [];
 
@@ -140,7 +147,7 @@ export async function POST(request: NextRequest) {
       {
         ok: true,
         steps,
-        message: `Disconnected. ${RESTART_APP_SENTENCE} The tunnel and DNS record still exist in your Cloudflare account (we keep no credentials that could delete them); remove them in the Cloudflare dashboard if you want to reuse the same public address.`,
+        message: `Disconnected. ${restartAppSentence(getPlatform())} The tunnel and DNS record still exist in your Cloudflare account (we keep no credentials that could delete them); remove them in the Cloudflare dashboard if you want to reuse the same public address.`,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview, __resetOverviewStateCache } from './DashboardOverview';
+import { PlatformProvider } from '@/components/providers/PlatformProvider';
 import type { AdminInfoResponse } from '@/services/admin';
 
 const baseInfo: AdminInfoResponse = {
@@ -360,6 +361,46 @@ describe('DashboardOverview address scope badge', () => {
   });
 });
 
+describe('DashboardOverview preview-mode badge', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    __resetOverviewStateCache();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a *.trycloudflare.com public address shows the Preview mode badge with its caveat tooltip', async () => {
+    mockBackend({ healthOk: true });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_icann_domain: 'chelsea-mpg-evaluating-restore.trycloudflare.com:443' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    const badge = await screen.findByTestId('preview-mode-badge');
+    expect(badge.textContent).toBe('Preview mode');
+    expect(badge.getAttribute('title')).toContain('temporary Cloudflare Quick Tunnel');
+    expect(badge.getAttribute('title')).toContain('/events');
+    expect(badge.getAttribute('title')).toContain('indexers');
+    expect(badge.getAttribute('title')).toContain('permanent Cloudflare domain');
+  });
+
+  it('the dashboard mode "preview" alone shows the badge even for a non-trycloudflare address', async () => {
+    mockBackend({ healthOk: true, mode: 'preview' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('preview-mode-badge')).toBeTruthy());
+  });
+
+  it('a real permanent domain shows no Preview badge', async () => {
+    mockBackend({ healthOk: true, mode: 'token' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByTestId('preview-mode-badge')).toBeNull();
+  });
+});
+
 describe('DashboardOverview get-started checklist', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -440,9 +481,16 @@ describe('DashboardOverview get-started checklist', () => {
         {...wiring}
       />,
     );
-    await waitFor(() => expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done'));
-    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
-    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+    // invite/signup settle synchronously from `info`, but reachable goes
+    // through an async checking -> pending transition. Assert all three in one
+    // waitFor so the probe has settled before we read reachable's final state -
+    // gating only on invite (true on first render) can catch reachable still
+    // 'checking' under load.
+    await waitFor(() => {
+      expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done');
+      expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
+      expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+    });
   });
 
   it('all three done: collapses to the slim all-set state', async () => {
@@ -693,6 +741,65 @@ describe('DashboardOverview pkarr verification', () => {
   });
 });
 
+describe('DashboardOverview standalone (no Umbrel)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    __resetOverviewStateCache();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const wiring = { onGoToInvites: () => {}, setupGuideDismissed: false, onDismissSetupGuide: () => {} };
+  const freshInstall = { ...baseInfo, num_users: 0, num_signup_codes: 0 };
+
+  it('hides the Cloudflare "Set up"/"Fix it" CTA and the get-started reachable step, keeps the status rows', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={freshInstall} isLoading={false} error={null} onFixCloudflare={() => {}} {...wiring} />
+      </PlatformProvider>,
+    );
+    // Status rows still present (a standalone operator may run their own proxy).
+    await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+    // No Cloudflare-setup CTA, no reachable get-started step.
+    expect(screen.queryByTestId('domain-health-fix')).toBeNull();
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    // The other get-started steps remain.
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
+  });
+
+  it('all-set copy does not claim reachability when the reachable step is hidden', async () => {
+    // Invite + first user done, but standalone never verifies reachability, so
+    // the all-set card must not assert the homeserver "is reachable".
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview
+          info={{ ...baseInfo, num_signup_codes: 2, num_users: 1 }}
+          isLoading={false}
+          error={null}
+          {...wiring}
+        />
+      </PlatformProvider>,
+    );
+    const card = await screen.findByTestId('setup-guide-allset');
+    expect(card.textContent).toContain('invites work');
+    expect(card.textContent).not.toContain('is reachable');
+  });
+
+  it('keeps the pkarr "Pubky network" row standalone', async () => {
+    mockBackend({ healthOk: true, pkarr: 'verified' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={baseInfo} isLoading={false} error={null} />
+      </PlatformProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+  });
+});
+
 describe('DashboardOverview backup note', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -710,6 +817,19 @@ describe('DashboardOverview backup note', () => {
     expect(note.textContent).toContain('include app data automatically');
     expect(note.textContent).toContain("don't exclude this app");
     expect(note.textContent).toContain("losing this server's identity");
+  });
+
+  it('standalone: generic backup note, no umbrelOS wording', async () => {
+    mockBackend();
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={baseInfo} isLoading={false} error={null} />
+      </PlatformProvider>,
+    );
+    const note = screen.getByTestId('backup-note');
+    expect(note.textContent).toContain("this app's data directory");
+    expect(note.textContent).toContain('Back it up regularly');
+    expect(note.textContent?.toLowerCase()).not.toContain('umbrel');
   });
 });
 
@@ -742,6 +862,18 @@ describe('DashboardOverview connection error', () => {
 
     fireEvent.click(screen.getByTestId('connection-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('standalone: the connection-error restart guidance is generic (no Umbrel)', async () => {
+    mockBackend();
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={null} isLoading={false} error={new Error('Request failed: 500')} />
+      </PlatformProvider>,
+    );
+    const alert = screen.getByTestId('connection-error');
+    expect(alert.textContent).toContain('Restart your homeserver');
+    expect(alert.textContent).not.toContain('Umbrel');
   });
 
   it('labels stale details "Last known state" while errored', async () => {
