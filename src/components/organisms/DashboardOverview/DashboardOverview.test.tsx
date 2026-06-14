@@ -360,6 +360,46 @@ describe('DashboardOverview address scope badge', () => {
   });
 });
 
+describe('DashboardOverview preview-mode badge', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    __resetOverviewStateCache();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a *.trycloudflare.com public address shows the Preview mode badge with its caveat tooltip', async () => {
+    mockBackend({ healthOk: true });
+    render(
+      <DashboardOverview
+        info={{ ...baseInfo, pkarr_icann_domain: 'chelsea-mpg-evaluating-restore.trycloudflare.com:443' }}
+        isLoading={false}
+        error={null}
+      />,
+    );
+    const badge = await screen.findByTestId('preview-mode-badge');
+    expect(badge.textContent).toBe('Preview mode');
+    expect(badge.getAttribute('title')).toContain('temporary Cloudflare Quick Tunnel');
+    expect(badge.getAttribute('title')).toContain('/events');
+    expect(badge.getAttribute('title')).toContain('indexers');
+    expect(badge.getAttribute('title')).toContain('permanent Cloudflare domain');
+  });
+
+  it('the dashboard mode "preview" alone shows the badge even for a non-trycloudflare address', async () => {
+    mockBackend({ healthOk: true, mode: 'preview' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('preview-mode-badge')).toBeTruthy());
+  });
+
+  it('a real permanent domain shows no Preview badge', async () => {
+    mockBackend({ healthOk: true, mode: 'token' });
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    await waitFor(() => expect(screen.getByTestId('domain-health-reachable')).toBeTruthy());
+    expect(screen.queryByTestId('preview-mode-badge')).toBeNull();
+  });
+});
+
 describe('DashboardOverview get-started checklist', () => {
   beforeEach(() => {
     vi.restoreAllMocks();

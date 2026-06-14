@@ -154,6 +154,22 @@ function AddressScopeBadge({ address }: { address: string }) {
   );
 }
 
+/** Flags the published address as a throwaway Preview tunnel so the operator
+ * knows its limits (a *.trycloudflare.com Quick Tunnel, or the dashboard's
+ * own preview mode). The hover text spells out why it is not a full setup. */
+function PreviewModeBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 border-amber-400/40 text-amber-400"
+      title="Preview mode - a temporary Cloudflare Quick Tunnel. Expect brief outages when the app restarts, and the server-sent-events stream (/events) does not work through it, so Pubky indexers may not pick up your content. Set up a permanent Cloudflare domain for full support."
+      data-testid="preview-mode-badge"
+    >
+      Preview mode
+    </Badge>
+  );
+}
+
 function CopyValueButton({ value, label }: { value: string; label: string }) {
   const { copiedKey, copy } = useCopyFeedback();
   return (
@@ -427,6 +443,11 @@ export function DashboardOverview({
   const shownPkarrHealth: PkarrHealth = pkarrStateFresh ? pkarrHealth : 'checking';
   const shownPkarrResult = pkarrStateFresh ? pkarrResult : null;
 
+  // The published address is a throwaway Preview tunnel when it is a
+  // *.trycloudflare.com Quick Tunnel, or when the dashboard's own mode says
+  // preview. Either signal flags the row so the operator knows its limits.
+  const isPreviewAddress = (probeHostname?.endsWith('.trycloudflare.com') ?? false) || cloudflareMode === 'preview';
+
   return (
     <div className="space-y-4">
       {/* Get-started checklist: rendered only when its wiring is present
@@ -568,6 +589,7 @@ export function DashboardOverview({
                         {info.pkarr_icann_domain}
                       </code>
                       <CopyValueButton value={info.pkarr_icann_domain} label="Copy public address" />
+                      {isPreviewAddress && <PreviewModeBadge />}
                     </>
                   )}
                   {domainHealth === 'checking' && (

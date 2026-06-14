@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Circle, CircleCheckBig, RefreshCw, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Circle, CircleCheckBig, RefreshCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** A checklist step is done, still being determined (async signal in flight),
@@ -143,16 +143,40 @@ export function GetStartedChecklist({
   onDismiss,
 }: GetStartedChecklistProps) {
   const allDone = reachableStatus === 'done' && inviteDone && signupDone;
+  // Collapsed by default; the chevron re-reveals the (now all-done) steps so
+  // the operator can review what was verified. Ephemeral - no need to persist.
+  const [allSetExpanded, setAllSetExpanded] = useState(false);
 
   if (allDone) {
     return (
       <Card data-testid="setup-guide-allset">
-        <CardContent className="flex items-center gap-3 py-3">
-          <CircleCheckBig className="h-4 w-4 shrink-0 text-brand" />
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            All set: your homeserver is reachable, invites work, and your first account is in.
-          </p>
-          <DismissButton onDismiss={onDismiss} />
+        <CardContent className="py-3">
+          <div className="flex items-center gap-3">
+            <CircleCheckBig className="h-4 w-4 shrink-0 text-brand" />
+            <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+              All set: your homeserver is reachable, invites work, and your first account is in.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-1.5"
+              onClick={() => setAllSetExpanded((e) => !e)}
+              aria-label={allSetExpanded ? 'Hide completed steps' : 'Show completed steps'}
+              aria-expanded={allSetExpanded}
+              data-testid="setup-guide-allset-toggle"
+            >
+              {allSetExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+            <DismissButton onDismiss={onDismiss} />
+          </div>
+          {allSetExpanded && (
+            <ul className="mt-3 space-y-3 border-t border-border/60 pt-3" data-testid="setup-guide-allset-steps">
+              <StepRow status="done" testId="setup-step-reachable" title="Make your homeserver reachable" />
+              <StepRow status="done" testId="setup-step-invite" title="Create your first invite" />
+              <StepRow status="done" testId="setup-step-signup" title="Sign up from Pubky Ring" />
+            </ul>
+          )}
         </CardContent>
       </Card>
     );

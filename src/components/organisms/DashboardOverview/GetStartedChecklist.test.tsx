@@ -93,6 +93,28 @@ describe('GetStartedChecklist steps', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('all-set: the chevron expands to the three verified (done) steps and collapses again', () => {
+    render(<GetStartedChecklist reachableStatus="done" inviteDone signupDone onDismiss={() => {}} />);
+    const toggle = screen.getByTestId('setup-guide-allset-toggle');
+    // Collapsed by default: steps hidden, label invites showing them.
+    expect(screen.queryByTestId('setup-guide-allset-steps')).toBeNull();
+    expect(toggle.getAttribute('aria-label')).toBe('Show completed steps');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle);
+    const steps = screen.getByTestId('setup-guide-allset-steps');
+    expect(steps).toBeTruthy();
+    // All three render as done.
+    for (const id of ['setup-step-reachable', 'setup-step-invite', 'setup-step-signup']) {
+      expect(screen.getByTestId(id).getAttribute('data-state')).toBe('done');
+    }
+    expect(toggle.getAttribute('aria-label')).toBe('Hide completed steps');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId('setup-guide-allset-steps')).toBeNull();
+  });
+
   it('reachable "checking" does not collapse to all-set even when invite and signup are done', () => {
     render(<GetStartedChecklist {...baseProps} reachableStatus="checking" inviteDone signupDone />);
     expect(screen.queryByTestId('setup-guide-allset')).toBeNull();
