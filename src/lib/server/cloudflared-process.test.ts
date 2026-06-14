@@ -447,7 +447,10 @@ describe('withFlowLock', () => {
       expect(ran + backedOff).toBe(4);
       await fs.rm(lockPath(), { force: true });
     }
-  });
+    // 200 trials x 4 concurrent file-lock acquisitions is a lot of real fs +
+    // timer work; under a loaded event loop it can blow the default 5s test
+    // timeout (a robustness limit, not the safety property). Give it room.
+  }, 30_000);
 
   it('steals an empty or corrupt lock file', async () => {
     const { withFlowLock } = await import('./cloudflared-process');

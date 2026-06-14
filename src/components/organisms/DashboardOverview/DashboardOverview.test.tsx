@@ -481,9 +481,16 @@ describe('DashboardOverview get-started checklist', () => {
         {...wiring}
       />,
     );
-    await waitFor(() => expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done'));
-    expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
-    expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+    // invite/signup settle synchronously from `info`, but reachable goes
+    // through an async checking -> pending transition. Assert all three in one
+    // waitFor so the probe has settled before we read reachable's final state -
+    // gating only on invite (true on first render) can catch reachable still
+    // 'checking' under load.
+    await waitFor(() => {
+      expect(screen.getByTestId('setup-step-invite').getAttribute('data-state')).toBe('done');
+      expect(screen.getByTestId('setup-step-signup').getAttribute('data-state')).toBe('done');
+      expect(screen.getByTestId('setup-step-reachable').getAttribute('data-state')).toBe('pending');
+    });
   });
 
   it('all three done: collapses to the slim all-set state', async () => {
