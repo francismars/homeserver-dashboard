@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.22]
+
+### Changed
+
+- The "Preview mode" badge on the Overview's public address is now clickable. Instead of a hover-only tooltip, it opens a short dialog that explains in plain terms why a Preview tunnel is temporary (the address can change and briefly drops on restart) and why live updates don't pass through it (the `/events` stream can't connect, so the Pubky network may miss your content). On Umbrel the dialog includes a "Set up Cloudflare account & domain" shortcut straight to the setup flow.
+
 ## [0.1.21]
 
 ### Added

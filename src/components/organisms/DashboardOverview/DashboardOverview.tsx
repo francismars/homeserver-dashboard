@@ -4,9 +4,18 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CircleCheckBig, AlertCircle, Copy, RefreshCw, ExternalLink } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { CircleCheckBig, AlertCircle, Copy, RefreshCw, ExternalLink, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
@@ -157,18 +166,76 @@ function AddressScopeBadge({ address }: { address: string }) {
 }
 
 /** Flags the published address as a throwaway Preview tunnel so the operator
- * knows its limits (a *.trycloudflare.com Quick Tunnel, or the dashboard's
- * own preview mode). The hover text spells out why it is not a full setup. */
-function PreviewModeBadge() {
+ * knows its limits (a *.trycloudflare.com Quick Tunnel, or the dashboard's own
+ * preview mode). Clicking the badge opens a dialog that explains the limits in
+ * plain terms and, on Umbrel, offers a shortcut to the full Cloudflare setup.
+ * `onSetUpCloudflare` is omitted where that setup is unavailable (standalone),
+ * in which case the dialog is purely informational. */
+function PreviewModeBadge({ onSetUpCloudflare }: { onSetUpCloudflare?: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Badge
-      variant="outline"
-      className="shrink-0 border-amber-400/40 text-amber-400"
-      title="Preview mode - a temporary Cloudflare Quick Tunnel. Expect brief outages when the app restarts, and the server-sent-events stream (/events) does not work through it, so Pubky indexers may not pick up your content. Set up a permanent Cloudflare domain for full support."
-      data-testid="preview-mode-badge"
-    >
-      Preview mode
-    </Badge>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            badgeVariants({ variant: 'outline' }),
+            'shrink-0 cursor-pointer gap-1 border-amber-400/40 text-amber-400 hover:border-amber-400/70 hover:text-amber-300',
+          )}
+          data-testid="preview-mode-badge"
+        >
+          Preview mode
+          <Info className="h-3 w-3" aria-hidden />
+        </button>
+      </DialogTrigger>
+      <DialogContent data-testid="preview-mode-dialog">
+        <DialogHeader>
+          <DialogTitle>Preview mode</DialogTitle>
+          <DialogDescription>
+            Your homeserver is online through a temporary Cloudflare Preview tunnel. It&apos;s the fastest way to get
+            started — no Cloudflare account or domain needed — but it isn&apos;t built to last:
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-3 text-sm text-muted-foreground">
+          <li className="flex gap-2">
+            <span aria-hidden className="text-amber-400">
+              •
+            </span>
+            <span>
+              <span className="font-medium text-foreground">The address is temporary.</span> It can change, and may drop
+              offline for a moment every time the app restarts.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden className="text-amber-400">
+              •
+            </span>
+            <span>
+              <span className="font-medium text-foreground">Live updates don&apos;t get through.</span> Apps that follow
+              your content as you post it (the <code className="font-mono text-xs">/events</code> stream) can&apos;t
+              connect over a Preview tunnel, so the rest of the Pubky network may miss what you publish.
+            </span>
+          </li>
+        </ul>
+        <p className="text-sm text-muted-foreground">
+          For an address that stays put and works everywhere, connect your own Cloudflare account and domain.
+        </p>
+        {onSetUpCloudflare && (
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onSetUpCloudflare();
+              }}
+              data-testid="preview-mode-setup-cta"
+            >
+              Set up Cloudflare account &amp; domain
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -596,7 +663,9 @@ export function DashboardOverview({
                         {info.pkarr_icann_domain}
                       </code>
                       <CopyValueButton value={info.pkarr_icann_domain} label="Copy public address" />
-                      {isPreviewAddress && <PreviewModeBadge />}
+                      {isPreviewAddress && (
+                        <PreviewModeBadge onSetUpCloudflare={platform === 'umbrel' ? onFixCloudflare : undefined} />
+                      )}
                     </>
                   )}
                   {domainHealth === 'checking' && (
