@@ -370,21 +370,48 @@ describe('DashboardOverview preview-mode badge', () => {
     vi.restoreAllMocks();
   });
 
-  it('a *.trycloudflare.com public address shows the Preview mode badge with its caveat tooltip', async () => {
+  it('a *.trycloudflare.com public address shows the Preview mode badge that opens an explainer dialog', async () => {
     mockBackend({ healthOk: true });
     render(
       <DashboardOverview
         info={{ ...baseInfo, pkarr_icann_domain: 'chelsea-mpg-evaluating-restore.trycloudflare.com:443' }}
         isLoading={false}
         error={null}
+        onFixCloudflare={() => {}}
       />,
     );
     const badge = await screen.findByTestId('preview-mode-badge');
-    expect(badge.textContent).toBe('Preview mode');
-    expect(badge.getAttribute('title')).toContain('temporary Cloudflare Quick Tunnel');
-    expect(badge.getAttribute('title')).toContain('/events');
-    expect(badge.getAttribute('title')).toContain('indexers');
-    expect(badge.getAttribute('title')).toContain('permanent Cloudflare domain');
+    expect(badge.textContent).toContain('Preview mode');
+    // No dialog until the badge is clicked.
+    expect(screen.queryByTestId('preview-mode-dialog')).toBeNull();
+    fireEvent.click(badge);
+    const dialog = await screen.findByTestId('preview-mode-dialog');
+    expect(dialog.textContent).toContain('temporary');
+    expect(dialog.textContent).toContain('/events');
+    expect(dialog.textContent).toContain('Pubky network');
+    expect(dialog.textContent).toContain('Cloudflare account and domain');
+  });
+
+  it('the dialog Set up button triggers the Cloudflare setup and closes the dialog', async () => {
+    mockBackend({ healthOk: true, mode: 'preview' });
+    const onFixCloudflare = vi.fn();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={onFixCloudflare} />);
+    fireEvent.click(await screen.findByTestId('preview-mode-badge'));
+    fireEvent.click(await screen.findByTestId('preview-mode-setup-cta'));
+    expect(onFixCloudflare).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId('preview-mode-dialog')).toBeNull());
+  });
+
+  it('standalone: the dialog explains the limits but offers no Cloudflare setup shortcut', async () => {
+    mockBackend({ healthOk: true, mode: 'preview' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={baseInfo} isLoading={false} error={null} onFixCloudflare={() => {}} />
+      </PlatformProvider>,
+    );
+    fireEvent.click(await screen.findByTestId('preview-mode-badge'));
+    expect(await screen.findByTestId('preview-mode-dialog')).toBeTruthy();
+    expect(screen.queryByTestId('preview-mode-setup-cta')).toBeNull();
   });
 
   it('the dashboard mode "preview" alone shows the badge even for a non-trycloudflare address', async () => {
