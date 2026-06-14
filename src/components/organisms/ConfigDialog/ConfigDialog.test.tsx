@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConfigDialog } from './ConfigDialog';
+import { PlatformProvider } from '@/components/providers/PlatformProvider';
 
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
 type JsonResponse = { status?: number; json: Record<string, unknown> };
@@ -63,6 +64,21 @@ describe('ConfigDialog Cloudflare status surface', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('standalone: the Cloudflare tab and all its setup cards are hidden', async () => {
+    mockBackend({ cloudflareConfig: cfConfig('off') });
+    render(
+      <PlatformProvider platform="standalone">
+        <ConfigDialog open onOpenChange={() => {}} />
+      </PlatformProvider>,
+    );
+    // The Config tab still loads; the Cloudflare surface must be entirely absent.
+    await waitFor(() => expect(screen.queryByTestId('cf-mode-badge')).toBeNull());
+    expect(screen.queryByText('Cloudflare')).toBeNull();
+    expect(screen.queryByTestId('cf-connect')).toBeNull();
+    expect(screen.queryByTestId('cf-api-token-toggle')).toBeNull();
+    expect(screen.queryByTestId('cf-preview')).toBeNull();
   });
 
   it('mode off: badge says Off, all four setup cards render directly, no disconnect', async () => {

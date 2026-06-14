@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview, __resetOverviewStateCache } from './DashboardOverview';
+import { PlatformProvider } from '@/components/providers/PlatformProvider';
 import type { AdminInfoResponse } from '@/services/admin';
 
 const baseInfo: AdminInfoResponse = {
@@ -733,6 +734,46 @@ describe('DashboardOverview pkarr verification', () => {
   });
 });
 
+describe('DashboardOverview standalone (no Umbrel)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    __resetOverviewStateCache();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const wiring = { onGoToInvites: () => {}, setupGuideDismissed: false, onDismissSetupGuide: () => {} };
+  const freshInstall = { ...baseInfo, num_users: 0, num_signup_codes: 0 };
+
+  it('hides the Cloudflare "Set up"/"Fix it" CTA and the get-started reachable step, keeps the status rows', async () => {
+    mockBackend({ healthOk: false, mode: 'off' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={freshInstall} isLoading={false} error={null} onFixCloudflare={() => {}} {...wiring} />
+      </PlatformProvider>,
+    );
+    // Status rows still present (a standalone operator may run their own proxy).
+    await waitFor(() => expect(screen.getByTestId('domain-health-unreachable')).toBeTruthy());
+    // No Cloudflare-setup CTA, no reachable get-started step.
+    expect(screen.queryByTestId('domain-health-fix')).toBeNull();
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    // The other get-started steps remain.
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
+  });
+
+  it('keeps the pkarr "Pubky network" row standalone', async () => {
+    mockBackend({ healthOk: true, pkarr: 'verified' });
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={baseInfo} isLoading={false} error={null} />
+      </PlatformProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('pkarr-health-verified')).toBeTruthy());
+  });
+});
+
 describe('DashboardOverview backup note', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -750,6 +791,19 @@ describe('DashboardOverview backup note', () => {
     expect(note.textContent).toContain('include app data automatically');
     expect(note.textContent).toContain("don't exclude this app");
     expect(note.textContent).toContain("losing this server's identity");
+  });
+
+  it('standalone: generic backup note, no umbrelOS wording', async () => {
+    mockBackend();
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={baseInfo} isLoading={false} error={null} />
+      </PlatformProvider>,
+    );
+    const note = screen.getByTestId('backup-note');
+    expect(note.textContent).toContain("this app's data directory");
+    expect(note.textContent).toContain('Back it up regularly');
+    expect(note.textContent?.toLowerCase()).not.toContain('umbrel');
   });
 });
 

@@ -56,6 +56,10 @@ export type GetStartedChecklistProps = {
    * answered the probe), 'checking' (the Cloudflare mode or the probe is
    * still loading - do not yet tell the user to set anything up), or 'todo'. */
   reachableStatus: StepStatus;
+  /** Whether to show the "make reachable" step at all. False on standalone,
+   * where reachability is set up outside the dashboard (no Cloudflare flow);
+   * the checklist is then invite + signup. Defaults to true. */
+  showReachableStep?: boolean;
   /** At least one signup code exists. */
   inviteDone: boolean;
   /** At least one user account exists. */
@@ -136,13 +140,14 @@ function DismissButton({ onDismiss }: { onDismiss: () => void }) {
  */
 export function GetStartedChecklist({
   reachableStatus,
+  showReachableStep = true,
   inviteDone,
   signupDone,
   onSetUpAccess,
   onCreateInvite,
   onDismiss,
 }: GetStartedChecklistProps) {
-  const allDone = reachableStatus === 'done' && inviteDone && signupDone;
+  const allDone = (!showReachableStep || reachableStatus === 'done') && inviteDone && signupDone;
   // Collapsed by default; the chevron re-reveals the (now all-done) steps so
   // the operator can review what was verified. Ephemeral - no need to persist.
   const [allSetExpanded, setAllSetExpanded] = useState(false);
@@ -172,7 +177,9 @@ export function GetStartedChecklist({
           </div>
           {allSetExpanded && (
             <ul className="mt-3 space-y-3 border-t border-border/60 pt-3" data-testid="setup-guide-allset-steps">
-              <StepRow status="done" testId="setup-step-reachable" title="Make your homeserver reachable" />
+              {showReachableStep && (
+                <StepRow status="done" testId="setup-step-reachable" title="Make your homeserver reachable" />
+              )}
               <StepRow status="done" testId="setup-step-invite" title="Create your first invite" />
               <StepRow status="done" testId="setup-step-signup" title="Sign up from Pubky Ring" />
             </ul>
@@ -189,7 +196,7 @@ export function GetStartedChecklist({
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base sm:text-lg">Get started</CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Three steps from a fresh install to your own account
+              {showReachableStep ? 'Three steps' : 'Two steps'} from a fresh install to your own account
             </CardDescription>
           </div>
           <DismissButton onDismiss={onDismiss} />
@@ -198,29 +205,31 @@ export function GetStartedChecklist({
       <div className="mx-6 h-px bg-border/60" />
       <CardContent className="pt-4">
         <ul className="space-y-4">
-          <StepRow
-            status={reachableStatus}
-            testId="setup-step-reachable"
-            title="Make your homeserver reachable"
-            checkingLabel="Checking whether your homeserver is reachable…"
-            action={
-              onSetUpAccess && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={onSetUpAccess}
-                  data-testid="setup-step-reachable-cta"
-                >
-                  Set up access
-                </Button>
-              )
-            }
-          >
-            Connect a domain through Cloudflare so Pubky apps and web browsers can reach this server from anywhere, even
-            behind your router (no port forwarding needed).
-          </StepRow>
+          {showReachableStep && (
+            <StepRow
+              status={reachableStatus}
+              testId="setup-step-reachable"
+              title="Make your homeserver reachable"
+              checkingLabel="Checking whether your homeserver is reachable…"
+              action={
+                onSetUpAccess && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={onSetUpAccess}
+                    data-testid="setup-step-reachable-cta"
+                  >
+                    Set up access
+                  </Button>
+                )
+              }
+            >
+              Connect a domain through Cloudflare so Pubky apps and web browsers can reach this server from anywhere,
+              even behind your router (no port forwarding needed).
+            </StepRow>
+          )}
           <StepRow
             status={inviteDone ? 'done' : 'todo'}
             testId="setup-step-invite"

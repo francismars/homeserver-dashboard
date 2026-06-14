@@ -10,7 +10,39 @@ export const metadata = {
 };
 
 export default function CloudflareGuidePage() {
-  const restartSentence = restartAppSentence(getPlatform());
+  const platform = getPlatform();
+  const restartSentence = restartAppSentence(platform);
+
+  // Cloudflare setup runs as part of the Umbrel app's containers; it is not
+  // available in a standalone deployment, so the guide does not apply.
+  if (platform !== 'umbrel') {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <main>
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+            <DashboardNavbar showSettingsButton={false} />
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+            <div className="rounded-lg border border-border bg-card p-6" data-testid="cloudflare-guide-standalone">
+              <h1 className="mb-2 text-xl font-semibold">Cloudflare Tunnel setup isn&apos;t available here</h1>
+              <p className="text-sm text-muted-foreground">
+                The guided Cloudflare Tunnel flow runs as part of the Pubky Homeserver Umbrel app and isn&apos;t
+                available in a standalone deployment. To expose your homeserver publicly, set up your own reverse proxy
+                or tunnel pointing at the homeserver&apos;s HTTP port, then make sure it&apos;s reachable at your
+                domain.
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>

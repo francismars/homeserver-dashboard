@@ -16,6 +16,7 @@ import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
 import { RestartCallout } from './RestartCallout';
 import { useRestartSentence } from '@/hooks/useRestartSentence';
+import { usePlatform } from '@/components/providers/PlatformProvider';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
@@ -51,7 +52,10 @@ type SaveMessage = { type: 'success' | 'error' | 'conflict'; text: string };
 
 export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudflare = 0 }: ConfigDialogProps) {
   const restartSentence = useRestartSentence();
-  const [activeTab, setActiveTab] = useState<Tab>('cloudflare');
+  // Cloudflare setup runs as separate Umbrel containers; it cannot work
+  // standalone, so the whole tab is hidden there.
+  const platform = usePlatform();
+  const [activeTab, setActiveTab] = useState<Tab>(platform === 'umbrel' ? 'cloudflare' : 'config');
   const [isConfigTabVisible, setIsConfigTabVisible] = useState(false);
 
   // The Overview "Fix it" button bumps this nonce; jump to the Cloudflare
@@ -203,14 +207,15 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCfConfig(data);
-      setIsCloudflareTabVisible(Boolean(data.supported));
+      setIsCloudflareTabVisible(platform === 'umbrel' && Boolean(data.supported));
       if (data.domain) setCfDomain(data.domain);
       return data;
     } catch (err) {
       // A failed read means "temporarily unavailable", not "unsupported":
-      // keep the tab and offer a retry instead of hiding the whole surface.
+      // keep the tab and offer a retry instead of hiding the whole surface
+      // (but never on standalone, where the tab does not apply at all).
       setCfError(err instanceof Error ? err.message : 'Request failed');
-      setIsCloudflareTabVisible(true);
+      setIsCloudflareTabVisible(platform === 'umbrel');
       return null;
     }
   };

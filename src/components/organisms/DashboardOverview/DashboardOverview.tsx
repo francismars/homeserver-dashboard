@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
 import { useRestartSentence } from '@/hooks/useRestartSentence';
+import { usePlatform } from '@/components/providers/PlatformProvider';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import { PkarrRecordViewer } from './PkarrRecordViewer';
@@ -199,6 +200,9 @@ export function DashboardOverview({
   cloudflareRefreshKey,
 }: DashboardOverviewProps) {
   const restartSentence = useRestartSentence();
+  // Cloudflare setup is Umbrel-only; on standalone, hide its CTAs and the
+  // get-started reachable step (reachability is set up outside the dashboard).
+  const platform = usePlatform();
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
@@ -469,6 +473,7 @@ export function DashboardOverview({
           }
           inviteDone={info.num_signup_codes > 0}
           signupDone={info.num_users > 0}
+          showReachableStep={platform === 'umbrel'}
           onSetUpAccess={onFixCloudflare}
           onCreateInvite={onGoToInvites}
           onDismiss={onDismissSetupGuide}
@@ -639,6 +644,7 @@ export function DashboardOverview({
                       until the app restarts; "Fix it" would point at a
                       non-problem. */}
                   {((domainHealth === 'unreachable' && !restartPending) || domainHealth === 'not_set_up') &&
+                    platform === 'umbrel' &&
                     onFixCloudflare && (
                       <Button
                         variant="outline"
@@ -772,11 +778,21 @@ export function DashboardOverview({
       )}
 
       {/* Where the data actually lives; the dashboard offers no export, so
-          this is the one place the backup story is told. */}
+          this is the one place the backup story is told. The umbrelOS backup
+          guidance only applies on Umbrel. */}
       <p className="px-1 text-xs text-muted-foreground/70" data-testid="backup-note">
-        Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory, and umbrelOS
-        1.5+ built-in backups include app data automatically. Just don&apos;t exclude this app in your backup settings;
-        losing this data means losing this server&apos;s identity.
+        {platform === 'umbrel' ? (
+          <>
+            Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory, and
+            umbrelOS 1.5+ built-in backups include app data automatically. Just don&apos;t exclude this app in your
+            backup settings; losing this data means losing this server&apos;s identity.
+          </>
+        ) : (
+          <>
+            Backups: your homeserver&apos;s identity and all user data live in this app&apos;s data directory. Back it
+            up regularly — losing this data means losing this server&apos;s identity.
+          </>
+        )}
       </p>
     </div>
   );

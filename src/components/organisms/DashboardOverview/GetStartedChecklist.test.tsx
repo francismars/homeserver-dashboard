@@ -120,6 +120,29 @@ describe('GetStartedChecklist steps', () => {
     expect(screen.queryByTestId('setup-guide-allset')).toBeNull();
     expect(screen.getByTestId('setup-guide')).toBeTruthy();
   });
+
+  it('showReachableStep=false (standalone): the reachable step is gone; checklist is invite + signup', () => {
+    render(
+      <GetStartedChecklist {...baseProps} showReachableStep={false} reachableStatus="todo" onSetUpAccess={() => {}} />,
+    );
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    expect(screen.queryByTestId('setup-step-reachable-cta')).toBeNull();
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
+    expect(screen.getByText(/Two steps/)).toBeTruthy();
+  });
+
+  it('showReachableStep=false: all-set once invite + signup are done, ignoring reachable status', () => {
+    render(
+      <GetStartedChecklist {...baseProps} showReachableStep={false} reachableStatus="todo" inviteDone signupDone />,
+    );
+    expect(screen.getByTestId('setup-guide-allset')).toBeTruthy();
+    // Expanding the all-set list shows only invite + signup, no reachable.
+    fireEvent.click(screen.getByTestId('setup-guide-allset-toggle'));
+    expect(screen.queryByTestId('setup-step-reachable')).toBeNull();
+    expect(screen.getByTestId('setup-step-invite')).toBeTruthy();
+    expect(screen.getByTestId('setup-step-signup')).toBeTruthy();
+  });
 });
 
 /** Mirrors the page wiring: the checklist while not dismissed, the footer
