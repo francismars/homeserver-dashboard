@@ -8,7 +8,8 @@ import { isDecodableTunnelToken } from '@/lib/server/tunnel-credentials';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { detectRestartPending } from '@/lib/server/restart-pending';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 
 const ROUTE_NAME = '/api/cloudflare-config';
 // Env is read lazily via getConfigDir() (call time, not module load),
@@ -270,7 +271,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       // Two separate truths: the crash-looping cloudflared picks the token up
       // by itself; only the pkarr publication needs the restart.
-      message: `Saved. The tunnel picks this up within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
+      message: `Saved. The tunnel picks this up within a minute. ${restartAppSentence(getPlatform())} The restart publishes your public address to the Pubky network.`,
       requestId,
     });
   } catch (e) {

@@ -28,7 +28,8 @@ import {
   updateDnsRecord,
 } from '@/lib/server/cloudflare-api';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 
 const ROUTE_NAME = '/api/cloudflare-auto-setup';
 
@@ -309,8 +310,8 @@ export async function POST(request: NextRequest) {
     });
     const message =
       priorMode !== 'off'
-        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${RESTART_APP_SENTENCE} The restart also publishes your public address to the Pubky network.`
-        : `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
+        ? `Tunnel configured. Your public address will be unreachable until the app restarts: DNS now points at the new tunnel, but the running tunnel still serves your previous setup. ${restartAppSentence(getPlatform())} The restart also publishes your public address to the Pubky network.`
+        : `Tunnel configured. The tunnel connects within a minute. ${restartAppSentence(getPlatform())} The restart publishes your public address to the Pubky network.`;
     return NextResponse.json(
       {
         ok: true,

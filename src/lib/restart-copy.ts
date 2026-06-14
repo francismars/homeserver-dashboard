@@ -1,10 +1,20 @@
 /**
  * The one canonical restart instruction, used verbatim anywhere the dashboard
- * (or an API route message) asks the operator to restart the app. Keeping a
- * single sentence avoids the previous drift between "restart the app",
- * "stop and start the app", and the guide explaining that those differ.
+ * (or an API route message) asks the operator to restart the app. A single
+ * source avoids drift between "restart the app", "stop and start", etc.
  *
- * Shared by client components and server routes; keep this module free of
- * React and Node-only imports.
+ * Platform-aware: under Umbrel the restart is the app tile's Restart; a
+ * standalone operator restarts the homeserver however they run it, so the
+ * Umbrel-specific instruction would be wrong. Server routes pass
+ * getPlatform(); client components use the useRestartSentence() hook.
+ *
+ * Keep this module free of React and Node-only imports (the Platform type is
+ * erased at build time).
  */
-export const RESTART_APP_SENTENCE = "Restart the Pubky Homeserver app from Umbrel (open the app's tile, then Restart).";
+import type { Platform } from '@/lib/server/platform';
+
+export function restartAppSentence(platform: Platform): string {
+  return platform === 'umbrel'
+    ? "Restart the Pubky Homeserver app from Umbrel (open the app's tile, then Restart)."
+    : 'Restart your homeserver to apply this.';
+}

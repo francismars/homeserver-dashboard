@@ -4,7 +4,7 @@
 
 **Goal:** Detect Umbrel vs standalone at runtime and hide Umbrel-only Cloudflare setup + reword Umbrel-only copy when standalone, keeping the read-only status views.
 
-**Architecture:** A `PLATFORM` env var read by `getPlatform()` (server); the server root layout seeds a `PlatformProvider` so client components read `usePlatform()` with no fetch. Cloudflare *setup* UI + routes are gated to umbrel; status views (public address, reachability, pkarr) stay. Restart copy and the backup note become platform-aware.
+**Architecture:** A `PLATFORM` env var read by `getPlatform()` (server); the server root layout seeds a `PlatformProvider` so client components read `usePlatform()` with no fetch. Cloudflare _setup_ UI + routes are gated to umbrel; status views (public address, reachability, pkarr) stay. Restart copy and the backup note become platform-aware.
 
 **Tech Stack:** Next.js 16 App Router (server layout + client context), vitest, existing e2e harness.
 
@@ -17,18 +17,32 @@
 **Files:** Create `src/lib/server/platform.ts`, `src/lib/server/platform.test.ts`
 
 - [ ] **Write failing test** `platform.test.ts`:
+
 ```ts
 import { afterEach, describe, expect, it } from 'vitest';
 import { getPlatform } from './platform';
 describe('getPlatform', () => {
-  afterEach(() => { delete process.env.PLATFORM; });
-  it('umbrel only when PLATFORM=umbrel', () => { process.env.PLATFORM = 'umbrel'; expect(getPlatform()).toBe('umbrel'); });
-  it('standalone when unset', () => { delete process.env.PLATFORM; expect(getPlatform()).toBe('standalone'); });
-  it('standalone for any other value (fail safe to generic)', () => { process.env.PLATFORM = 'docker'; expect(getPlatform()).toBe('standalone'); });
+  afterEach(() => {
+    delete process.env.PLATFORM;
+  });
+  it('umbrel only when PLATFORM=umbrel', () => {
+    process.env.PLATFORM = 'umbrel';
+    expect(getPlatform()).toBe('umbrel');
+  });
+  it('standalone when unset', () => {
+    delete process.env.PLATFORM;
+    expect(getPlatform()).toBe('standalone');
+  });
+  it('standalone for any other value (fail safe to generic)', () => {
+    process.env.PLATFORM = 'docker';
+    expect(getPlatform()).toBe('standalone');
+  });
 });
 ```
+
 - [ ] **Run:** `npx vitest run src/lib/server/platform.test.ts` → FAIL (no module).
 - [ ] **Implement** `platform.ts`:
+
 ```ts
 export type Platform = 'umbrel' | 'standalone';
 /** Read lazily (call time). The same image serves both; only the runtime
@@ -38,6 +52,7 @@ export function getPlatform(): Platform {
   return process.env.PLATFORM === 'umbrel' ? 'umbrel' : 'standalone';
 }
 ```
+
 - [ ] **Run → PASS. Commit** `feat: platform detection (PLATFORM env)`.
 
 ### Task 2: Client PlatformProvider + layout injection
@@ -45,14 +60,21 @@ export function getPlatform(): Platform {
 **Files:** Create `src/components/providers/PlatformProvider.tsx`, `src/components/providers/PlatformProvider.test.tsx`; Modify `src/app/layout.tsx`
 
 - [ ] **Write failing test** `PlatformProvider.test.tsx`:
+
 ```tsx
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PlatformProvider, usePlatform } from './PlatformProvider';
-function Probe() { return <span data-testid="p">{usePlatform()}</span>; }
+function Probe() {
+  return <span data-testid="p">{usePlatform()}</span>;
+}
 describe('PlatformProvider', () => {
   it('exposes the platform value', () => {
-    render(<PlatformProvider platform="standalone"><Probe /></PlatformProvider>);
+    render(
+      <PlatformProvider platform="standalone">
+        <Probe />
+      </PlatformProvider>,
+    );
     expect(screen.getByTestId('p').textContent).toBe('standalone');
   });
   it('defaults to umbrel when no provider (back-compat for untouched trees)', () => {
@@ -61,7 +83,9 @@ describe('PlatformProvider', () => {
   });
 });
 ```
+
 - [ ] **Run → FAIL. Implement** `PlatformProvider.tsx`:
+
 ```tsx
 'use client';
 import { createContext, useContext, type ReactNode } from 'react';
@@ -71,16 +95,23 @@ const PlatformContext = createContext<Platform>('umbrel');
 export function PlatformProvider({ platform, children }: { platform: Platform; children: ReactNode }) {
   return <PlatformContext.Provider value={platform}>{children}</PlatformContext.Provider>;
 }
-export function usePlatform(): Platform { return useContext(PlatformContext); }
+export function usePlatform(): Platform {
+  return useContext(PlatformContext);
+}
 ```
-Note: importing the `Platform` *type* from a server module is fine (types are erased; no server code is bundled).
+
+Note: importing the `Platform` _type_ from a server module is fine (types are erased; no server code is bundled).
+
 - [ ] **Run → PASS.** Modify `layout.tsx` to inject it:
+
 ```tsx
 import type { ReactNode } from 'react';
 import './globals.css';
 import { getPlatform } from '@/lib/server/platform';
 import { PlatformProvider } from '@/components/providers/PlatformProvider';
-export const metadata = { /* unchanged */ };
+export const metadata = {
+  /* unchanged */
+};
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
@@ -91,7 +122,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   );
 }
 ```
+
 (Keep the existing `metadata` object verbatim.)
+
 - [ ] **Run** `npx tsc --noEmit` → OK. **Commit** `feat: PlatformProvider seeded by the server layout`.
 
 ### Task 3: Platform-aware restart copy
@@ -99,11 +132,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 **Files:** Modify `src/lib/restart-copy.ts`; Create `src/lib/restart-copy.test.ts`, `src/hooks/useRestartSentence.ts`; Modify every RESTART_APP_SENTENCE call site.
 
 - [ ] **Write failing test** `restart-copy.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { restartAppSentence } from './restart-copy';
 describe('restartAppSentence', () => {
-  it('umbrel mentions Umbrel', () => { expect(restartAppSentence('umbrel')).toContain('from Umbrel'); });
+  it('umbrel mentions Umbrel', () => {
+    expect(restartAppSentence('umbrel')).toContain('from Umbrel');
+  });
   it('standalone is generic, no Umbrel', () => {
     const s = restartAppSentence('standalone');
     expect(s.toLowerCase()).toContain('restart your homeserver');
@@ -111,7 +147,9 @@ describe('restartAppSentence', () => {
   });
 });
 ```
+
 - [ ] **Run → FAIL. Implement** in `restart-copy.ts` (keep the doc comment; replace the const):
+
 ```ts
 import type { Platform } from '@/lib/server/platform';
 export function restartAppSentence(platform: Platform): string {
@@ -120,12 +158,17 @@ export function restartAppSentence(platform: Platform): string {
     : 'Restart your homeserver to apply this.';
 }
 ```
+
 - [ ] **Run → PASS.** Create the client hook `src/hooks/useRestartSentence.ts`:
+
 ```ts
 import { usePlatform } from '@/components/providers/PlatformProvider';
 import { restartAppSentence } from '@/lib/restart-copy';
-export function useRestartSentence(): string { return restartAppSentence(usePlatform()); }
+export function useRestartSentence(): string {
+  return restartAppSentence(usePlatform());
+}
 ```
+
 - [ ] **Convert server call sites** — in each of `src/app/api/server-config/route.ts`, `cloudflare-config/route.ts`, `cloudflare-connect/route.ts`, `cloudflare-auto-setup/route.ts`, `cloudflare-disconnect/route.ts`: replace `import { RESTART_APP_SENTENCE } from '@/lib/restart-copy'` with `import { restartAppSentence } from '@/lib/restart-copy'` and `import { getPlatform } from '@/lib/server/platform'`; inside each handler add `const restart = restartAppSentence(getPlatform());` and replace `${RESTART_APP_SENTENCE}` usages with `${restart}`.
 - [ ] **Convert client call sites** — in `DashboardOverview.tsx`, `ConfigDialog.tsx`, `RestartCallout.tsx`, `CloudflarePreview.tsx`, `cloudflare-guide/page.tsx`: replace the import with `import { useRestartSentence } from '@/hooks/useRestartSentence'`, add `const restartSentence = useRestartSentence();` at the top of the component, and replace `{RESTART_APP_SENTENCE}` / `${RESTART_APP_SENTENCE}` with `{restartSentence}` / `${restartSentence}`. (RestartCallout/CloudflarePreview/cloudflare-guide only render on umbrel after later tasks, but converting them keeps the copy uniform and correct if ever shown.)
 - [ ] **Run** `npx tsc --noEmit && npx vitest run` → green (update any test asserting the old constant string to call `restartAppSentence('umbrel')`). **Commit** `feat: platform-aware restart copy`.
@@ -135,6 +178,7 @@ export function useRestartSentence(): string { return restartAppSentence(usePlat
 **Files:** Modify `cloudflare-connect/route.ts` (POST), `cloudflare-auto-setup/route.ts` (POST), `cloudflare-preview/route.ts` (POST), `cloudflare-disconnect/route.ts` (POST), `cloudflare-config/route.ts` (POST only); Tests in each `route.test.ts`.
 
 - [ ] **Write failing test** (pattern, per route — example for auto-setup `route.test.ts`):
+
 ```ts
 it('refuses on standalone with 404 not_supported', async () => {
   process.env.PLATFORM = 'standalone';
@@ -144,16 +188,24 @@ it('refuses on standalone with 404 not_supported', async () => {
   delete process.env.PLATFORM;
 });
 ```
+
 (Each route test file already sets `process.env.PLATFORM` undefined by default → standalone. So ALSO set `process.env.PLATFORM = 'umbrel'` in those files' `beforeEach` so the EXISTING happy-path tests keep exercising the umbrel path.)
+
 - [ ] **Run → FAIL** (currently returns 200). **Implement** the guard as the first lines of each gated handler:
+
 ```ts
 import { getPlatform } from '@/lib/server/platform';
 // ... at the top of POST(), after getRequestId:
 if (getPlatform() !== 'umbrel') {
-  return errorResponse(new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'), requestId);
+  return errorResponse(
+    new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+    requestId,
+  );
 }
 ```
+
 Verify `RouteError`/`errorResponse` accept a `not_supported` type (it's a free-form string in `RouteError`; confirm in `src/lib/server/errors.ts`). The `cloudflare-config` GET is NOT guarded (status views need it); only its POST is.
+
 - [ ] **Add `process.env.PLATFORM = 'umbrel'`** to the `beforeEach` of every gated route's test file so existing tests stay on the umbrel path; add the new standalone-refusal test to each.
 - [ ] **Run → PASS. Commit** `feat: Cloudflare setup routes 404 on standalone`.
 

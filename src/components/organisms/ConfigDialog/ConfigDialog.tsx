@@ -15,7 +15,7 @@ import { CloudflareAutoSetup } from './CloudflareAutoSetup';
 import { CloudflareConnect } from './CloudflareConnect';
 import { CloudflarePreview } from './CloudflarePreview';
 import { RestartCallout } from './RestartCallout';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { useRestartSentence } from '@/hooks/useRestartSentence';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
@@ -50,6 +50,7 @@ interface ConfigDialogProps {
 type SaveMessage = { type: 'success' | 'error' | 'conflict'; text: string };
 
 export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudflare = 0 }: ConfigDialogProps) {
+  const restartSentence = useRestartSentence();
   const [activeTab, setActiveTab] = useState<Tab>('cloudflare');
   const [isConfigTabVisible, setIsConfigTabVisible] = useState(false);
 
@@ -240,7 +241,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setHealthStatus('idle');
       setRecentChange(null);
       setRecentMessage(null);
-      setDisconnectMessage(data.message || `Disconnected. ${RESTART_APP_SENTENCE}`);
+      setDisconnectMessage(data.message || `Disconnected. ${restartSentence}`);
       // Re-read the server-derived mode and remount the setup cards so the
       // whole tab re-syncs from the single source of truth.
       await fetchCloudflareConfig();
@@ -331,7 +332,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       setIsEditing(false);
       setSaveMessage({
         type: 'success',
-        text: data.message || `Config saved. ${RESTART_APP_SENTENCE}`,
+        text: data.message || `Config saved. ${restartSentence}`,
       });
     } catch {
       setSaveMessage({ type: 'error', text: 'Request failed' });
@@ -475,7 +476,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
         type: 'success',
         text:
           data.message ||
-          `Saved. The tunnel picks this up within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
+          `Saved. The tunnel picks this up within a minute. ${restartSentence} The restart publishes your public address to the Pubky network.`,
       });
       setHealthStatus('idle'); // Reset health check after save
       const fresh = await fetchCloudflareConfig();
@@ -521,19 +522,19 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       if (recentChange)
         return (
           recentMessage ??
-          `The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`
+          `The tunnel connects within a minute. ${restartSentence} The restart publishes your public address to the Pubky network.`
         );
       // Durable signal: survives page reloads, unlike the session state above.
       if (restartPending === true) {
         if (cfConfig?.restart_reason === 'config_changed')
-          return `${RESTART_APP_SENTENCE} The restart applies your configuration changes.`;
+          return `${restartSentence} The restart applies your configuration changes.`;
         if (cfMode === 'connect' || cfMode === 'token')
-          return `${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`;
-        return `${RESTART_APP_SENTENCE} The restart applies your changes.`;
+          return `${restartSentence} The restart publishes your public address to the Pubky network.`;
+        return `${restartSentence} The restart applies your changes.`;
       }
     }
     if ((cfMode === 'connect' || cfMode === 'token') && healthStatus === 'fail')
-      return `Your public address is not reachable yet. If you just set this up or restarted, give it a minute and use Check. If it stays unreachable: ${RESTART_APP_SENTENCE}`;
+      return `Your public address is not reachable yet. If you just set this up or restarted, give it a minute and use Check. If it stays unreachable: ${restartSentence}`;
     return null;
   })();
 
@@ -734,7 +735,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                   <p className="text-xs text-muted-foreground/70">
                     Sensitive fields (passwords, database URL) are masked as <code>&quot;********&quot;</code> on
                     display. Leave the placeholder untouched and the real value is preserved on save. Config changes
-                    only take effect after a restart. {RESTART_APP_SENTENCE}
+                    only take effect after a restart. {restartSentence}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground/70">

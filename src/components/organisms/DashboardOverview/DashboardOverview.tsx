@@ -10,7 +10,7 @@ import { CircleCheckBig, AlertCircle, Copy, RefreshCw, ExternalLink } from 'luci
 import { cn } from '@/lib/utils';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallout';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { useRestartSentence } from '@/hooks/useRestartSentence';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import { PkarrRecordViewer } from './PkarrRecordViewer';
@@ -68,12 +68,13 @@ function domainHostname(pkarrIcannDomain: string | undefined): string | null {
  * .env.local to fix); the env-var checklist only matters to developers and
  * lives behind a collapsed disclosure. */
 function ConnectionErrorAlert({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const restartSentence = useRestartSentence();
   return (
     <Alert variant="destructive" data-testid="connection-error">
       <AlertTitle>Connection Error</AlertTitle>
       <AlertDescription className="text-xs">
         <p>Your homeserver may still be starting. Wait a minute - this page retries automatically.</p>
-        <p className="mt-1">If this persists: {RESTART_APP_SENTENCE}</p>
+        <p className="mt-1">If this persists: {restartSentence}</p>
         {onRetry && (
           <Button
             type="button"
@@ -197,6 +198,7 @@ export function DashboardOverview({
   onDismissSetupGuide,
   cloudflareRefreshKey,
 }: DashboardOverviewProps) {
+  const restartSentence = useRestartSentence();
   const isConnected = !error && !!info;
   const connectionError = error?.message || (error ? 'Failed to load server information' : null);
 
@@ -650,7 +652,7 @@ export function DashboardOverview({
                     )}
                   {domainHealth === 'unreachable' && restartPending && (
                     <span className="w-full text-xs text-muted-foreground" data-testid="domain-health-restart-hint">
-                      To finish setup: {RESTART_APP_SENTENCE}
+                      To finish setup: {restartSentence}
                     </span>
                   )}
                 </div>

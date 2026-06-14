@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { usePolling } from '@/hooks/usePolling';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from './RestartCallout';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { useRestartSentence } from '@/hooks/useRestartSentence';
 
 type InstantStatus = { status: 'stopped' | 'starting' | 'running'; url?: string; error?: string };
 type PreviewState = {
@@ -39,6 +39,7 @@ interface CloudflarePreviewProps {
  * the enabled rendering here is in-session feedback only.
  */
 export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
+  const restartSentence = useRestartSentence();
   const [state, setState] = useState<PreviewState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +172,7 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
           )}
 
           <RestartCallout>
-            {RESTART_APP_SENTENCE} The restart publishes the preview address to the Pubky network. The address shown now
+            {restartSentence} The restart publishes the preview address to the Pubky network. The address shown now
             works immediately but is not yet published; it will change after the restart.
           </RestartCallout>
         </div>

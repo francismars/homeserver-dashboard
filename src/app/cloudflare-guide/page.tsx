@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { DashboardNavbar } from '@/components/organisms/DashboardNavbar';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 
 export const metadata = {
   title: 'Cloudflare Tunnel Setup - Pubky Homeserver',
@@ -9,6 +10,7 @@ export const metadata = {
 };
 
 export default function CloudflareGuidePage() {
+  const restartSentence = restartAppSentence(getPlatform());
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
@@ -149,7 +151,7 @@ export default function CloudflareGuidePage() {
                   Click <strong>Save</strong>.
                 </li>
                 <li>
-                  {RESTART_APP_SENTENCE} Wait 30 to 60 seconds.
+                  {restartSentence} Wait 30 to 60 seconds.
                   <p className="mt-2 text-sm text-muted-foreground">
                     The tunnel itself usually connects within a minute of saving; the restart is what updates your
                     homeserver&apos;s published record so other Pubky tools find it at your public address (
@@ -205,8 +207,8 @@ export default function CloudflareGuidePage() {
                 </Gotcha>
                 <Gotcha title="Use Umbrel's app restart, not a stop and start from inside the dashboard">
                   The cloudflared container only reads the token at container start, and stopping and starting the
-                  homeserver from inside this dashboard does not touch that container. {RESTART_APP_SENTENCE} That
-                  brings both containers back up cleanly.
+                  homeserver from inside this dashboard does not touch that container. {restartSentence} That brings
+                  both containers back up cleanly.
                 </Gotcha>
                 <Gotcha title="Do not change admin_password in config.toml">
                   On Umbrel the dashboard authenticates to the homeserver with a platform-generated password. Changing{' '}

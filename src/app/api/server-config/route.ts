@@ -4,7 +4,8 @@ import { createHash, randomUUID } from 'crypto';
 import { parse as parseToml } from 'smol-toml';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 
 // Env is read lazily (call time, not module load), following the convention
 // in cloudflared-process.ts, so tests and multi-env deployments are never
@@ -409,7 +410,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     checksum: newChecksum,
     updated_at: stat.mtime.toISOString(),
-    message: `Config saved. Changes take effect after a restart. ${RESTART_APP_SENTENCE}`,
+    message: `Config saved. Changes take effect after a restart. ${restartAppSentence(getPlatform())}`,
     requestId,
   });
 }

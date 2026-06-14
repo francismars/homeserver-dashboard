@@ -38,7 +38,8 @@ import {
 } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
-import { RESTART_APP_SENTENCE } from '@/lib/restart-copy';
+import { restartAppSentence } from '@/lib/restart-copy';
+import { getPlatform } from '@/lib/server/platform';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 
 const ROUTE_NAME = '/api/cloudflare-connect';
@@ -428,7 +429,7 @@ export async function POST(request: NextRequest) {
         // The crash-looping cloudflared-local container picks config.yml +
         // credentials.json up without a restart; only the pkarr publication
         // needs the restart.
-        message: `Tunnel configured. The tunnel connects within a minute. ${RESTART_APP_SENTENCE} The restart publishes your public address to the Pubky network.`,
+        message: `Tunnel configured. The tunnel connects within a minute. ${restartAppSentence(getPlatform())} The restart publishes your public address to the Pubky network.`,
         requestId,
       },
       { headers: { 'Cache-Control': 'no-store' } },
