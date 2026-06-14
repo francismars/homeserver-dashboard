@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A "Preview mode" badge on the Overview's public address when it's a temporary `*.trycloudflare.com` Quick Tunnel, with a hover note explaining its limits (brief outages on restart, the `/events` SSE stream doesn't work through it so Pubky indexers may miss content, use a permanent domain for full support).
 - The "All set" get-started card can be expanded to review the steps that were verified.
 
+### Fixed
+
+- A rare double-acquire race in the cloudflared setup-flow lock: under concurrent requests a delayed caller could steal a lock another caller had just taken, letting two setup flows run at once. The lock now re-verifies staleness before stealing and restores a live lock it grabbed by mistake.
+
 ## [0.1.20]
 
 ### Changed
