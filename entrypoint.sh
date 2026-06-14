@@ -5,6 +5,15 @@ set -e
 # The token is sensitive; do not leave it world-readable on a shared bind mount.
 CLOUDFLARE_DIR="/app/cloudflare-config"
 if [ -d "$CLOUDFLARE_DIR" ]; then
+  # One-time migration for installs created before the token-mode container
+  # was removed: convert a legacy token+domain into the locally-managed
+  # credentials.json + config.yml that the single cloudflared --config service
+  # runs. Idempotent and conservative (no-op when config.yml exists or the
+  # token is empty/undecodable); runs BEFORE the perm phase below so the new
+  # files inherit the same ownership/modes. Must never fail the boot. Note
+  # this only adds config.yml/credentials.json; the create-only touch below
+  # still leaves the boot-stamp comparison for token/domain untouched.
+  CLOUDFLARE_CONFIG_DIR="$CLOUDFLARE_DIR" node /app/migrate-cf-token.mjs || true
   # Create-only: an unconditional touch would bump the mtimes on every boot,
   # AFTER the wrapper wrote its boot stamp, so the restart-pending probe
   # (which compares these files against the stamp) would report a pending

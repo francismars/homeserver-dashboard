@@ -6,6 +6,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { runSpec, openCloudflareTab, check, step, sleep, VALID_TOKEN } from './lib/harness.mjs';
+import { RUN_TOKEN_TID } from './lib/mock-cf-server.mjs';
 
 await runSpec('cf-auto', async ({ env, browser }) => {
   const page = await (await browser.newContext({ viewport: { width: 1200, height: 950 } })).newPage();
@@ -87,7 +88,16 @@ await runSpec('cf-auto', async ({ env, browser }) => {
   const successText = await page.locator('[data-testid="cf-auto-success"]').textContent();
   check(successText.includes('pubky.example.com'), 'success feedback shows the hostname', successText.slice(0, 80));
   check((await env.readConfigFile('domain'))?.trim() === 'pubky.example.com', 'domain file written');
-  check(((await env.readConfigFile('token')) ?? '').length > 10, 'run token file written');
+  check(((await env.readConfigFile('token')) ?? '').length > 10, 'run token marker written');
+  // The locally-managed files the single cloudflared --config service runs are
+  // materialized from the token (decoded into credentials.json + config.yml).
+  const credsJson = await env.readConfigFile('credentials.json');
+  check(!!credsJson && JSON.parse(credsJson).TunnelID === RUN_TOKEN_TID, 'credentials.json materialized from the token');
+  const cfgYml = (await env.readConfigFile('config.yml')) ?? '';
+  check(
+    cfgYml.includes(`tunnel: ${RUN_TOKEN_TID}`) && cfgYml.includes('hostname: pubky.example.com'),
+    'config.yml materialized with the tunnel id and hostname',
+  );
   await page.waitForFunction(
     () => document.querySelector('[data-testid="cf-mode-badge"]')?.textContent?.trim() === 'API token',
     { timeout: 15000 },
