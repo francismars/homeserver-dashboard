@@ -12,6 +12,15 @@
  * as the rest. Idempotent and conservative: a no-op when config.yml already
  * exists, the token is empty, the domain is not a real public hostname, or
  * the token cannot be decoded.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEPRECATION — safe to delete this script (and its entrypoint invocation,
+ * Dockerfile COPY, and tests) AFTER 2026-12-01. By then every active install
+ * will have booted at least once on a release carrying this shim, so the
+ * legacy token-only state no longer exists in the wild. Removing it earlier
+ * risks a not-yet-upgraded install losing its tunnel on the next update.
+ * (First shipped 2026-06; introduced with the token+local container collapse.)
+ * ─────────────────────────────────────────────────────────────────────────
  */
 import { promises as fs } from 'fs';
 import path from 'path';

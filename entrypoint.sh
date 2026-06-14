@@ -13,6 +13,8 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   # files inherit the same ownership/modes. Must never fail the boot. Note
   # this only adds config.yml/credentials.json; the create-only touch below
   # still leaves the boot-stamp comparison for token/domain untouched.
+  # DEPRECATION: remove this line and /app/migrate-cf-token.mjs after
+  # 2026-12-01 (see the script header for why).
   CLOUDFLARE_CONFIG_DIR="$CLOUDFLARE_DIR" node /app/migrate-cf-token.mjs || true
   # Create-only: an unconditional touch would bump the mtimes on every boot,
   # AFTER the wrapper wrote its boot stamp, so the restart-pending probe
