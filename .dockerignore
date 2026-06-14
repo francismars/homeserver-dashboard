@@ -28,6 +28,8 @@ tsconfig.tsbuildinfo
 **/*.test.*
 vitest.config.ts
 scripts
+# ...except the boot-time migration the runtime image needs (Dockerfile COPYs it).
+!scripts/migrate-cf-token.mjs
 docs
 
 # IDE
