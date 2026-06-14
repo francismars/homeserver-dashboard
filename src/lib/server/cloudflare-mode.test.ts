@@ -71,11 +71,13 @@ describe('detectCloudflareMode', () => {
     expect((await detectCloudflareMode()).mode).toBe('off');
   });
 
-  it('connect files win over a token setup', async () => {
+  it('the token marker badges as token even alongside config.yml (every token setup now has both)', async () => {
+    // The API-token/manual flows write config.yml + credentials.json AND the
+    // token marker; the marker is what distinguishes them from Connect.
     await seedConnect();
     await write('token', TOKEN);
     await write('domain', 'pubky.example.com');
-    expect((await detectCloudflareMode()).mode).toBe('connect');
+    expect((await detectCloudflareMode()).mode).toBe('token');
   });
 
   it('connect files win over a preview marker', async () => {
@@ -91,11 +93,18 @@ describe('detectCloudflareMode', () => {
     expect((await detectCloudflareMode()).mode).toBe('token');
   });
 
-  it('all three fingerprints at once resolve to connect', async () => {
+  it('all fingerprints at once: the token marker decides the badge', async () => {
     await seedConnect();
     await write('token', TOKEN);
     await write('domain', 'pubky.example.com');
     await write('testdrive.env', '');
+    expect((await detectCloudflareMode()).mode).toBe('token');
+  });
+
+  it('connect (no token marker) still badges as connect', async () => {
+    await seedConnect();
+    await write('token', ''); // Connect truncates the token file to empty
+    await write('domain', 'pubky.example.com');
     expect((await detectCloudflareMode()).mode).toBe('connect');
   });
 

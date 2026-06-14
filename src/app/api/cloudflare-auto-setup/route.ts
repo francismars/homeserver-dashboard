@@ -11,6 +11,7 @@ import {
   atomicWrite,
   getConfigDir,
   withFlowLock,
+  writeLocallyManagedFromToken,
 } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
@@ -271,21 +272,17 @@ export async function POST(request: NextRequest) {
       // following the convention in cloudflared-process.ts.
       const configDir = getConfigDir();
       await fs.mkdir(configDir, { recursive: true });
-      // Mode switch FIRST (mirror of the Connect flow's token truncation): a
-      // stale locally-managed config would keep a second tunnel running
-      // against the old hostname and make the Connect card claim "completed".
-      // Deleting it before the token lands means a crash in between can never
-      // leave both modes validly configured with two tunnels running.
-      // config.yml goes first: completed-detection needs config.yml AND
-      // credentials.json, so removing it alone already kills that mode.
-      await fs.rm(path.join(configDir, 'config.yml'), { force: true });
-      await fs.rm(path.join(configDir, 'credentials.json'), { force: true });
-      // Same files the manual flow writes; the entrypoint re-asserts ownership
-      // and modes at the next app start. cloudflared's restart-on-failure loop
-      // picks the token up within seconds, so the tunnel connects without an
-      // app restart; the restart is only needed to publish icann_domain.
-      // Domain before token: the token write is what makes status report
-      // "configured", so everything it implies must already be in place.
+      // Materialize the locally-managed files (credentials.json + config.yml)
+      // from the run token, so the single cloudflared --config service runs
+      // this tunnel - there is no separate token-mode container any more. The
+      // `token` file below is now purely a setup-method marker (the badge) and
+      // the migration source for older installs; no container reads it. The
+      // entrypoint re-asserts ownership/modes at the next app start, and
+      // cloudflared picks config.yml up within seconds, so the tunnel connects
+      // without a restart (the restart only publishes icann_domain). Order:
+      // everything the "configured" status implies must be in place before the
+      // marker lands.
+      await writeLocallyManagedFromToken(runToken, hostname);
       await atomicWrite(path.join(configDir, 'domain'), hostname);
       await atomicWrite(path.join(configDir, 'token'), runToken);
       // A real setup supersedes preview mode: stop publishing and serving

@@ -10,6 +10,15 @@ export const ZONE2_ID = 'b'.repeat(32);
 export const ACCOUNT_ID = 'mock-account';
 export const TUNNEL_ID = 'mock-tunnel-uuid';
 export const VALID_TOKEN = 'mock-cf-api-token-valid-12345678';
+/** A real cloudflared-format run token (base64 of {a,s,t}); the dashboard now
+ * decodes it into credentials.json, so the mock must serve a decodable one.
+ * The embedded TunnelID is a valid UUID (distinct from the API path's
+ * TUNNEL_ID, which is just the account-scoped tunnel handle). */
+export const RUN_TOKEN_TID = '2043373f-18dd-4616-b30e-7f9d0e9d8bc6';
+const RUN_TOKEN = Buffer.from(
+  JSON.stringify({ a: 'mock-acct', s: Buffer.alloc(32, 5).toString('base64'), t: RUN_TOKEN_TID }),
+  'utf-8',
+).toString('base64');
 
 const ok = (result) => JSON.stringify({ success: true, errors: [], result });
 const err = (code, message) => JSON.stringify({ success: false, errors: [{ code, message }], result: null });
@@ -78,12 +87,12 @@ export function startMockCf(port = 0, { quiet = false } = {}) {
             name: 'pubky-homeserver',
             remote_config: true,
             config_src: 'cloudflare',
-            token: 'mock-run-token-eyJabc',
+            token: RUN_TOKEN,
           }),
         );
       }
       if (req.method === 'GET' && p === `/accounts/${ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/token`) {
-        return send(200, ok('mock-run-token-eyJabc'));
+        return send(200, ok(RUN_TOKEN));
       }
       if (req.method === 'PUT' && p === `/accounts/${ACCOUNT_ID}/cfd_tunnel/${TUNNEL_ID}/configurations`) {
         return send(200, ok({}));

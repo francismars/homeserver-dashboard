@@ -3,7 +3,8 @@ import { constants as fsConstants, promises as fs } from 'fs';
 import path from 'path';
 import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
-import { atomicWrite, fileExists, getConfigDir } from '@/lib/server/cloudflared-process';
+import { atomicWrite, fileExists, getConfigDir, writeLocallyManagedFromToken } from '@/lib/server/cloudflared-process';
+import { isDecodableTunnelToken } from '@/lib/server/tunnel-credentials';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { detectRestartPending } from '@/lib/server/restart-pending';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
@@ -134,8 +135,16 @@ export async function POST(request: NextRequest) {
     return errorResponse(error, requestId);
   }
 
-  if (token && !isPlausibleCloudflareToken(token)) {
-    const error = new RouteError(400, 'bad_request', 'Invalid token');
+  // The token must both look plausible AND actually decode to a tunnel
+  // token (base64 of {a,s,t}): we now convert it into credentials.json at
+  // save time, so a mistyped/partial paste is rejected here with a clear
+  // 400 instead of silently failing to produce a runnable config.
+  if (token && (!isPlausibleCloudflareToken(token) || !isDecodableTunnelToken(token))) {
+    const error = new RouteError(
+      400,
+      'bad_request',
+      'That does not look like a Cloudflare tunnel token. Copy the full token from the Cloudflare dashboard.',
+    );
     logRouteError({
       requestId,
       route: ROUTE_NAME,
@@ -205,13 +214,39 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // A token needs a hostname to serve: the locally-managed config.yml ingress
+  // routes that hostname to the homeserver. Resolve it from this request or a
+  // previously-saved domain; reject a token with no hostname anywhere.
+  let tokenHostname = '';
+  if (token) {
+    tokenHostname =
+      domain ||
+      (await fs
+        .readFile(domainFile(), 'utf-8')
+        .then((s) => s.trim())
+        .catch(() => ''));
+    if (!tokenHostname) {
+      const error = new RouteError(400, 'bad_request', 'Paste the domain together with the tunnel token.');
+      logRouteError({
+        requestId,
+        route: ROUTE_NAME,
+        method: 'POST',
+        statusCode: error.status,
+        durationMs: Date.now() - startedAt,
+        errorType: error.type,
+        message: error.message,
+      });
+      return errorResponse(error, requestId);
+    }
+  }
+
   try {
-    if (body.token !== undefined && token) {
-      // Switching to token mode: drop the locally-managed config BEFORE the
-      // token lands, so a crash in between can never leave both modes
-      // validly configured with two tunnels running.
-      await fs.rm(path.join(getConfigDir(), 'config.yml'), { force: true });
-      await fs.rm(path.join(getConfigDir(), 'credentials.json'), { force: true });
+    if (token) {
+      // Materialize credentials.json + config.yml from the token, so the
+      // single cloudflared --config service runs it. The `token` file below
+      // is kept only as a setup-method marker (the "API token" badge) and the
+      // migration source for older installs; no container reads it.
+      await writeLocallyManagedFromToken(token, tokenHostname);
     }
     if (body.domain !== undefined) {
       await atomicWrite(domainFile(), domain);

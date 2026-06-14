@@ -13,6 +13,16 @@ const ZONE_ID = 'a'.repeat(32);
 const ACCOUNT_ID = 'acc-1';
 const TUNNEL_ID = 'tun-uuid-1';
 
+/** A real cloudflared-format run token (base64 of {a,s,t}); the route now
+ * decodes it into credentials.json, so test tokens must be decodable. */
+function mkToken(tid = '2043373f-18dd-4616-b30e-7f9d0e9d8bc6'): string {
+  const secret = Buffer.alloc(32, 1).toString('base64');
+  return Buffer.from(JSON.stringify({ a: 'acct', s: secret, t: tid }), 'utf-8').toString('base64');
+}
+const RUN_TOKEN_GET = mkToken();
+const RUN_TOKEN_INLINE = mkToken('11111111-1111-4111-8111-111111111111');
+const TOKEN_TID = '2043373f-18dd-4616-b30e-7f9d0e9d8bc6';
+
 type MockRule = {
   match: (method: string, url: string) => boolean;
   reply: (method: string, url: string, body?: unknown) => { status?: number; json: unknown };
@@ -46,7 +56,7 @@ function makeRules(overrides: Partial<Record<string, MockRule['reply']>> = {}): 
     [
       'getTunnelToken',
       (m, u) => m === 'GET' && u.includes(`/cfd_tunnel/${TUNNEL_ID}/token`),
-      () => cfOk('run-token-from-get'),
+      () => cfOk(RUN_TOKEN_GET),
     ],
     ['putIngress', (m, u) => m === 'PUT' && u.includes(`/cfd_tunnel/${TUNNEL_ID}/configurations`), () => cfOk({})],
     ['listDns', (m, u) => m === 'GET' && u.includes('/dns_records?'), () => cfOk([])],
@@ -122,9 +132,18 @@ describe('cloudflare-auto-setup route', () => {
       { key: 'dns', status: 'done' },
       { key: 'credentials', status: 'done' },
     ]);
-    // Run token fetched via the dedicated GET (create responses do not carry it)
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-from-get');
+    // Run token fetched via the dedicated GET (create responses do not carry it),
+    // kept as the setup-method marker.
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(RUN_TOKEN_GET);
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
+    // The locally-managed files that the single cloudflared --config service
+    // actually runs are materialized from the token.
+    const creds = JSON.parse(await fs.readFile(path.join(tmpDir, 'credentials.json'), 'utf-8'));
+    expect(creds.TunnelID).toBe(TOKEN_TID);
+    const configYml = await fs.readFile(path.join(tmpDir, 'config.yml'), 'utf-8');
+    expect(configYml).toContain(`tunnel: ${TOKEN_TID}`);
+    expect(configYml).toContain('hostname: pubky.example.com');
+    expect(configYml).toContain('service: http://homeserver:6286');
     expect(calls.some((c) => c.method === 'GET' && c.url.includes(`/cfd_tunnel/${TUNNEL_ID}/token`))).toBe(true);
     // Ingress body shape matches the documented config schema
     const ingressCall = calls.find((c) => c.method === 'PUT' && c.url.includes('/configurations'));
@@ -195,7 +214,7 @@ describe('cloudflare-auto-setup route', () => {
     expect(res.status).toBe(200);
     expect(data.steps[0]).toEqual({ key: 'tunnel', status: 'done', detail: 'Reusing existing tunnel' });
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/cfd_tunnel'))).toBe(false);
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-from-get');
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(RUN_TOKEN_GET);
   });
 
   it('DNS conflict without overwrite returns 409 BEFORE any account mutation', async () => {
@@ -285,14 +304,14 @@ describe('cloudflare-auto-setup route', () => {
   it('uses a token from the create response when present (skips the GET)', async () => {
     installFetchMock(
       makeRules({
-        createTunnel: () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver', token: 'run-token-inline' }),
+        createTunnel: () => cfOk({ id: TUNNEL_ID, name: 'pubky-homeserver', token: RUN_TOKEN_INLINE }),
       }),
       calls,
     );
     const res = await post(validBody);
     expect(res.status).toBe(200);
     expect(calls.some((c) => c.method === 'GET' && c.url.includes(`/cfd_tunnel/${TUNNEL_ID}/token`))).toBe(false);
-    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe('run-token-inline');
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(RUN_TOKEN_INLINE);
   });
 
   it('tolerates the DNS-delete bare envelope (no success field)', async () => {
@@ -492,22 +511,20 @@ describe('cloudflare-auto-setup route', () => {
     expect(preview.published_url).toBeUndefined();
   });
 
-  it('mode switch removes the locally-managed config before the token write can land', async () => {
+  it('re-setup overwrites the locally-managed config with the new tunnel', async () => {
     installFetchMock(makeRules(), calls);
-    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: old', 'utf-8');
-    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{}', 'utf-8');
-    // A directory at the tmp path makes the atomic token write fail (EISDIR),
-    // freezing the state at the moment just before the token would land.
-    await fs.mkdir(path.join(tmpDir, 'token.tmp'));
+    // Stale config from a prior setup: the run now overwrites it (one runtime
+    // mode now, so there is no "two tunnels" risk to guard against).
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: old-id', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{"TunnelID":"old"}', 'utf-8');
     const res = await post(validBody);
-    const data = await res.json();
-    expect(res.status).toBe(500);
-    expect(data.steps.find((s: { key: string }) => s.key === 'credentials').status).toBe('failed');
-    // The other mode's files were already gone and the domain already written:
-    // a crash here leaves one incomplete mode, never two complete ones.
-    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
-    await expect(fs.access(path.join(tmpDir, 'credentials.json'))).rejects.toThrow();
-    expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
+    expect(res.status).toBe(200);
+    const configYml = await fs.readFile(path.join(tmpDir, 'config.yml'), 'utf-8');
+    expect(configYml).toContain(`tunnel: ${TOKEN_TID}`);
+    expect(configYml).toContain('hostname: pubky.example.com');
+    const creds = JSON.parse(await fs.readFile(path.join(tmpDir, 'credentials.json'), 'utf-8'));
+    expect(creds.TunnelID).toBe(TOKEN_TID);
+    expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(RUN_TOKEN_GET);
   });
 
   it('returns 500 when the credentials write fails, with the failed step marked', async () => {

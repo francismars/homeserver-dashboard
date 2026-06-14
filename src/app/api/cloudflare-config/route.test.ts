@@ -6,8 +6,16 @@ import os from 'os';
 import path from 'path';
 import { GET, POST } from './route';
 
-const VALID_TOKEN = 'eyJhbGciOi-test.token_with.various-chars.123456789ABCdef=';
-const ANOTHER_VALID_TOKEN = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+// Real cloudflared-format tokens (base64 of {a,s,t}); the route now decodes
+// them into credentials.json, so test tokens must be decodable.
+const VALID_TID = '2043373f-18dd-4616-b30e-7f9d0e9d8bc6';
+const mkToken = (tid: string, seed: number) =>
+  Buffer.from(JSON.stringify({ a: 'acct', s: Buffer.alloc(32, seed).toString('base64'), t: tid }), 'utf-8').toString(
+    'base64',
+  );
+const VALID_TOKEN = mkToken(VALID_TID, 2);
+const ANOTHER_VALID_TID = '11111111-1111-4111-8111-111111111111';
+const ANOTHER_VALID_TOKEN = mkToken(ANOTHER_VALID_TID, 3);
 
 describe('cloudflare-config route', () => {
   const originalEnv = { ...process.env };
@@ -227,7 +235,13 @@ describe('cloudflare-config route', () => {
     const response = await POST(request);
     expect(response.status).toBe(200);
     expect(await fs.readFile(path.join(tmpDir, 'domain'), 'utf-8')).toBe('pubky.example.com');
+    // The token is kept as the setup-method marker...
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
+    // ...and the locally-managed files the single cloudflared --config service
+    // runs are materialized from it.
+    const creds = JSON.parse(await fs.readFile(path.join(tmpDir, 'credentials.json'), 'utf-8'));
+    expect(creds.TunnelID).toBe(VALID_TID);
+    expect(await fs.readFile(path.join(tmpDir, 'config.yml'), 'utf-8')).toContain(`tunnel: ${VALID_TID}`);
   });
 
   it('POST only writes fields that are present in the body', async () => {
@@ -302,9 +316,9 @@ describe('cloudflare-config route', () => {
     await expect(fs.access(path.join(tmpDir, 'domain'))).rejects.toThrow();
   });
 
-  it('POST switching to token mode removes the locally-managed config', async () => {
-    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: x', 'utf-8');
-    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{}', 'utf-8');
+  it('POST a token paste overwrites any prior locally-managed config with the new tunnel', async () => {
+    await fs.writeFile(path.join(tmpDir, 'config.yml'), 'tunnel: old', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, 'credentials.json'), '{"TunnelID":"old"}', 'utf-8');
     const { POST } = await loadRoute();
     const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
       method: 'POST',
@@ -313,25 +327,45 @@ describe('cloudflare-config route', () => {
     });
     const response = await POST(request);
     expect(response.status).toBe(200);
-    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
-    await expect(fs.access(path.join(tmpDir, 'credentials.json'))).rejects.toThrow();
+    // The single runtime mode now: the files are rewritten from the new token,
+    // not deleted.
+    expect(JSON.parse(await fs.readFile(path.join(tmpDir, 'credentials.json'), 'utf-8')).TunnelID).toBe(VALID_TID);
+    expect(await fs.readFile(path.join(tmpDir, 'config.yml'), 'utf-8')).toContain('hostname: pubky.example.com');
     expect(await fs.readFile(path.join(tmpDir, 'token'), 'utf-8')).toBe(VALID_TOKEN);
+  });
+
+  it('POST rejects a token with no hostname to serve', async () => {
+    const { POST } = await loadRoute();
+    const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
+      method: 'POST',
+      body: JSON.stringify({ token: VALID_TOKEN }), // no domain, none on disk
+      headers: { 'content-type': 'application/json' },
+    });
+    const response = await POST(request);
+    const payload = await response.json();
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain('domain');
+    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
   });
 
   it.each([
     ['too short', 'short'],
     ['contains whitespace', 'a'.repeat(20) + ' ' + 'a'.repeat(20)],
     ['contains illegal chars', 'a'.repeat(20) + '!@#$' + 'a'.repeat(20)],
-  ])('POST rejects an implausible token (%s)', async (_label, badToken) => {
+    // Plausible shape (long, base64-ish) but not a decodable tunnel token:
+    ['plausible but undecodable', 'a'.repeat(120)],
+  ])('POST rejects an invalid token (%s)', async (_label, badToken) => {
     const { POST } = await loadRoute();
     const request = new NextRequest('http://localhost:8080/api/cloudflare-config', {
       method: 'POST',
-      body: JSON.stringify({ token: badToken }),
+      body: JSON.stringify({ domain: 'pubky.example.com', token: badToken }),
       headers: { 'content-type': 'application/json' },
     });
     const response = await POST(request);
     const payload = await response.json();
     expect(response.status).toBe(400);
-    expect(payload.error).toBe('Invalid token');
+    expect(payload.error).toContain('Cloudflare tunnel token');
+    // Nothing persisted on a rejected token.
+    await expect(fs.access(path.join(tmpDir, 'config.yml'))).rejects.toThrow();
   });
 });

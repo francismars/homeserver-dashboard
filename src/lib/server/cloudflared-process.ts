@@ -16,6 +16,7 @@ import { promisify } from 'util';
 import { closeSync, openSync, readFileSync } from 'fs';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { buildTunnelConfigYml, tokenToCredentials } from './tunnel-credentials';
 
 const execFileAsync = promisify(execFile);
 
@@ -23,6 +24,9 @@ const execFileAsync = promisify(execFile);
 // deployments are never frozen to a stale value.
 export const getCloudflaredBin = () => process.env.CLOUDFLARED_BIN || '/usr/local/bin/cloudflared';
 export const getConfigDir = () => process.env.CLOUDFLARE_CONFIG_DIR || '/app/cloudflare-config';
+/** Where the cloudflared runtime container sees the shared config dir (the
+ * credentials-file path in config.yml is resolved against it). */
+export const getRuntimeDir = () => process.env.CLOUDFLARED_RUNTIME_DIR || '/etc/cloudflared-config';
 /** The fixed tunnel name the app owns. Re-runs adopt it (idempotency). */
 export const TUNNEL_NAME = 'pubky-homeserver';
 /** Where the tunnel forwards traffic inside the Umbrel network. */
@@ -71,6 +75,30 @@ export async function fileExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Materializes the locally-managed tunnel files (credentials.json +
+ * config.yml) from a tunnel token, so a single
+ * `cloudflared tunnel --config config.yml run` service runs every persistent
+ * setup tier (API-token, manual paste, Connect) - no separate token-mode
+ * container. Throws on a malformed token (the caller surfaces a 400).
+ *
+ * Written world-readable (0644) like the Connect flow: the next app start's
+ * entrypoint hardens them to 640 + group 65532, but until then the
+ * cloudflared container (distroless UID 65532) can still pick them up via the
+ * world bit without waiting for that restart.
+ */
+export async function writeLocallyManagedFromToken(token: string, hostname: string): Promise<void> {
+  const creds = tokenToCredentials(token); // throws on malformed input
+  await fs.mkdir(getConfigDir(), { recursive: true });
+  await atomicWrite(CREDENTIALS_PATH(), JSON.stringify(creds));
+  await fs.chmod(CREDENTIALS_PATH(), 0o644).catch(() => {});
+  await atomicWrite(
+    LOCAL_CONFIG_PATH(),
+    buildTunnelConfigYml(hostname, creds.TunnelID, getRuntimeDir(), INGRESS_SERVICE),
+    0o644,
+  );
 }
 
 // The --version probe result barely changes; cache it briefly so polling GETs

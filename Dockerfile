@@ -57,6 +57,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@synonymdev/pkarr ./
 # binary, runs fine on alpine/musl.
 COPY --from=cloudflare/cloudflared:2026.5.2@sha256:12ff5c6992a9863db4da270746af7c244bcaee49353039af8104268a18d6c4f0 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
+# Boot-time migration for legacy token-mode installs (run by the entrypoint
+# as root before the perm phase). Self-contained ESM, no app imports.
+COPY scripts/migrate-cf-token.mjs /app/migrate-cf-token.mjs
+
 # Copy entrypoint script and fix line endings (Windows CRLF -> Unix LF)
 COPY entrypoint.sh /tmp/entrypoint.sh
 RUN sed -i 's/\r$//' /tmp/entrypoint.sh && \

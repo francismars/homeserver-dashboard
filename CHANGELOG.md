@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.20]
+
+### Changed
+
+- Every Cloudflare setup tier (API token, manual token paste, and Connect account) now runs as a single locally-managed tunnel. The dashboard converts a tunnel token into the same `credentials.json` + `config.yml` that the Connect flow writes, so the Umbrel app needs only one persistent `cloudflared` container instead of two. A pasted token that is not a real Cloudflare tunnel token is now rejected immediately with a clear message instead of failing silently.
+
+### Added
+
+- A one-time, idempotent boot migration converts older token-mode installs to the locally-managed form on the next start, so existing tunnels keep working seamlessly after the upgrade. (Transitional; scheduled for removal after 2026-12-01.)
+
+### Notes
+
+- This makes everything locally managed: a tunnel whose ingress was configured remotely in the Cloudflare dashboard now uses the dashboard's local ingress (the homeserver origin). This is transparent for the normal single-hostname setup.
+
 ## [0.1.19]
 
 ### Fixed

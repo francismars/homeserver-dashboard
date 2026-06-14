@@ -18,28 +18,29 @@ export interface CloudflareModeInfo {
 
 /**
  * Single source of truth for which Cloudflare setup is active, derived from
- * file fingerprints in the config dir:
- *   - connect: config.yml + credentials.json (locally-managed tunnel)
- *   - token:   non-empty token + a real public domain. The API-token and
- *     manual flows write the same two files, so they are one fingerprint.
+ * file fingerprints in the config dir. Since every persistent tier now runs
+ * as one locally-managed tunnel (config.yml + credentials.json), `mode` is
+ * really the setup METHOD (which the UI badges), not what runs:
+ *   - token:   a non-empty token file next to a real public domain. The
+ *     API-token and manual paste flows write that token purely as a
+ *     setup-method marker (no container reads it); they ALSO write
+ *     config.yml + credentials.json, which is what actually runs.
+ *   - connect: config.yml + credentials.json with no token marker (the
+ *     browser-auth flow truncates the token file to empty).
  *   - preview: testdrive.env marker
  *   - off:     none of the above
  *
- * Precedence over contradictory leftovers is connect > token > preview,
- * matching what actually runs: config.yml pins the hostname the local tunnel
- * serves regardless of the token file (and the wrapper publishes the domain
- * file, which connect owns while its config exists), while every real setup
- * tears preview down on completion - so a surviving preview marker next to
- * real credentials is residue, never the active mode.
+ * Precedence is token > connect > preview. The token marker is checked first
+ * because every token-tier setup now ALSO has config.yml: the marker is what
+ * distinguishes "set up via token/API" from "set up via Connect" for the
+ * badge. Preview comes last: every real setup tears preview down on
+ * completion, so a surviving marker next to real credentials is residue.
  */
 export async function detectCloudflareMode(): Promise<CloudflareModeInfo> {
   const domain = await fs
     .readFile(DOMAIN_PATH(), 'utf-8')
     .then((s) => s.trim() || null)
     .catch(() => null);
-  if ((await fileExists(LOCAL_CONFIG_PATH())) && (await fileExists(CREDENTIALS_PATH()))) {
-    return { mode: 'connect', domain };
-  }
   const token = await fs
     .readFile(TOKEN_PATH(), 'utf-8')
     .then((s) => s.trim())
@@ -49,6 +50,9 @@ export async function detectCloudflareMode(): Promise<CloudflareModeInfo> {
   const lower = domain?.toLowerCase();
   const realDomain = lower !== undefined && !lower.startsWith('localhost') && !lower.endsWith('.trycloudflare.com');
   if (token && realDomain) return { mode: 'token', domain };
+  if ((await fileExists(LOCAL_CONFIG_PATH())) && (await fileExists(CREDENTIALS_PATH()))) {
+    return { mode: 'connect', domain };
+  }
   if (await fileExists(PREVIEW_ENV())) return { mode: 'preview', domain };
   return { mode: 'off', domain };
 }
