@@ -27,6 +27,7 @@ import {
   putTunnelIngress,
   updateDnsRecord,
 } from '@/lib/server/cloudflare-api';
+import { cfDnsRecordsUrl, cfTunnelsUrl } from '@/lib/server/cloudflare-links';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
 import { restartAppSentence } from '@/lib/restart-copy';
 import { getPlatform } from '@/lib/server/platform';
@@ -196,6 +197,8 @@ export async function POST(request: NextRequest) {
             error: `A DNS record already exists at ${hostname}`,
             type: 'dns_conflict',
             existing_records: needsConfirmation.map((r) => ({ type: r.type, content: r.content })),
+            dashboard_url: cfDnsRecordsUrl(accountId, zoneName),
+            dashboard_label: `Open DNS settings for ${zoneName}`,
             steps,
             requestId,
           },
@@ -220,8 +223,10 @@ export async function POST(request: NextRequest) {
           new RouteError(
             409,
             'bad_request',
-            `A locally-managed tunnel named "${TUNNEL_NAME}" already exists in your Cloudflare account. Delete or rename it in the Cloudflare dashboard, then retry.`,
+            `A locally-managed tunnel named "${TUNNEL_NAME}" already exists in your Cloudflare account, and it can't be reused for this setup. Open your Cloudflare Zero Trust dashboard (Networks → Tunnels), delete or rename the "${TUNNEL_NAME}" tunnel, then run setup again.`,
           ),
+          undefined,
+          { dashboard_url: cfTunnelsUrl(accountId), dashboard_label: 'Open Cloudflare Tunnels' },
         );
       }
       if (existing) {
@@ -298,10 +303,15 @@ export async function POST(request: NextRequest) {
       steps.push({ key: 'credentials', status: 'done' });
     } catch (e) {
       steps.push({ key: 'credentials', status: 'failed' });
+      // tokenToCredentials throws descriptive, secret-free messages ("Tunnel
+      // token is not valid base64.", etc.) - surface those so a malformed run
+      // token is debuggable instead of a blank 500.
       const error =
         e instanceof CfApiError
           ? mapCfError(e, 'tunnel')
-          : new RouteError(500, 'internal_error', 'Could not save the tunnel credentials');
+          : e instanceof Error && e.message.startsWith('Tunnel token')
+            ? new RouteError(500, 'internal_error', `Could not save the tunnel credentials: ${e.message}`)
+            : new RouteError(500, 'internal_error', 'Could not save the tunnel credentials');
       return fail(error, e instanceof Error ? e.message : String(e));
     }
 
@@ -344,6 +354,9 @@ function mapCfError(e: unknown, area: 'zone' | 'tunnel' | 'dns'): RouteError {
     return new RouteError(401, 'unauthorized', 'Cloudflare rejected the token (invalid or expired).');
   }
   if (e.status === 403) {
+    // Name the permission this call needed first (so the user sees the
+    // immediate blocker), then list the full set so they can fix it in one
+    // pass instead of one failed request at a time.
     const missing =
       area === 'dns'
         ? 'Zone > DNS > Edit'
@@ -353,7 +366,7 @@ function mapCfError(e: unknown, area: 'zone' | 'tunnel' | 'dns'): RouteError {
     return new RouteError(
       403,
       'forbidden',
-      `The token is missing a permission: ${missing}. Recreate it with the pre-filled link and try again.`,
+      `The token is missing the "${missing}" permission. Setup needs all three: Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit, and Zone > Zone > Read. Recreate the token with the pre-filled link above and try again.`,
     );
   }
   if (e.status === 404 && area === 'zone') {

@@ -119,6 +119,28 @@ describe('CloudflareConnect subdomain picker', () => {
     expect(screen.getByTestId('cf-connect-success').textContent).toContain('pubky.example.com');
   });
 
+  it('a DNS conflict shows the message and a deep link to the Cloudflare DNS page', async () => {
+    mockFetch(
+      () => authorized('example.com'),
+      () => ({
+        status: 502,
+        json: {
+          error: "There's already a DNS record for pubky.example.com in your Cloudflare account.",
+          dashboard_url: 'https://dash.cloudflare.com/?to=/:account/example.com/dns',
+          dashboard_label: 'Open DNS settings for example.com',
+        },
+      }),
+    );
+    render(<CloudflareConnect onConfigured={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('cf-connect-subdomain')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('cf-connect-chip-pubky'));
+    fireEvent.click(screen.getByTestId('cf-connect-complete'));
+    await waitFor(() => expect(screen.getByTestId('cf-connect-error').textContent).toContain('already a DNS record'));
+    const link = screen.getByTestId('cf-connect-error-link') as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('https://dash.cloudflare.com/?to=/:account/example.com/dns');
+    expect(link.textContent).toContain('Open DNS settings for example.com');
+  });
+
   it('a complete that 409s resets the card to idle with the error visible', async () => {
     mockFetch(
       () => authorized(null),

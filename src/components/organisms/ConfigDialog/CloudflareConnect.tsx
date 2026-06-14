@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { QRCodeSVG } from 'qrcode.react';
 import { usePolling } from '@/hooks/usePolling';
 import { StepList } from './StepList';
+import { SetupError, type SetupErrorLink } from './SetupError';
 
 type ConnectStatus = 'idle' | 'waiting' | 'authorized' | 'completed';
 type Step = { key: 'tunnel' | 'dns' | 'config'; status: 'done' | 'failed'; detail?: string };
@@ -51,6 +52,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const [expired, setExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorLink, setErrorLink] = useState<SetupErrorLink | null>(null);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [doneHostname, setDoneHostname] = useState<string | null>(null);
 
@@ -80,6 +82,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
   const act = async (body: Record<string, unknown>) => {
     setBusy(true);
     setError(null);
+    setErrorLink(null);
     try {
       const res = await fetch('/api/cloudflare-connect', {
         method: 'POST',
@@ -90,6 +93,11 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       if (!res.ok) {
         setSteps(data.steps ?? null);
         setError(data.error || `Request failed (${res.status})`);
+        setErrorLink(
+          data.dashboard_url
+            ? { href: data.dashboard_url, label: data.dashboard_label || 'Open Cloudflare dashboard' }
+            : null,
+        );
         return { data: null, status: res.status };
       }
       return { data, status: res.status };
@@ -326,12 +334,7 @@ export function CloudflareConnect({ onConfigured }: CloudflareConnectProps) {
       {/* failure progress (success renders in the completed branch above) */}
       {steps && <StepList steps={steps} labels={STEP_LABELS} testId="cf-connect-steps" />}
 
-      {error && (
-        <div className="flex items-start gap-2 text-sm text-destructive" data-testid="cf-connect-error">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <SetupError message={error} link={errorLink} testId="cf-connect-error" />}
     </div>
   );
 }

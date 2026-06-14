@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StepList } from './StepList';
+import { SetupError, type SetupErrorLink } from './SetupError';
 
 /**
  * Pre-filled Cloudflare token-creation link (officially supported template
@@ -63,7 +64,9 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
   const [running, setRunning] = useState(false);
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorLink, setErrorLink] = useState<SetupErrorLink | null>(null);
   const [conflict, setConflict] = useState<ConflictRecord[] | null>(null);
+  const [conflictLink, setConflictLink] = useState<SetupErrorLink | null>(null);
   const [doneHostname, setDoneHostname] = useState<string | null>(null);
 
   const selectedZone = zones?.find((z) => z.id === zoneId) ?? null;
@@ -98,14 +101,23 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
    * user has not seen. */
   const resetRunState = () => {
     setConflict(null);
+    setConflictLink(null);
     setSteps(null);
     setError(null);
+    setErrorLink(null);
   };
+
+  const dashLink = (data: { dashboard_url?: string; dashboard_label?: string }): SetupErrorLink | null =>
+    data.dashboard_url
+      ? { href: data.dashboard_url, label: data.dashboard_label || 'Open Cloudflare dashboard' }
+      : null;
 
   const run = async (overwriteDns: boolean) => {
     setRunning(true);
     setError(null);
+    setErrorLink(null);
     setConflict(null);
+    setConflictLink(null);
     setSteps(null);
     try {
       const res = await fetch('/api/cloudflare-auto-setup', {
@@ -122,15 +134,22 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
       setSteps(data.steps ?? null);
       if (res.status === 409 && data.type === 'dns_conflict') {
         setConflict(data.existing_records ?? []);
+        setConflictLink(dashLink(data));
         return;
       }
-      if (!res.ok) throw new Error(data.error || `Setup failed (${res.status})`);
+      if (!res.ok) {
+        setError(data.error || `Setup failed (${res.status})`);
+        setErrorLink(dashLink(data));
+        return;
+      }
       setDoneHostname(data.hostname);
       // The API token was used server-side for this request only and is
       // discarded there; clear it from the form as well.
       setApiToken('');
       onConfigured(data.hostname, typeof data.message === 'string' ? data.message : undefined);
     } catch (err) {
+      // Reaches here only on a network/transport failure (the fetch itself
+      // rejected); API-level errors are handled above with their deep link.
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
       setRunning(false);
@@ -301,8 +320,20 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
-            Replacing it will break whatever currently uses this hostname.
+            Replacing it will break whatever currently uses this hostname. To keep it, pick a different subdomain
+            instead, or remove the record yourself in your Cloudflare DNS settings.
           </p>
+          {conflictLink && (
+            <a
+              href={conflictLink.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-brand underline-offset-2 hover:underline"
+              data-testid="cf-auto-conflict-link"
+            >
+              {conflictLink.label} <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
           <div className="flex gap-2">
             <Button
               type="button"
@@ -321,12 +352,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
         </div>
       )}
 
-      {error && (
-        <div className="flex items-start gap-2 text-sm text-destructive" data-testid="cf-auto-error">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <SetupError message={error} link={errorLink} testId="cf-auto-error" />}
     </div>
   );
 }

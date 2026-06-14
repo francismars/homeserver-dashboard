@@ -331,6 +331,10 @@ describe('cloudflare-connect route', () => {
     const data = await res.json();
     expect(res.status).toBe(502);
     expect(data.error).toContain('different subdomain');
+    // The message names the exact hostname and ships a deep link to the DNS page.
+    expect(data.error).toContain('pubky.example.com');
+    expect(data.dashboard_url).toMatch(/dash\.cloudflare\.com.*\/dns$/);
+    expect(typeof data.dashboard_label).toBe('string');
     // retry idempotency: the just-created tunnel is deleted again
     const calls = (lib.runCloudflared as Mock).mock.calls;
     expect(calls[2][0]).toEqual(['tunnel', 'delete', '-f', 'pubky-homeserver']);
