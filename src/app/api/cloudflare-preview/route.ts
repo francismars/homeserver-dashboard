@@ -29,6 +29,7 @@ import {
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
 import { teardownPreview } from '@/lib/server/preview-teardown';
 import { getRequestId, logRouteError, logRouteInfo } from '@/lib/server/logger';
+import { getPlatform } from '@/lib/server/platform';
 
 const ROUTE_NAME = '/api/cloudflare-preview';
 
@@ -92,6 +93,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
+  if (getPlatform() !== 'umbrel') {
+    return errorResponse(
+      new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+      requestId,
+    );
+  }
   const startedAt = Date.now();
 
   let body: { action?: unknown };

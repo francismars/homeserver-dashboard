@@ -36,6 +36,7 @@ describe('cloudflare-connect route', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-connect-test-'));
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.PLATFORM = 'umbrel'; // these flows are Umbrel-only; keep happy-paths on umbrel
     process.env.CLOUDFLARED_RUNTIME_DIR = '/etc/cloudflared-config';
   });
 
@@ -130,6 +131,13 @@ describe('cloudflare-connect route', () => {
     });
   };
 
+  it('POST refuses on standalone with 404 not_supported', async () => {
+    process.env.PLATFORM = 'standalone';
+    const { POST } = await routes();
+    const res = await post(POST, { action: 'start' });
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+  });
   it('GET reports idle initially', async () => {
     const { GET } = await routes();
     const data = await (await get(GET)).json();

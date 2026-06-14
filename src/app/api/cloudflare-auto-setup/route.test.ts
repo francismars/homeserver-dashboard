@@ -96,6 +96,7 @@ describe('cloudflare-auto-setup route', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-auto-test-'));
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.PLATFORM = 'umbrel'; // these flows are Umbrel-only; keep happy-paths on umbrel
     calls = [];
   });
 
@@ -119,6 +120,12 @@ describe('cloudflare-auto-setup route', () => {
 
   const validBody = { api_token: TOKEN, zone_id: ZONE_ID, subdomain: 'pubky' };
 
+  it('refuses on standalone with 404 not_supported', async () => {
+    process.env.PLATFORM = 'standalone';
+    const res = await post(validBody);
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+  });
   it('happy path: creates tunnel, ingress, DNS, writes files', async () => {
     installFetchMock(makeRules(), calls);
     const res = await post(validBody);

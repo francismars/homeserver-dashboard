@@ -8,6 +8,7 @@ export type ErrorType =
   | 'timeout'
   | 'upstream_error'
   | 'config_error'
+  | 'not_supported'
   | 'internal_error';
 
 export class RouteError extends Error {

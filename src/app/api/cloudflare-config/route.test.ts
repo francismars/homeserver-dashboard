@@ -28,6 +28,7 @@ describe('cloudflare-config route', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-config-test-'));
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.PLATFORM = 'umbrel'; // these flows are Umbrel-only; keep happy-paths on umbrel
   });
 
   afterEach(async () => {
@@ -44,6 +45,19 @@ describe('cloudflare-config route', () => {
 
   const getRequest = () => new NextRequest('http://localhost:8080/api/cloudflare-config');
 
+  it('POST refuses on standalone with 404 not_supported', async () => {
+    process.env.PLATFORM = 'standalone';
+    const { POST } = await loadRoute();
+    const res = await POST(
+      new NextRequest('http://localhost:8080/api/cloudflare-config', {
+        method: 'POST',
+        body: JSON.stringify({ domain: 'pubky.example.com', token: VALID_TOKEN }),
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+  });
   it('GET returns mode off when no files exist', async () => {
     const { GET } = await loadRoute();
     const response = await GET(getRequest());

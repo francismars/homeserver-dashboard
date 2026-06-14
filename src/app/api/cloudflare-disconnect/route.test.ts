@@ -24,6 +24,7 @@ describe('cloudflare-disconnect route', () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cf-disc-test-'));
     configPath = path.join(tmpDir, 'config.toml');
     process.env.CLOUDFLARE_CONFIG_DIR = tmpDir;
+    process.env.PLATFORM = 'umbrel'; // these flows are Umbrel-only; keep happy-paths on umbrel
     process.env.HOMESERVER_CONFIG_PATH = configPath;
   });
 
@@ -41,6 +42,12 @@ describe('cloudflare-disconnect route', () => {
     return { res, lib };
   }
 
+  it('refuses on standalone with 404 not_supported', async () => {
+    process.env.PLATFORM = 'standalone';
+    const { res } = await post();
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+  });
   it('tears down all modes: files removed, token/domain truncated, icann reset', async () => {
     // a fully-populated mixed state
     for (const [f, content] of [

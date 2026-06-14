@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RouteError } from '@/lib/server/errors';
+import { RouteError, errorResponse } from '@/lib/server/errors';
 import { isAllowedPublicHostname } from '@/lib/server/hostname';
 import {
   AlreadyRunningError,
@@ -61,6 +61,12 @@ type Step = { key: StepKey; status: StepStatus; detail?: string };
  */
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
+  if (getPlatform() !== 'umbrel') {
+    return errorResponse(
+      new RouteError(404, 'not_supported', 'Cloudflare setup is only available on Umbrel.'),
+      requestId,
+    );
+  }
   const startedAt = Date.now();
   const steps: Step[] = [];
 
