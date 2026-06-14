@@ -838,6 +838,18 @@ describe('DashboardOverview connection error', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('standalone: the connection-error restart guidance is generic (no Umbrel)', async () => {
+    mockBackend();
+    render(
+      <PlatformProvider platform="standalone">
+        <DashboardOverview info={null} isLoading={false} error={new Error('Request failed: 500')} />
+      </PlatformProvider>,
+    );
+    const alert = screen.getByTestId('connection-error');
+    expect(alert.textContent).toContain('Restart your homeserver');
+    expect(alert.textContent).not.toContain('Umbrel');
+  });
+
   it('labels stale details "Last known state" while errored', async () => {
     mockBackend();
     render(<DashboardOverview info={baseInfo} isLoading={false} error={new Error('Request failed: 502')} />);

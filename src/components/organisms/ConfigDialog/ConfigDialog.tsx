@@ -189,7 +189,7 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
       const upstreamStatus = data.status ?? res.status;
       setHealthError(
         upstreamStatus === 530 || upstreamStatus === 1033
-          ? 'Tunnel not connected. If you just set this up, restart the app from Umbrel.'
+          ? `Tunnel not connected. If you just set this up, give it a moment. ${restartSentence}`
           : data.error || `HTTP ${upstreamStatus}`,
       );
       return false;

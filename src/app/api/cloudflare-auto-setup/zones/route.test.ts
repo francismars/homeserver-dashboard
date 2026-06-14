@@ -15,10 +15,12 @@ describe('cloudflare-auto-setup zones route', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.PLATFORM = 'umbrel'; // zones is part of the Umbrel-only auto-setup flow
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.PLATFORM;
   });
 
   async function post(body: unknown) {
@@ -30,6 +32,15 @@ describe('cloudflare-auto-setup zones route', () => {
       }),
     );
   }
+
+  it('refuses on standalone with 404 not_supported (never proxies the token)', async () => {
+    process.env.PLATFORM = 'standalone';
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    const res = await post({ api_token: 'a'.repeat(40) });
+    expect(res.status).toBe(404);
+    expect((await res.json()).type).toBe('not_supported');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
   it('returns the zones the token can see', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(

@@ -315,7 +315,8 @@ describe('ConfigDialog Cloudflare status surface', () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('cf-status-unreachable')).toBeTruthy());
     const chip = screen.getByTestId('cf-status-unreachable').textContent ?? '';
-    expect(chip).toContain('Tunnel not connected. If you just set this up, restart the app from Umbrel.');
+    expect(chip).toContain('Tunnel not connected. If you just set this up, give it a moment.');
+    expect(chip).toContain('Restart the Pubky Homeserver app from Umbrel');
     expect(chip).not.toContain('HTTP 530');
   });
 

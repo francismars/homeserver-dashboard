@@ -58,6 +58,13 @@ describe('cloudflare-config route', () => {
     expect(res.status).toBe(404);
     expect((await res.json()).type).toBe('not_supported');
   });
+  it('GET still works on standalone (status views read it; only POST is gated)', async () => {
+    process.env.PLATFORM = 'standalone';
+    const { GET } = await loadRoute();
+    const response = await GET(getRequest());
+    expect(response.status).toBe(200);
+    expect((await response.json()).mode).toBe('off');
+  });
   it('GET returns mode off when no files exist', async () => {
     const { GET } = await loadRoute();
     const response = await GET(getRequest());

@@ -221,6 +221,25 @@ describe('server-config route', () => {
       expect(await fs.readFile(configPath, 'utf-8')).toBe(updated);
     });
 
+    it('save message is platform-aware: generic on standalone, Umbrel-specific on Umbrel', async () => {
+      const save = async () => {
+        await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
+        const updated = VALID_CONFIG.replace('token_required', 'open');
+        const { POST } = await loadRoute();
+        return (await POST(postRequest({ config_toml: updated, checksum: sha256(VALID_CONFIG) }))).json();
+      };
+      // This is the one always-visible restart-bearing route (Config tab is not
+      // Cloudflare-gated), so its standalone copy must not mention Umbrel.
+      process.env.PLATFORM = 'standalone';
+      const standalone = await save();
+      expect(standalone.message).toContain('Restart your homeserver');
+      expect(standalone.message).not.toContain('Umbrel');
+
+      process.env.PLATFORM = 'umbrel';
+      const umbrel = await save();
+      expect(umbrel.message).toContain('from Umbrel');
+    });
+
     it('preserves the file mode across a save (config.toml holds admin_password)', async () => {
       await fs.writeFile(configPath, VALID_CONFIG, 'utf-8');
       await fs.chmod(configPath, 0o660);

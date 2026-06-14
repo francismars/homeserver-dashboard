@@ -555,6 +555,7 @@ describe('cloudflare-auto-setup zones route', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.PLATFORM = 'umbrel'; // zones is part of the Umbrel-only auto-setup flow
   });
 
   afterEach(() => {
@@ -571,6 +572,8 @@ describe('cloudflare-auto-setup zones route', () => {
       }),
     );
   }
+
+  // (Standalone refusal for this route is covered in zones/route.test.ts.)
 
   it('maps zones and never echoes the token', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(

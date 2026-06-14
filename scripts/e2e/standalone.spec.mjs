@@ -35,6 +35,12 @@ await runSpec(
     // Backup note is generic.
     const backup = (await page.locator('[data-testid="backup-note"]').textContent()) ?? '';
     check(!/umbrel/i.test(backup), 'backup note has no Umbrel wording', backup.slice(0, 60));
+    // The footer "Cloudflare Tunnel guide" link is gone (it leads to an
+    // Umbrel-only flow).
+    check(
+      (await page.locator('a:has-text("Cloudflare Tunnel guide")').count()) === 0,
+      'no Cloudflare Tunnel guide footer link',
+    );
 
     step('Cloudflare setup routes refuse on standalone (404 not_supported)');
     const res = await env.api('/api/cloudflare-preview', {
