@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.23]
+
+### Changed
+
+- **Cloudflare setup failures now explain themselves with full context and deep links.** When provisioning fails, the dashboard names the exact hostname/record, says what went wrong and why, and links straight to the Cloudflare dashboard page where you can fix it:
+  - The Connect-account flow's "DNS record already exists" no longer dead-ends with "use the other method" — it names the hostname, explains the clash, and links to your zone's **DNS settings** so you can delete the record (or pick a different subdomain). A leftover-tunnel failure links to the **Zero Trust → Networks → Tunnels** page.
+  - The API-token flow's DNS-conflict prompt and its "a locally-managed tunnel already exists" message now carry the same deep links; a permission error lists all three required token permissions at once; and a malformed run token surfaces the specific reason instead of a blank error.
+  - A shared error component renders these consistently across the Connect, API-token, and Preview cards.
+
 ## [0.1.22]
 
 ### Changed

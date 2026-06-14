@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, Copy, ExternalLink, FlaskConical, RefreshCw } from 'lucide-react';
+import { Copy, ExternalLink, FlaskConical, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePolling } from '@/hooks/usePolling';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
 import { RestartCallout } from './RestartCallout';
+import { SetupError } from './SetupError';
 import { useRestartSentence } from '@/hooks/useRestartSentence';
 
 type InstantStatus = { status: 'stopped' | 'starting' | 'running'; url?: string; error?: string };
@@ -179,10 +180,7 @@ export function CloudflarePreview({ onEnabled }: CloudflarePreviewProps) {
       )}
 
       {(error || state?.instant.error) && (
-        <div className="flex items-start gap-2 text-sm text-destructive" data-testid="cf-preview-error">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>{error ?? state?.instant.error}</span>
-        </div>
+        <SetupError message={error ?? state?.instant.error ?? ''} testId="cf-preview-error" />
       )}
     </div>
   );

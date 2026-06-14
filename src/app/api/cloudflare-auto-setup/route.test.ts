@@ -236,6 +236,10 @@ describe('cloudflare-auto-setup route', () => {
     expect(res.status).toBe(409);
     expect(data.type).toBe('dns_conflict');
     expect(data.existing_records).toEqual([{ type: 'A', content: '1.2.3.4' }]);
+    // The 409 carries a deep link to the zone's DNS page so the user can go
+    // delete the record instead of being told to "pick a different subdomain".
+    expect(data.dashboard_url).toBe(`https://dash.cloudflare.com/${ACCOUNT_ID}/example.com/dns`);
+    expect(data.dashboard_label).toContain('example.com');
     // Cancelling at the prompt must have zero side effects: no tunnel
     // create/adopt, no ingress rewrite, nothing written to disk.
     expect(calls.some((c) => c.url.includes('cfd_tunnel'))).toBe(false);
@@ -290,6 +294,9 @@ describe('cloudflare-auto-setup route', () => {
     const data = await res.json();
     expect(res.status).toBe(409);
     expect(data.error).toContain('locally-managed');
+    // Points the user straight at the Zero Trust tunnels page to remove it.
+    expect(data.dashboard_url).toBe(`https://one.dash.cloudflare.com/${ACCOUNT_ID}/networks/tunnels`);
+    expect(data.error).toContain('Networks');
     // No ingress rewrite of a tunnel we do not manage
     expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/configurations'))).toBe(false);
   });
@@ -402,6 +409,10 @@ describe('cloudflare-auto-setup route', () => {
     const data = await res.json();
     expect(res.status).toBe(403);
     expect(data.error).toContain('Cloudflare Tunnel');
+    // Lists all three required permissions so the user fixes the token in one
+    // pass rather than one failed request at a time.
+    expect(data.error).toContain('Zone > DNS > Edit');
+    expect(data.error).toContain('Zone > Zone > Read');
     expect(data.steps).toEqual([{ key: 'tunnel', status: 'failed' }]);
   });
 

@@ -37,6 +37,7 @@ import {
   writeState,
 } from '@/lib/server/cloudflared-process';
 import { detectCloudflareMode } from '@/lib/server/cloudflare-mode';
+import { cfDnsRecordsUrl, cfTunnelsUrl } from '@/lib/server/cloudflare-links';
 import { teardownPreview } from '@/lib/server/preview-teardown';
 import { restartAppSentence } from '@/lib/restart-copy';
 import { getPlatform } from '@/lib/server/platform';
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
   // Everything below runs under the completion lock.
   async function runComplete(): Promise<NextResponse> {
     const steps: Step[] = [];
-    const fail = (error: RouteError, logMessage: string) => {
+    const fail = (error: RouteError, logMessage: string, extra?: Record<string, unknown>) => {
       logRouteError({
         requestId,
         route: ROUTE_NAME,
@@ -295,7 +296,7 @@ export async function POST(request: NextRequest) {
         message: logMessage,
       });
       return NextResponse.json(
-        { error: error.publicMessage, type: error.type, steps, requestId },
+        { error: error.publicMessage, type: error.type, steps, requestId, ...extra },
         { status: error.status, headers: { 'Cache-Control': 'no-store' } },
       );
     };
@@ -333,9 +334,22 @@ export async function POST(request: NextRequest) {
       }
       if (!create.ok) {
         steps.push({ key: 'tunnel', status: 'failed' });
+        // Both fixed names are taken: almost always leftover tunnels from
+        // earlier setups. Point the user straight at the tunnels list so they
+        // can delete the old "pubky-homeserver" tunnel and retry.
+        const namesExhausted = /already exists/i.test(create.output);
         return fail(
-          new RouteError(502, 'upstream_error', `Could not create the tunnel: ${lastLine(create.output)}`),
+          new RouteError(
+            502,
+            'upstream_error',
+            namesExhausted
+              ? `A Cloudflare tunnel named "${TUNNEL_NAME}" already exists and couldn't be reused automatically. Open your Cloudflare Zero Trust dashboard (Networks → Tunnels), delete the old "${TUNNEL_NAME}" tunnel, then run setup again.`
+              : `Could not create the Cloudflare tunnel: ${lastLine(create.output)}`,
+          ),
           create.output.slice(-500),
+          namesExhausted
+            ? { dashboard_url: cfTunnelsUrl(null), dashboard_label: 'Open Cloudflare Tunnels' }
+            : undefined,
         );
       }
       steps.push({ key: 'tunnel', status: 'done', detail: tunnelName });
@@ -366,12 +380,22 @@ export async function POST(request: NextRequest) {
       // rather than burning one of the two fixed names.
       const del = await runCloudflared(['tunnel', 'delete', '-f', tunnelRef], certEnv);
       if (del.ok) await fs.rm(CREDENTIALS_PATH(), { force: true });
-      const friendly = /already exists/i.test(route.output)
-        ? `A DNS record already exists at ${hostname}. Pick a different subdomain (or use the API-token setup, which can replace records).`
-        : /find.*zone|zone for|no zone/i.test(route.output)
-          ? `${hostname} is not in the domain you authorized. Use a hostname under the domain you picked on Cloudflare.`
-          : `Could not create the DNS record: ${lastLine(route.output)}`;
-      return fail(new RouteError(502, 'upstream_error', friendly), route.output.slice(-500));
+      const dnsExists = /already exists/i.test(route.output);
+      const zoneNotFound = /find.*zone|zone for|no zone/i.test(route.output);
+      const friendly = dnsExists
+        ? `There's already a DNS record for ${hostname} in your Cloudflare account, so the tunnel can't claim that name. Either pick a different subdomain, or open your Cloudflare DNS settings, delete the existing record for ${hostname}, and run setup again.`
+        : zoneNotFound
+          ? `${hostname} isn't in the domain you authorized with Cloudflare${authorizedDomain ? ` (${authorizedDomain})` : ''}. Use a hostname under that domain.`
+          : `Could not create the DNS record for ${hostname}: ${lastLine(route.output)}`;
+      const extra = dnsExists
+        ? {
+            dashboard_url: cfDnsRecordsUrl(null, authorizedDomain),
+            dashboard_label: authorizedDomain
+              ? `Open DNS settings for ${authorizedDomain}`
+              : 'Open your Cloudflare DNS settings',
+          }
+        : undefined;
+      return fail(new RouteError(502, 'upstream_error', friendly), route.output.slice(-500), extra);
     }
     steps.push({ key: 'dns', status: 'done' });
 
