@@ -29,12 +29,12 @@ function PubkyRingAssist() {
     <p className="text-xs text-muted-foreground">
       Don&apos;t have Pubky Ring yet? Get it at{' '}
       <a
-        href="https://pubky.org"
+        href="https://pubkyring.app/"
         target="_blank"
         rel="noopener noreferrer"
         className="text-brand underline-offset-2 hover:underline"
       >
-        pubky.org
+        pubkyring.app
       </a>
       .
     </p>

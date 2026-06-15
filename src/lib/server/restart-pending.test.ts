@@ -67,6 +67,31 @@ describe('detectRestartPending', () => {
     },
   );
 
+  it('fresh-install placeholders at the boot stamp mtime are NOT pending (entrypoint backdates them)', async () => {
+    // On a fresh install the dashboard entrypoint create-touches empty
+    // token/domain placeholders (for the perms block) AFTER the wrapper wrote
+    // its boot stamp, then backdates them to the stamp (touch -r) so they are
+    // never *newer* than it. Equal mtime must not count as a change - the
+    // comparison is strict-greater - otherwise the fresh install shows a
+    // spurious "restart pending".
+    await writeStamp(50);
+    const stampTime = (await fs.stat(BOOT_STAMP_PATH())).mtime;
+    for (const f of ['token', 'domain']) {
+      await fs.writeFile(inConfig(f), '');
+      await fs.utimes(inConfig(f), stampTime, stampTime);
+    }
+    expect(await detectRestartPending()).toEqual({ restart_pending: false, restart_reason: null });
+  });
+
+  it('a disconnect that truncates token/domain to empty (newer than the stamp) still flags pending', async () => {
+    // The fix must not ignore empty files outright: disconnect truncates
+    // token/domain to '' with a current mtime, and that must still register.
+    await writeStamp(50);
+    await fs.writeFile(inConfig('token'), '');
+    await fs.writeFile(inConfig('domain'), '');
+    expect(await detectRestartPending()).toEqual({ restart_pending: true, restart_reason: 'setup_changed' });
+  });
+
   it('testdrive.env newer than the stamp: preview_changed', async () => {
     await writeStamp(50);
     await writeAged(inConfig('testdrive.env'), 10);

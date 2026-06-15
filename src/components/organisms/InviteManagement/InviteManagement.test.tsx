@@ -35,16 +35,16 @@ describe('InviteManagement session-only list', () => {
     expect(screen.queryByText('No invite codes yet')).toBeNull();
   });
 
-  it('empty state offers the Pubky Ring assist with the pubky.org link', () => {
+  it('empty state offers the Pubky Ring assist with the pubkyring.app link', () => {
     render(<InviteManagement invites={[]} onGenerate={noop} />);
     expect(screen.getByText(/Don't have Pubky Ring yet\?/)).toBeTruthy();
-    const link = screen.getByRole('link', { name: 'pubky.org' });
-    expect(link.getAttribute('href')).toBe('https://pubky.org');
+    const link = screen.getByRole('link', { name: 'pubkyring.app' });
+    expect(link.getAttribute('href')).toBe('https://pubkyring.app/');
   });
 });
 
 describe('InviteManagement QR panel', () => {
-  it('explains the pubkyauth link needs Pubky Ring and links to pubky.org', () => {
+  it('explains the pubkyauth link needs Pubky Ring and links to pubkyring.app', () => {
     render(
       <InviteManagement
         invites={['AAAA-BBBB']}
@@ -55,6 +55,6 @@ describe('InviteManagement QR panel', () => {
     fireEvent.click(screen.getByLabelText('Show invite QR code'));
     expect(screen.getByText(/only opens on a device with Pubky Ring installed/)).toBeTruthy();
     expect(screen.getByText(/Don't have Pubky Ring yet\?/)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'pubky.org' }).getAttribute('href')).toBe('https://pubky.org');
+    expect(screen.getByRole('link', { name: 'pubkyring.app' }).getAttribute('href')).toBe('https://pubkyring.app/');
   });
 });
