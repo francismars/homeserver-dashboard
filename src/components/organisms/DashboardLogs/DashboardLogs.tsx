@@ -56,16 +56,25 @@ export function DashboardLogs() {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
 
-  const fetchLogs = useCallback(async () => {
-    const params = new URLSearchParams({ lines: String(LINES) });
-    if (level !== 'all') params.set('level', level);
-    try {
+  // Shared GET /api/logs for both the live view and the download; honors the
+  // active level filter. Throws the upstream error (or a fallback) on failure.
+  const fetchLogsData = useCallback(
+    async (lines: number, failMessage: string): Promise<LogsResponse> => {
+      const params = new URLSearchParams({ lines: String(lines) });
+      if (level !== 'all') params.set('level', level);
       const response = await fetch(`/api/logs?${params.toString()}`, { cache: 'no-store' });
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(payload.error || `Failed to fetch logs (${response.status})`);
+        throw new Error(payload.error || `${failMessage} (${response.status})`);
       }
-      const data = (await response.json()) as LogsResponse;
+      return (await response.json()) as LogsResponse;
+    },
+    [level],
+  );
+
+  const fetchLogs = useCallback(async () => {
+    try {
+      const data = await fetchLogsData(LINES, 'Failed to fetch logs');
       if (!isMountedRef.current) return;
       setItems(data.items);
       setPartial(Boolean(data.partial));
@@ -76,7 +85,7 @@ export function DashboardLogs() {
     } finally {
       if (isMountedRef.current) setIsInitialLoading(false);
     }
-  }, [level]);
+  }, [fetchLogsData]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -91,15 +100,7 @@ export function DashboardLogs() {
   const handleDownload = useCallback(async () => {
     setDownloadError(null);
     try {
-      // The download honors the active level filter, like the view does.
-      const params = new URLSearchParams({ lines: '5000' });
-      if (level !== 'all') params.set('level', level);
-      const response = await fetch(`/api/logs?${params.toString()}`, { cache: 'no-store' });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(payload.error || `Download failed (${response.status})`);
-      }
-      const data = (await response.json()) as LogsResponse;
+      const data = await fetchLogsData(5000, 'Download failed');
       const blob = new Blob([data.items.map((item) => JSON.stringify(item)).join('\n')], {
         type: 'application/x-ndjson',
       });
@@ -114,7 +115,7 @@ export function DashboardLogs() {
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     }
-  }, [level]);
+  }, [fetchLogsData]);
 
   // Stable row keys on a sliding window: keyed by content plus an occurrence
   // counter for duplicate lines, instead of the array index, so rows keep
@@ -129,6 +130,7 @@ export function DashboardLogs() {
       const isRaw = entry.raw !== undefined;
       const lvl = (entry.level ?? '').toLowerCase();
       const badgeClass = LEVEL_BADGE[lvl] ?? 'bg-muted text-muted-foreground';
+      const fieldsText = entry.fields ? fmtFields(entry.fields) : '';
       return (
         <div
           key={key}
@@ -146,9 +148,7 @@ export function DashboardLogs() {
           )}
           <span className="break-words text-foreground/90">
             {entry.raw ?? entry.msg ?? ''}
-            {entry.fields && fmtFields(entry.fields) && (
-              <span className="ml-2 text-muted-foreground/80">{fmtFields(entry.fields)}</span>
-            )}
+            {fieldsText && <span className="ml-2 text-muted-foreground/80">{fieldsText}</span>}
           </span>
         </div>
       );
