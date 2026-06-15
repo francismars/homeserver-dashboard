@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.25]
+
+### Fixed
+
+- A fresh install no longer shows a spurious "restart pending" prompt. The dashboard creates empty Cloudflare `token`/`domain` placeholder files on its first boot (it starts after the config wrapper writes its boot stamp), and the server-side restart-pending probe mistook those just-created files for a real setup change. The placeholders are now backdated to the boot stamp, so the prompt only appears after an actual setup or disconnect.
+- The "Sign up from Pubky Ring" step and the invite Pubky-Ring hint now link to [pubkyring.app](https://pubkyring.app/) (the app's site) instead of pubky.org.
+
 ## [0.1.24]
 
 ### Fixed

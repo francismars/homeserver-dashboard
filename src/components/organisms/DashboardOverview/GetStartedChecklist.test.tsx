@@ -60,10 +60,10 @@ describe('GetStartedChecklist steps', () => {
     expect(screen.getByText(/Your first invite is for your own account/)).toBeTruthy();
   });
 
-  it('signup step links to pubky.org for Pubky Ring', () => {
+  it('signup step links to pubkyring.app for Pubky Ring', () => {
     render(<GetStartedChecklist {...baseProps} />);
-    const link = screen.getByRole('link', { name: 'pubky.org' });
-    expect(link.getAttribute('href')).toBe('https://pubky.org');
+    const link = screen.getByRole('link', { name: 'pubkyring.app' });
+    expect(link.getAttribute('href')).toBe('https://pubkyring.app/');
   });
 
   it('a done step hides its CTA and helper copy', () => {

@@ -256,12 +256,12 @@ export function GetStartedChecklist({
           <StepRow status={signupDone ? 'done' : 'todo'} testId="setup-step-signup" title="Sign up from Pubky Ring">
             Install Pubky Ring on your phone (get it at{' '}
             <a
-              href="https://pubky.org"
+              href="https://pubkyring.app/"
               target="_blank"
               rel="noopener noreferrer"
               className="text-brand underline-offset-2 hover:underline"
             >
-              pubky.org
+              pubkyring.app
             </a>
             ), then scan the invite QR code to create your account on this homeserver.
           </StepRow>

@@ -20,8 +20,21 @@ if [ -d "$CLOUDFLARE_DIR" ]; then
   # AFTER the wrapper wrote its boot stamp, so the restart-pending probe
   # (which compares these files against the stamp) would report a pending
   # restart forever. Existence is all the perms block below needs.
+  #
+  # On a FRESH install these files do not exist yet, so creating them here
+  # would give them a current mtime - and because the dashboard boots AFTER
+  # the wrapper wrote its boot stamp, the probe would mistake first-boot
+  # placeholder creation for a real setup change and show a spurious "restart
+  # pending" prompt until the first restart. Backdate the just-created empty
+  # placeholders to the boot stamp so they are never newer than it. A real
+  # setup (writes the token) or a disconnect (truncates it) sets a current
+  # mtime and correctly re-triggers the prompt.
+  BOOT_STAMP="/app/homeserver-data/.wrapper-boot-stamp"
   for f in token domain; do
-    [ -f "$CLOUDFLARE_DIR/$f" ] || touch "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+    if [ ! -f "$CLOUDFLARE_DIR/$f" ]; then
+      touch "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+      [ -f "$BOOT_STAMP" ] && touch -r "$BOOT_STAMP" "$CLOUDFLARE_DIR/$f" 2>/dev/null || true
+    fi
   done
   chown -R nextjs:nodejs "$CLOUDFLARE_DIR" 2>/dev/null || true
   # token must be readable by cloudflared (distroless image, UID 65532) which
