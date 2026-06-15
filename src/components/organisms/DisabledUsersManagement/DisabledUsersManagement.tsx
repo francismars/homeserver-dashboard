@@ -87,31 +87,57 @@ export function DisabledUsersManagement({
     [copy],
   );
 
+  // Shared body of every disable/enable: set the in-flight action, run the op,
+  // announce the outcome, refresh, and surface errors. `onSuccess` runs (before
+  // the feedback) only for the input-form variants that clear + close the dialog.
+  const runUserAction = useCallback(
+    async (
+      action: 'disable' | 'enable',
+      pubkey: string,
+      op: (pubkey: string) => Promise<void>,
+      feedback: string,
+      errorFallback: string,
+      onSuccess?: () => void,
+    ) => {
+      setProcessingAction(action);
+      setLocalError(null);
+      try {
+        await op(pubkey);
+        onSuccess?.();
+        setActionFeedback(feedback);
+        if (onRefreshDisabledUsers) {
+          await onRefreshDisabledUsers();
+        }
+      } catch (err) {
+        setLocalError(err instanceof Error ? err.message : errorFallback);
+      } finally {
+        setProcessingAction(null);
+      }
+    },
+    [onRefreshDisabledUsers],
+  );
+
+  const enabledMessage = (pubkey: string) => `Account ${formatDisplayName(pubkey)} enabled. It can log in again.`;
+  const clearAccessDialog = () => {
+    setPubkeyToDisable('');
+    setIsAccessDialogOpen(false);
+  };
+
   const handleDisableByPubkey = useCallback(async () => {
     const pubkey = pubkeyToDisable.trim();
     if (!pubkey) {
       setLocalError('Please enter a pubkey');
       return;
     }
-
-    setProcessingAction('disable');
-    setLocalError(null);
-    try {
-      await onDisableUser(pubkey);
-      setPubkeyToDisable('');
-      setIsAccessDialogOpen(false);
-      setActionFeedback(
-        `Account ${formatDisplayName(pubkey)} disabled. It can no longer log in or write data; stored files are kept.`,
-      );
-      if (onRefreshDisabledUsers) {
-        await onRefreshDisabledUsers();
-      }
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to disable user');
-    } finally {
-      setProcessingAction(null);
-    }
-  }, [pubkeyToDisable, onDisableUser, onRefreshDisabledUsers]);
+    await runUserAction(
+      'disable',
+      pubkey,
+      onDisableUser,
+      `Account ${formatDisplayName(pubkey)} disabled. It can no longer log in or write data; stored files are kept.`,
+      'Failed to disable user',
+      clearAccessDialog,
+    );
+  }, [pubkeyToDisable, onDisableUser, runUserAction]);
 
   const handleEnableByPubkey = useCallback(async () => {
     const pubkey = pubkeyToDisable.trim();
@@ -119,41 +145,19 @@ export function DisabledUsersManagement({
       setLocalError('Please enter a pubkey');
       return;
     }
-
-    setProcessingAction('enable');
-    setLocalError(null);
-    try {
-      await onEnableUser(pubkey);
-      setPubkeyToDisable('');
-      setIsAccessDialogOpen(false);
-      setActionFeedback(`Account ${formatDisplayName(pubkey)} enabled. It can log in again.`);
-      if (onRefreshDisabledUsers) {
-        await onRefreshDisabledUsers();
-      }
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to enable user');
-    } finally {
-      setProcessingAction(null);
-    }
-  }, [pubkeyToDisable, onEnableUser, onRefreshDisabledUsers]);
+    await runUserAction(
+      'enable',
+      pubkey,
+      onEnableUser,
+      enabledMessage(pubkey),
+      'Failed to enable user',
+      clearAccessDialog,
+    );
+  }, [pubkeyToDisable, onEnableUser, runUserAction]);
 
   const handleEnableUser = useCallback(
-    async (pubkey: string) => {
-      setProcessingAction('enable');
-      setLocalError(null);
-      try {
-        await onEnableUser(pubkey);
-        setActionFeedback(`Account ${formatDisplayName(pubkey)} enabled. It can log in again.`);
-        if (onRefreshDisabledUsers) {
-          await onRefreshDisabledUsers();
-        }
-      } catch (err) {
-        setLocalError(err instanceof Error ? err.message : 'Failed to enable user');
-      } finally {
-        setProcessingAction(null);
-      }
-    },
-    [onEnableUser, onRefreshDisabledUsers],
+    (pubkey: string) => runUserAction('enable', pubkey, onEnableUser, enabledMessage(pubkey), 'Failed to enable user'),
+    [onEnableUser, runUserAction],
   );
 
   const isProcessing = processingAction !== null;
