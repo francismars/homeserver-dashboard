@@ -114,11 +114,7 @@ export function CloudflareAutoSetup({ onConfigured }: CloudflareAutoSetupProps) 
 
   const run = async (overwriteDns: boolean) => {
     setRunning(true);
-    setError(null);
-    setErrorLink(null);
-    setConflict(null);
-    setConflictLink(null);
-    setSteps(null);
+    resetRunState();
     try {
       const res = await fetch('/api/cloudflare-auto-setup', {
         method: 'POST',

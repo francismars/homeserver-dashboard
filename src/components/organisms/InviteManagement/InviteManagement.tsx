@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -108,11 +109,7 @@ export function InviteManagement({
             title="New invite"
             aria-label="New invite"
           >
-            {isGenerating ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
+            {isGenerating ? <ButtonSpinner /> : <Plus className="h-4 w-4" />}
           </Button>
         </div>
       </CardHeader>
@@ -146,24 +143,20 @@ export function InviteManagement({
             )}
           </div>
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
-            <div className="rounded-lg border bg-muted/30 p-4 text-center">
-              <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalGenerated ?? '-')}
+            {(
+              [
+                [totalGenerated, 'Total generated'],
+                [totalUsed, 'Used'],
+                [totalUnused, 'Unused'],
+              ] as const
+            ).map(([value, label]) => (
+              <div key={label} className="rounded-lg border bg-muted/30 p-4 text-center">
+                <div className="text-2xl font-bold tabular-nums">
+                  {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (value ?? '-')}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">{label}</div>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">Total generated</div>
-            </div>
-            <div className="rounded-lg border bg-muted/30 p-4 text-center">
-              <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUsed ?? '-')}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">Used</div>
-            </div>
-            <div className="rounded-lg border bg-muted/30 p-4 text-center">
-              <div className="text-2xl font-bold tabular-nums">
-                {isStatsLoading ? <Skeleton className="mx-auto h-7 w-10" /> : (totalUnused ?? '-')}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">Unused</div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -190,7 +183,7 @@ export function InviteManagement({
               <Button onClick={handleGenerate} disabled={isGenerating} size="sm" className="mt-4">
                 {isGenerating ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <ButtonSpinner className="mr-2" />
                     Creating...
                   </>
                 ) : (

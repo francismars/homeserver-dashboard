@@ -1,6 +1,6 @@
 import {
   DisabledUsersResponse,
-  AdminInfo,
+  AdminInfoResponse,
   DeleteUrlRequest,
   DisableUserRequest,
   GenerateInviteResponse,
@@ -66,8 +66,8 @@ export class AdminService {
     }
   }
 
-  async getInfo(): Promise<AdminInfo> {
-    return this.request<AdminInfo>('/info');
+  async getInfo(): Promise<AdminInfoResponse> {
+    return this.request<AdminInfoResponse>('/info');
   }
 
   async getDisabledUsers(limit = 20, cursor?: string): Promise<DisabledUsersResponse> {

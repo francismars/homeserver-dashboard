@@ -41,6 +41,92 @@ type SortField = 'name' | 'size' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 type SortOption = { field: SortField; direction: SortDirection };
 
+/** Joins a directory path and a child name with exactly one separator. */
+function joinPath(base: string, name: string): string {
+  return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`;
+}
+
+/** The sortable table columns (the Name column sorts by entry type so folders
+ * group together). The Actions column is not sortable and is rendered apart. */
+const SORT_COLUMNS: ReadonlyArray<{ field: SortField; label: string; aria: string }> = [
+  { field: 'type', label: 'Name', aria: 'Sort files by name and type' },
+  { field: 'size', label: 'Size', aria: 'Sort files by size' },
+  { field: 'date', label: 'Modified', aria: 'Sort files by modified date' },
+];
+
+function SortHeader({
+  field,
+  label,
+  aria,
+  active,
+  direction,
+  onSort,
+}: {
+  field: SortField;
+  label: string;
+  aria: string;
+  active: boolean;
+  direction: SortDirection;
+  onSort: (field: SortField) => void;
+}) {
+  return (
+    <th className="p-2 text-left text-sm font-semibold select-none">
+      <button
+        type="button"
+        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        onClick={() => onSort(field)}
+        aria-label={aria}
+      >
+        <span>{label}</span>
+        {active && (direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
+}
+
+/** The Rename + Delete icon buttons for one file row, shared by the desktop
+ * table and the mobile card (each wraps these in its own layout div). */
+function FileRowActions({
+  file,
+  onRename,
+  onDelete,
+}: {
+  file: WebDavFile;
+  onRename: (file: WebDavFile) => void;
+  onDelete: (file: WebDavFile) => void;
+}) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRename(file);
+        }}
+        className="h-7 w-7 p-0"
+        title="Rename"
+        aria-label={`Rename ${file.displayName}`}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(file);
+        }}
+        className="h-7 w-7 p-0"
+        title="Delete"
+        aria-label={`Delete ${file.displayName}`}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </>
+  );
+}
+
 export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
@@ -127,10 +213,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     }
   };
 
-  const handleEdit = () => {
-    setIsEditingFile(true);
-  };
-
   const handleSave = async () => {
     if (!selectedFile) return;
 
@@ -157,7 +239,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
 
     setIsSaving(true);
     setValidationError(null);
-    const uploadPath = currentPath.endsWith('/') ? `${currentPath}${newFileName}` : `${currentPath}/${newFileName}`;
+    const uploadPath = joinPath(currentPath, newFileName);
 
     const success = await writeFile(uploadPath, newFileContent);
     if (success) {
@@ -182,7 +264,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
 
     setIsSaving(true);
     setValidationError(null);
-    const dirPath = currentPath.endsWith('/') ? `${currentPath}${newDirName}/` : `${currentPath}/${newDirName}/`;
+    const dirPath = `${joinPath(currentPath, newDirName)}/`;
 
     const success = await createDirectory(dirPath);
     if (success) {
@@ -191,6 +273,16 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
       await loadDirectory(currentPath);
     }
     setIsSaving(false);
+  };
+
+  const beginRename = (file: WebDavFile) => {
+    setFileToRename(file);
+    setRenameValue(file.displayName);
+    setShowRenameDialog(true);
+  };
+  const beginDelete = (file: WebDavFile) => {
+    setFileToDelete(file);
+    setShowDeleteDialog(true);
   };
 
   const handleDelete = async () => {
@@ -208,10 +300,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
       }
     }
     setIsSaving(false);
-  };
-
-  const navigateToPath = (path: string) => {
-    setCurrentPath(path);
   };
 
   const normalizeAdminDeletePath = (raw: string): string => {
@@ -270,9 +358,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     try {
       // Get the parent directory path
       const parentPath = fileToRename.path.substring(0, fileToRename.path.lastIndexOf('/'));
-      const newPath = parentPath.endsWith('/')
-        ? `${parentPath}${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`
-        : `${parentPath}/${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`;
+      const newPath = `${joinPath(parentPath, renameValue.trim())}${fileToRename.isCollection ? '/' : ''}`;
 
       const success = await moveFile(fileToRename.path, newPath);
       if (!success) {
@@ -454,7 +540,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigateToPath(crumb.path)}
+                    onClick={() => setCurrentPath(crumb.path)}
                     className="h-6 px-1.5 text-xs sm:px-2 sm:text-sm"
                   >
                     {crumb.name}
@@ -541,54 +627,15 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('type')}
-                          aria-label="Sort files by name and type"
-                        >
-                          <span>Name</span>
-                          {sortOption.field === 'type' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('size')}
-                          aria-label="Sort files by size"
-                        >
-                          <span>Size</span>
-                          {sortOption.field === 'size' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('date')}
-                          aria-label="Sort files by modified date"
-                        >
-                          <span>Modified</span>
-                          {sortOption.field === 'date' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
+                      {SORT_COLUMNS.map((col) => (
+                        <SortHeader
+                          key={col.field}
+                          {...col}
+                          active={sortOption.field === col.field}
+                          direction={sortOption.direction}
+                          onSort={handleSort}
+                        />
+                      ))}
                       <th className="p-2 text-right text-sm font-semibold">Actions</th>
                     </tr>
                   </thead>
@@ -616,35 +663,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                         <td className="p-2 text-sm text-muted-foreground">{formatDate(file.lastModified)}</td>
                         <td className="p-2">
                           <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFileToRename(file);
-                                setRenameValue(file.displayName);
-                                setShowRenameDialog(true);
-                              }}
-                              className="h-7 w-7 p-0"
-                              title="Rename"
-                              aria-label={`Rename ${file.displayName}`}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFileToDelete(file);
-                                setShowDeleteDialog(true);
-                              }}
-                              className="h-7 w-7 p-0"
-                              title="Delete"
-                              aria-label={`Delete ${file.displayName}`}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <FileRowActions file={file} onRename={beginRename} onDelete={beginDelete} />
                           </div>
                         </td>
                       </tr>
@@ -687,35 +706,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFileToRename(file);
-                            setRenameValue(file.displayName);
-                            setShowRenameDialog(true);
-                          }}
-                          className="h-7 w-7 p-0"
-                          title="Rename"
-                          aria-label={`Rename ${file.displayName}`}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFileToDelete(file);
-                            setShowDeleteDialog(true);
-                          }}
-                          className="h-7 w-7 p-0"
-                          title="Delete"
-                          aria-label={`Delete ${file.displayName}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <FileRowActions file={file} onRename={beginRename} onDelete={beginDelete} />
                       </div>
                     </div>
                   </div>
@@ -754,7 +745,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
             ) : (
-              <Button onClick={handleEdit}>
+              <Button onClick={() => setIsEditingFile(true)}>
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit
               </Button>

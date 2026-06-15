@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,7 +86,6 @@ const ADMIN_ENDPOINTS: ApiEndpoint[] = [
     description: 'WebDAV: Upload/update a file (requires Basic Auth: admin:password)',
     server: 'admin',
     requiresAuth: true,
-    requiresBody: true,
     exampleBody: 'File content (binary)',
   },
   {
@@ -111,7 +111,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Create a new user account (requires signup_token query param if token_required)',
     server: 'client',
     requiresAuth: false,
-    requiresBody: true,
     exampleBody: 'AuthToken binary (application/octet-stream)',
   },
   {
@@ -120,7 +119,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Authenticate and create a session for existing user',
     server: 'client',
     requiresAuth: false,
-    requiresBody: true,
     exampleBody: 'AuthToken binary (application/octet-stream)',
   },
   {
@@ -171,7 +169,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Upload or update a file',
     server: 'client',
     requiresAuth: true,
-    requiresBody: true,
     exampleBody: 'File content (binary)',
   },
   {
@@ -259,6 +256,9 @@ export function ApiExplorer() {
 
   const currentGroup = ENDPOINT_GROUPS.find((g) => g.server === selectedServer) || ENDPOINT_GROUPS[0];
   const currentEndpoints = currentGroup.endpoints;
+  // The preset picked in the dropdown (undefined for custom requests); reused
+  // wherever we need its method/path/exampleBody instead of re-scanning the list.
+  const selectedPreset = currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint);
 
   const handleServerChange = (server: 'admin' | 'client' | 'metrics') => {
     setSelectedServer(server);
@@ -284,17 +284,10 @@ export function ApiExplorer() {
     resetCopied();
 
     try {
-      const path = selectedEndpoint
-        ? currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.path || customPath
-        : customPath;
-
-      const method = selectedEndpoint
-        ? currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.method || customMethod
-        : customMethod;
-
-      const endpoint = currentEndpoints.find(
-        (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
-      );
+      const path = selectedPreset?.path || customPath;
+      const method = selectedPreset?.method || customMethod;
+      const endpoint =
+        selectedPreset ?? currentEndpoints.find((e) => `${e.method} ${e.path}` === `${customMethod} ${customPath}`);
 
       // Every group goes through a same-origin proxy route.
       const url = resolveRequestUrl(selectedServer, path);
@@ -353,15 +346,8 @@ export function ApiExplorer() {
           }
           init.body = requestBody;
         } else {
-          // JSON endpoint
-          try {
-            // Validate JSON if provided
-            JSON.parse(requestBody);
-            init.body = requestBody;
-          } catch {
-            // If not valid JSON, send as-is
-            init.body = requestBody;
-          }
+          // JSON endpoint: sent verbatim (the server validates).
+          init.body = requestBody;
         }
       }
 
@@ -547,21 +533,15 @@ export function ApiExplorer() {
             <div className="space-y-2">
               <Label>
                 Request Body
-                {selectedEndpoint &&
-                  currentEndpoints
-                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
-                    ?.exampleBody?.includes('binary') && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Binary/Base64 for AuthToken endpoints)</span>
-                  )}
+                {selectedPreset?.exampleBody?.includes('binary') && (
+                  <span className="ml-2 text-xs text-muted-foreground">(Binary/Base64 for AuthToken endpoints)</span>
+                )}
               </Label>
               <Textarea
                 value={requestBody}
                 onChange={(e) => setRequestBody(e.target.value)}
                 placeholder={
-                  selectedEndpoint &&
-                  currentEndpoints
-                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
-                    ?.exampleBody?.includes('binary')
+                  selectedPreset?.exampleBody?.includes('binary')
                     ? 'Base64-encoded binary data or raw bytes'
                     : customMethod === 'PROPFIND' ||
                         customMethod === 'MKCOL' ||
@@ -573,12 +553,9 @@ export function ApiExplorer() {
                 className="font-mono text-sm"
                 rows={6}
               />
-              {selectedEndpoint &&
-                currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody && (
-                  <p className="text-xs text-muted-foreground">
-                    Example: {currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody}
-                  </p>
-                )}
+              {selectedPreset?.exampleBody && (
+                <p className="text-xs text-muted-foreground">Example: {selectedPreset.exampleBody}</p>
+              )}
             </div>
           )}
 
@@ -586,7 +563,7 @@ export function ApiExplorer() {
             <Button onClick={handleSendRequest} disabled={isLoading || !customPath} className="flex-1">
               {isLoading ? (
                 <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <ButtonSpinner className="mr-2" />
                   Sending...
                 </>
               ) : (

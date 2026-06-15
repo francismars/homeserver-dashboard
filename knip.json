@@ -13,5 +13,5 @@
   "ignoreIssues": {
     "src/components/ui/**": ["exports", "types"]
   },
-  "ignoreDependencies": ["eslint-config-next", "tw-animate-css"]
+  "ignoreDependencies": ["tw-animate-css"]
 }
