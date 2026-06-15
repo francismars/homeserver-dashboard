@@ -314,10 +314,14 @@ describe('ConfigDialog Cloudflare status surface', () => {
     });
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('cf-status-unreachable')).toBeTruthy());
-    const chip = screen.getByTestId('cf-status-unreachable').textContent ?? '';
-    expect(chip).toContain('Tunnel not connected. If you just set this up, give it a moment.');
-    expect(chip).toContain('Restart the Pubky Homeserver app from Umbrel');
-    expect(chip).not.toContain('HTTP 530');
+    const chip = screen.getByTestId('cf-status-unreachable');
+    expect(chip.textContent).toContain('Tunnel not connected. If you just set this up, give it a moment.');
+    expect(chip.textContent).toContain('Restart the Pubky Homeserver app from Umbrel');
+    expect(chip.textContent).not.toContain('HTTP 530');
+    // The long reason renders on its own wrapping block, not as an inline chip
+    // crammed into the address/actions row (which forced horizontal scroll).
+    expect(chip.tagName).toBe('P');
+    expect(chip.className).toContain('break-words');
   });
 
   it('disconnect: consequences are stated after arming, and Cancel disarms without a call', async () => {

@@ -811,62 +811,69 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                         </p>
                       )}
                       {cfMode !== 'off' && (
-                        <div className="flex items-center justify-between gap-3">
-                          <code
-                            className="truncate font-mono text-xs text-muted-foreground"
-                            data-testid="cf-status-address"
-                          >
-                            {cfMode === 'preview' ? (previewUrl ?? 'temporary address pending…') : cfConfig?.domain}
-                          </code>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {(cfMode === 'connect' || cfMode === 'token') && cfConfig?.domain && (
-                              <>
-                                {publishState === 'published' && (
-                                  <span className="text-xs text-brand" data-testid="cf-status-published">
-                                    Published
-                                  </span>
-                                )}
-                                {publishState === 'pending' && (
-                                  <span className="text-xs text-amber-400" data-testid="cf-status-unpublished">
-                                    Restart to publish
-                                  </span>
-                                )}
-                                {healthStatus === 'ok' && (
-                                  <span className="text-xs text-brand" data-testid="cf-status-reachable">
-                                    Reachable
-                                  </span>
-                                )}
-                                {healthStatus === 'fail' && (
-                                  <span className="text-xs text-destructive" data-testid="cf-status-unreachable">
-                                    Not reachable{healthError ? ` (${healthError})` : ''}
-                                  </span>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs"
-                                  disabled={healthStatus === 'checking'}
-                                  onClick={() => checkHealth(cfConfig.domain!)}
-                                  data-testid="cf-check"
-                                >
-                                  {healthStatus === 'checking' ? (
-                                    <RefreshCw className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    'Check'
-                                  )}
-                                </Button>
-                              </>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                              onClick={() => void handleDisconnectAll()}
-                              data-testid="cf-disconnect"
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <code
+                              className="truncate font-mono text-xs text-muted-foreground"
+                              data-testid="cf-status-address"
                             >
-                              {confirmDisconnect ? 'Confirm?' : 'Disconnect'}
-                            </Button>
+                              {cfMode === 'preview' ? (previewUrl ?? 'temporary address pending…') : cfConfig?.domain}
+                            </code>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {(cfMode === 'connect' || cfMode === 'token') && cfConfig?.domain && (
+                                <>
+                                  {publishState === 'published' && (
+                                    <span className="text-xs text-brand" data-testid="cf-status-published">
+                                      Published
+                                    </span>
+                                  )}
+                                  {publishState === 'pending' && (
+                                    <span className="text-xs text-amber-400" data-testid="cf-status-unpublished">
+                                      Restart to publish
+                                    </span>
+                                  )}
+                                  {healthStatus === 'ok' && (
+                                    <span className="text-xs text-brand" data-testid="cf-status-reachable">
+                                      Reachable
+                                    </span>
+                                  )}
+                                  {/* A failed probe carries a long reason, so it is not shown
+                                      inline here - it renders on its own wrapping line below the
+                                      row so it never forces horizontal scroll. */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={healthStatus === 'checking'}
+                                    onClick={() => checkHealth(cfConfig.domain!)}
+                                    data-testid="cf-check"
+                                  >
+                                    {healthStatus === 'checking' ? (
+                                      <RefreshCw className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      'Check'
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                                onClick={() => void handleDisconnectAll()}
+                                data-testid="cf-disconnect"
+                              >
+                                {confirmDisconnect ? 'Confirm?' : 'Disconnect'}
+                              </Button>
+                            </div>
                           </div>
+                          {(cfMode === 'connect' || cfMode === 'token') &&
+                            cfConfig?.domain &&
+                            healthStatus === 'fail' && (
+                              <p className="text-xs break-words text-destructive" data-testid="cf-status-unreachable">
+                                Not reachable{healthError ? ` (${healthError})` : ''}
+                              </p>
+                            )}
                         </div>
                       )}
 
