@@ -39,6 +39,31 @@ const MODE_LABELS: Record<CloudflareMode, string> = {
   off: 'Off',
 };
 
+/** A chevron + label button that toggles a collapsible setup section. */
+function DisclosureToggle({
+  open,
+  onToggle,
+  label,
+  testId,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      onClick={onToggle}
+      data-testid={testId}
+    >
+      {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+      {label}
+    </button>
+  );
+}
+
 interface ConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -921,19 +946,12 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                         "switch method" disclosure; the Status surface above is
                         what says "connected". */}
                     {cfMode !== 'off' && (
-                      <button
-                        type="button"
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                        onClick={() => setShowSetupMethods((s) => !s)}
-                        data-testid="cf-switch-method-toggle"
-                      >
-                        {showSetupMethods ? (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        )}
-                        Switch setup method
-                      </button>
+                      <DisclosureToggle
+                        open={showSetupMethods}
+                        onToggle={() => setShowSetupMethods((s) => !s)}
+                        label="Switch setup method"
+                        testId="cf-switch-method-toggle"
+                      />
                     )}
 
                     {(cfMode === 'off' || showSetupMethods) && (
@@ -944,19 +962,12 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                         <div className="h-px bg-border/50" />
 
                         {/* Option Y: API-token automatic setup (collapsed) */}
-                        <button
-                          type="button"
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                          onClick={() => setShowApiTokenSetup((s) => !s)}
-                          data-testid="cf-api-token-toggle"
-                        >
-                          {showApiTokenSetup ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          )}
-                          Set up with an API token instead
-                        </button>
+                        <DisclosureToggle
+                          open={showApiTokenSetup}
+                          onToggle={() => setShowApiTokenSetup((s) => !s)}
+                          label="Set up with an API token instead"
+                          testId="cf-api-token-toggle"
+                        />
                         {showApiTokenSetup && (
                           <CloudflareAutoSetup onConfigured={(h, m) => handleAutoConfigured(h, 'token', m)} />
                         )}
@@ -967,19 +978,12 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                         <div className="h-px bg-border/50" />
 
                         {/* Option X: manual setup (collapsed escape hatch) */}
-                        <button
-                          type="button"
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                          onClick={() => setShowManualSetup((s) => !s)}
-                          data-testid="cf-manual-toggle"
-                        >
-                          {showManualSetup ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          )}
-                          Set up manually instead
-                        </button>
+                        <DisclosureToggle
+                          open={showManualSetup}
+                          onToggle={() => setShowManualSetup((s) => !s)}
+                          label="Set up manually instead"
+                          testId="cf-manual-toggle"
+                        />
 
                         {showManualSetup && (
                           <>

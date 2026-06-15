@@ -46,6 +46,44 @@ function joinPath(base: string, name: string): string {
   return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`;
 }
 
+/** The sortable table columns (the Name column sorts by entry type so folders
+ * group together). The Actions column is not sortable and is rendered apart. */
+const SORT_COLUMNS: ReadonlyArray<{ field: SortField; label: string; aria: string }> = [
+  { field: 'type', label: 'Name', aria: 'Sort files by name and type' },
+  { field: 'size', label: 'Size', aria: 'Sort files by size' },
+  { field: 'date', label: 'Modified', aria: 'Sort files by modified date' },
+];
+
+function SortHeader({
+  field,
+  label,
+  aria,
+  active,
+  direction,
+  onSort,
+}: {
+  field: SortField;
+  label: string;
+  aria: string;
+  active: boolean;
+  direction: SortDirection;
+  onSort: (field: SortField) => void;
+}) {
+  return (
+    <th className="p-2 text-left text-sm font-semibold select-none">
+      <button
+        type="button"
+        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        onClick={() => onSort(field)}
+        aria-label={aria}
+      >
+        <span>{label}</span>
+        {active && (direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
+}
+
 export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
@@ -536,54 +574,15 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('type')}
-                          aria-label="Sort files by name and type"
-                        >
-                          <span>Name</span>
-                          {sortOption.field === 'type' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('size')}
-                          aria-label="Sort files by size"
-                        >
-                          <span>Size</span>
-                          {sortOption.field === 'size' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th className="p-2 text-left text-sm font-semibold select-none">
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          onClick={() => handleSort('date')}
-                          aria-label="Sort files by modified date"
-                        >
-                          <span>Modified</span>
-                          {sortOption.field === 'date' &&
-                            (sortOption.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            ))}
-                        </button>
-                      </th>
+                      {SORT_COLUMNS.map((col) => (
+                        <SortHeader
+                          key={col.field}
+                          {...col}
+                          active={sortOption.field === col.field}
+                          direction={sortOption.direction}
+                          onSort={handleSort}
+                        />
+                      ))}
                       <th className="p-2 text-right text-sm font-semibold">Actions</th>
                     </tr>
                   </thead>
