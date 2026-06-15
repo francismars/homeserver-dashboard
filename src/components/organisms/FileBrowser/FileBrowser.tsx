@@ -41,6 +41,11 @@ type SortField = 'name' | 'size' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 type SortOption = { field: SortField; direction: SortDirection };
 
+/** Joins a directory path and a child name with exactly one separator. */
+function joinPath(base: string, name: string): string {
+  return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`;
+}
+
 export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
@@ -127,10 +132,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     }
   };
 
-  const handleEdit = () => {
-    setIsEditingFile(true);
-  };
-
   const handleSave = async () => {
     if (!selectedFile) return;
 
@@ -157,7 +158,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
 
     setIsSaving(true);
     setValidationError(null);
-    const uploadPath = currentPath.endsWith('/') ? `${currentPath}${newFileName}` : `${currentPath}/${newFileName}`;
+    const uploadPath = joinPath(currentPath, newFileName);
 
     const success = await writeFile(uploadPath, newFileContent);
     if (success) {
@@ -182,7 +183,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
 
     setIsSaving(true);
     setValidationError(null);
-    const dirPath = currentPath.endsWith('/') ? `${currentPath}${newDirName}/` : `${currentPath}/${newDirName}/`;
+    const dirPath = `${joinPath(currentPath, newDirName)}/`;
 
     const success = await createDirectory(dirPath);
     if (success) {
@@ -208,10 +209,6 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
       }
     }
     setIsSaving(false);
-  };
-
-  const navigateToPath = (path: string) => {
-    setCurrentPath(path);
   };
 
   const normalizeAdminDeletePath = (raw: string): string => {
@@ -270,9 +267,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
     try {
       // Get the parent directory path
       const parentPath = fileToRename.path.substring(0, fileToRename.path.lastIndexOf('/'));
-      const newPath = parentPath.endsWith('/')
-        ? `${parentPath}${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`
-        : `${parentPath}/${renameValue.trim()}${fileToRename.isCollection ? '/' : ''}`;
+      const newPath = `${joinPath(parentPath, renameValue.trim())}${fileToRename.isCollection ? '/' : ''}`;
 
       const success = await moveFile(fileToRename.path, newPath);
       if (!success) {
@@ -454,7 +449,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigateToPath(crumb.path)}
+                    onClick={() => setCurrentPath(crumb.path)}
                     className="h-6 px-1.5 text-xs sm:px-2 sm:text-sm"
                   >
                     {crumb.name}
@@ -754,7 +749,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                 {isSaving ? 'Saving...' : 'Save'}
               </Button>
             ) : (
-              <Button onClick={handleEdit}>
+              <Button onClick={() => setIsEditingFile(true)}>
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit
               </Button>

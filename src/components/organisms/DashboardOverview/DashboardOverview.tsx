@@ -501,9 +501,10 @@ export function DashboardOverview({
     );
   }
 
-  // Support both new (public_key) and legacy (pubkey) field names. No
-  // fallback values: a made-up pubkey gets copied into pkdns and shared.
-  const homeserverPubkey = info.public_key ?? info.pubkey ?? null;
+  // homeserverPubkey is the same new-or-legacy field already resolved as
+  // pkarrPubkey above; reuse it (no fallback - a made-up pubkey gets copied
+  // into pkdns and shared).
+  const homeserverPubkey = pkarrPubkey;
   const homeserverVersion = info.version ?? null;
 
   // Render the pkarr verdict/record only when the state actually belongs to

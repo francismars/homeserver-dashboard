@@ -255,6 +255,9 @@ export function ApiExplorer() {
 
   const currentGroup = ENDPOINT_GROUPS.find((g) => g.server === selectedServer) || ENDPOINT_GROUPS[0];
   const currentEndpoints = currentGroup.endpoints;
+  // The preset picked in the dropdown (undefined for custom requests); reused
+  // wherever we need its method/path/exampleBody instead of re-scanning the list.
+  const selectedPreset = currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint);
 
   const handleServerChange = (server: 'admin' | 'client' | 'metrics') => {
     setSelectedServer(server);
@@ -280,17 +283,10 @@ export function ApiExplorer() {
     resetCopied();
 
     try {
-      const path = selectedEndpoint
-        ? currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.path || customPath
-        : customPath;
-
-      const method = selectedEndpoint
-        ? currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.method || customMethod
-        : customMethod;
-
-      const endpoint = currentEndpoints.find(
-        (e) => `${e.method} ${e.path}` === (selectedEndpoint || `${customMethod} ${customPath}`),
-      );
+      const path = selectedPreset?.path || customPath;
+      const method = selectedPreset?.method || customMethod;
+      const endpoint =
+        selectedPreset ?? currentEndpoints.find((e) => `${e.method} ${e.path}` === `${customMethod} ${customPath}`);
 
       // Every group goes through a same-origin proxy route.
       const url = resolveRequestUrl(selectedServer, path);
@@ -536,21 +532,15 @@ export function ApiExplorer() {
             <div className="space-y-2">
               <Label>
                 Request Body
-                {selectedEndpoint &&
-                  currentEndpoints
-                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
-                    ?.exampleBody?.includes('binary') && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Binary/Base64 for AuthToken endpoints)</span>
-                  )}
+                {selectedPreset?.exampleBody?.includes('binary') && (
+                  <span className="ml-2 text-xs text-muted-foreground">(Binary/Base64 for AuthToken endpoints)</span>
+                )}
               </Label>
               <Textarea
                 value={requestBody}
                 onChange={(e) => setRequestBody(e.target.value)}
                 placeholder={
-                  selectedEndpoint &&
-                  currentEndpoints
-                    .find((e) => `${e.method} ${e.path}` === selectedEndpoint)
-                    ?.exampleBody?.includes('binary')
+                  selectedPreset?.exampleBody?.includes('binary')
                     ? 'Base64-encoded binary data or raw bytes'
                     : customMethod === 'PROPFIND' ||
                         customMethod === 'MKCOL' ||
@@ -562,12 +552,9 @@ export function ApiExplorer() {
                 className="font-mono text-sm"
                 rows={6}
               />
-              {selectedEndpoint &&
-                currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody && (
-                  <p className="text-xs text-muted-foreground">
-                    Example: {currentEndpoints.find((e) => `${e.method} ${e.path}` === selectedEndpoint)?.exampleBody}
-                  </p>
-                )}
+              {selectedPreset?.exampleBody && (
+                <p className="text-xs text-muted-foreground">Example: {selectedPreset.exampleBody}</p>
+              )}
             </div>
           )}
 
