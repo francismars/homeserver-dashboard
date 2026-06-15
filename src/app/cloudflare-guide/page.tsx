@@ -98,7 +98,7 @@ export default function CloudflareGuidePage() {
                   Inside Zero Trust, navigate to <strong>Networks → Connectors → Cloudflare Tunnels</strong>.
                 </li>
                 <li>
-                  Click <strong>Create a tunnel</strong>.
+                  Click <strong>Add a tunnel</strong>.
                 </li>
                 <li>
                   Choose connector type <strong>Cloudflared</strong> → <strong>Next</strong>.
@@ -121,12 +121,12 @@ export default function CloudflareGuidePage() {
                   with <Code>eyJ</Code> and looks like base64. This is your tunnel token. Save it for Part B.
                 </li>
                 <li>
-                  Click <strong>Next</strong>. The connector will show as <em>Inactive</em>, that is expected, it
-                  activates after Part B.
+                  Click <strong>Next</strong>. Cloudflare may still say <em>No connectors installed</em> at this point,
+                  that is expected, your connector activates after you finish Part B.
                 </li>
                 <li>
-                  You are now on the <strong>Route traffic</strong> page. Open the <strong>Public hostnames</strong> (or{' '}
-                  <em>Published application hostname</em>) tab.
+                  You are now on the <strong>Route traffic</strong> page. Open the{' '}
+                  <strong>Published applications</strong> (or <em>Public hostnames</em>) tab.
                 </li>
                 <li>
                   Fill the fields:

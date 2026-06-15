@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The Cloudflare Status row no longer scrolls sideways when the homeserver is unreachable. A long "Not reachable" reason (e.g. the tunnel-not-connected/restart hint) was rendered inline next to the Check/Disconnect buttons, forcing the dialog to scroll horizontally. The reason now wraps on its own line below the address.
+- The Cloudflare Tunnel guide now matches the current Cloudflare dashboard wording: "Add a tunnel" (was "Create a tunnel"), the "Route traffic" step points at the **Published applications** tab, and the connector-state note refers to the "No connectors installed" message you actually see (instead of an "Inactive" state that isn't shown on that page).
 
 ## [0.1.23]
 
