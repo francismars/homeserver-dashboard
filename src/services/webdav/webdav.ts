@@ -276,7 +276,6 @@ export class WebDavService {
       }
 
       files.push({
-        href,
         displayName: displayName || path.split('/').filter(Boolean).pop() || path,
         contentType: contentType || (isCollection ? 'directory' : 'application/octet-stream'),
         contentLength: contentLength ? parseInt(contentLength, 10) : undefined,

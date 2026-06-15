@@ -85,7 +85,6 @@ const ADMIN_ENDPOINTS: ApiEndpoint[] = [
     description: 'WebDAV: Upload/update a file (requires Basic Auth: admin:password)',
     server: 'admin',
     requiresAuth: true,
-    requiresBody: true,
     exampleBody: 'File content (binary)',
   },
   {
@@ -111,7 +110,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Create a new user account (requires signup_token query param if token_required)',
     server: 'client',
     requiresAuth: false,
-    requiresBody: true,
     exampleBody: 'AuthToken binary (application/octet-stream)',
   },
   {
@@ -120,7 +118,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Authenticate and create a session for existing user',
     server: 'client',
     requiresAuth: false,
-    requiresBody: true,
     exampleBody: 'AuthToken binary (application/octet-stream)',
   },
   {
@@ -171,7 +168,6 @@ const CLIENT_ENDPOINTS: ApiEndpoint[] = [
     description: 'Upload or update a file',
     server: 'client',
     requiresAuth: true,
-    requiresBody: true,
     exampleBody: 'File content (binary)',
   },
   {
@@ -353,15 +349,8 @@ export function ApiExplorer() {
           }
           init.body = requestBody;
         } else {
-          // JSON endpoint
-          try {
-            // Validate JSON if provided
-            JSON.parse(requestBody);
-            init.body = requestBody;
-          } catch {
-            // If not valid JSON, send as-is
-            init.body = requestBody;
-          }
+          // JSON endpoint: sent verbatim (the server validates).
+          init.body = requestBody;
         }
       }
 

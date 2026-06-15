@@ -1,5 +1,4 @@
 export type WebDavFile = {
-  href: string;
   displayName: string;
   contentType: string;
   contentLength?: number;

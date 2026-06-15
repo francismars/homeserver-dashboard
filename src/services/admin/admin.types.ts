@@ -8,12 +8,9 @@ export type AdminInfoResponse = {
   pkarr_pubky_address?: string;
   pkarr_icann_domain?: string;
   version?: string;
-  // Legacy fields for backward compatibility
+  // Legacy field for backward compatibility
   pubkey?: string;
-  address?: string;
 };
-
-export type AdminInfo = AdminInfoResponse; // Alias for backward compatibility
 
 export type DeleteUrlRequest = { path: string };
 export type DisableUserRequest = { pubkey: string };

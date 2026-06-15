@@ -2,17 +2,15 @@
 
 import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface DashboardNavbarProps {
-  className?: string;
   onSettingsClick?: () => void;
   showSettingsButton?: boolean;
 }
 
-export function DashboardNavbar({ className, onSettingsClick, showSettingsButton = true }: DashboardNavbarProps) {
+export function DashboardNavbar({ onSettingsClick, showSettingsButton = true }: DashboardNavbarProps) {
   return (
-    <header className={cn('w-full bg-background pt-4 pb-2 sm:pt-5 sm:pb-3', className)}>
+    <header className="w-full bg-background pt-4 pb-2 sm:pt-5 sm:pb-3">
       <nav className="flex w-full min-w-0 items-center justify-between gap-4 sm:gap-6">
         {/* Left: Pubky Homeserver logo */}
         <div className="flex min-w-0 shrink-0 items-center">

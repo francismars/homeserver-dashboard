@@ -3,7 +3,6 @@ export type ApiEndpoint = {
   path: string;
   description: string;
   server: 'admin' | 'client' | 'metrics';
-  requiresBody?: boolean;
   exampleBody?: string;
   requiresAuth?: boolean;
 };

@@ -29,7 +29,6 @@ const files: WebDavFile[] = [
   {
     displayName: 'notes.txt',
     path: '/pk1/pub/notes.txt',
-    href: '/pk1/pub/notes.txt',
     isCollection: false,
     contentType: 'text/plain',
     contentLength: 12,
