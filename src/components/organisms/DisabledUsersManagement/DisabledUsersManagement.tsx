@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -440,7 +441,7 @@ export function DisabledUsersManagement({
               >
                 {processingAction === 'disable' ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <ButtonSpinner className="mr-2" />
                     <span className="hidden sm:inline">Disabling...</span>
                     <span className="sm:hidden">...</span>
                   </>
@@ -457,7 +458,7 @@ export function DisabledUsersManagement({
               >
                 {processingAction === 'enable' ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <ButtonSpinner className="mr-2" />
                     <span className="hidden sm:inline">Enabling...</span>
                     <span className="sm:hidden">...</span>
                   </>

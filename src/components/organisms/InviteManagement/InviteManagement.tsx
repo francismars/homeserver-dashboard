@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -109,7 +110,7 @@ export function InviteManagement({
             aria-label="New invite"
           >
             {isGenerating ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <ButtonSpinner />
             ) : (
               <Plus className="h-4 w-4" />
             )}
@@ -190,7 +191,7 @@ export function InviteManagement({
               <Button onClick={handleGenerate} disabled={isGenerating} size="sm" className="mt-4">
                 {isGenerating ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <ButtonSpinner className="mr-2" />
                     Creating...
                   </>
                 ) : (
