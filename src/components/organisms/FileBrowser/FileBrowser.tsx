@@ -84,6 +84,49 @@ function SortHeader({
   );
 }
 
+/** The Rename + Delete icon buttons for one file row, shared by the desktop
+ * table and the mobile card (each wraps these in its own layout div). */
+function FileRowActions({
+  file,
+  onRename,
+  onDelete,
+}: {
+  file: WebDavFile;
+  onRename: (file: WebDavFile) => void;
+  onDelete: (file: WebDavFile) => void;
+}) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRename(file);
+        }}
+        className="h-7 w-7 p-0"
+        title="Rename"
+        aria-label={`Rename ${file.displayName}`}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(file);
+        }}
+        className="h-7 w-7 p-0"
+        title="Delete"
+        aria-label={`Delete ${file.displayName}`}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </>
+  );
+}
+
 export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }: FileBrowserProps) {
   const { listDirectory, readFile, writeFile, deleteFile, createDirectory, moveFile, isLoading, error } = useWebDav();
   const { deleteUrl, isDeletingUrl, deleteUrlError } = useAdminActions();
@@ -230,6 +273,16 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
       await loadDirectory(currentPath);
     }
     setIsSaving(false);
+  };
+
+  const beginRename = (file: WebDavFile) => {
+    setFileToRename(file);
+    setRenameValue(file.displayName);
+    setShowRenameDialog(true);
+  };
+  const beginDelete = (file: WebDavFile) => {
+    setFileToDelete(file);
+    setShowDeleteDialog(true);
   };
 
   const handleDelete = async () => {
@@ -610,35 +663,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                         <td className="p-2 text-sm text-muted-foreground">{formatDate(file.lastModified)}</td>
                         <td className="p-2">
                           <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFileToRename(file);
-                                setRenameValue(file.displayName);
-                                setShowRenameDialog(true);
-                              }}
-                              className="h-7 w-7 p-0"
-                              title="Rename"
-                              aria-label={`Rename ${file.displayName}`}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFileToDelete(file);
-                                setShowDeleteDialog(true);
-                              }}
-                              className="h-7 w-7 p-0"
-                              title="Delete"
-                              aria-label={`Delete ${file.displayName}`}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <FileRowActions file={file} onRename={beginRename} onDelete={beginDelete} />
                           </div>
                         </td>
                       </tr>
@@ -681,35 +706,7 @@ export function FileBrowser({ initialPath = '/', diskUsedMB, homeserverPubkey }:
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFileToRename(file);
-                            setRenameValue(file.displayName);
-                            setShowRenameDialog(true);
-                          }}
-                          className="h-7 w-7 p-0"
-                          title="Rename"
-                          aria-label={`Rename ${file.displayName}`}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFileToDelete(file);
-                            setShowDeleteDialog(true);
-                          }}
-                          className="h-7 w-7 p-0"
-                          title="Delete"
-                          aria-label={`Delete ${file.displayName}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <FileRowActions file={file} onRename={beginRename} onDelete={beginDelete} />
                       </div>
                     </div>
                   </div>
