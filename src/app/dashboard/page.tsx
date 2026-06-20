@@ -223,6 +223,22 @@ export default function DashboardPage() {
     };
   }, [detectionNonce]);
 
+  // The API Explorer is a developer tool; show its tab only when explicitly
+  // enabled at build time (NEXT_PUBLIC_API_EXPLORER=true) so production users
+  // don't see it. Base tabs (Overview, Invites, Files) are always present;
+  // Users/Logs/API are optional, so the column count is 3 + however many show.
+  const apiExplorerEnabled = process.env.NEXT_PUBLIC_API_EXPLORER === 'true';
+  const optionalTabCount =
+    (usersTab !== 'unknown' ? 1 : 0) + (logsTab !== 'unknown' ? 1 : 0) + (apiExplorerEnabled ? 1 : 0);
+  const tabColsClass =
+    optionalTabCount >= 3
+      ? 'md:grid-cols-6'
+      : optionalTabCount === 2
+        ? 'md:grid-cols-5'
+        : optionalTabCount === 1
+          ? 'md:grid-cols-4'
+          : 'md:grid-cols-3';
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
@@ -233,19 +249,7 @@ export default function DashboardPage() {
           />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList
-              className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${
-                // Base tabs (Overview, Invites, Files, API) = 4; plus 1 each for
-                // Users (homeserver exposes /admin/users/disabled) and Logs (log
-                // file readable). Tailwind needs literal class names so this
-                // expands to one of three constants.
-                usersTab !== 'unknown' && logsTab !== 'unknown'
-                  ? 'md:grid-cols-6'
-                  : usersTab !== 'unknown' || logsTab !== 'unknown'
-                    ? 'md:grid-cols-5'
-                    : 'md:grid-cols-4'
-              }`}
-            >
+            <TabsList className={`flex w-full scrollbar-none flex-nowrap overflow-x-auto md:grid ${tabColsClass}`}>
               <TabsTrigger value="overview" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
                 <Home className="shrink-0" />
                 Overview
@@ -278,10 +282,16 @@ export default function DashboardPage() {
                   Logs
                 </TabsTrigger>
               )}
-              <TabsTrigger value="api" className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4">
-                <Plug className="shrink-0" />
-                API
-              </TabsTrigger>
+              {apiExplorerEnabled && (
+                <TabsTrigger
+                  value="api"
+                  className="shrink-0 gap-2 text-xs sm:text-sm [&_svg]:size-4"
+                  data-testid="tab-api"
+                >
+                  <Plug className="shrink-0" />
+                  API
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
@@ -348,9 +358,11 @@ export default function DashboardPage() {
               </TabsContent>
             )}
 
-            <TabsContent value="api" className="space-y-4">
-              <ApiExplorer />
-            </TabsContent>
+            {apiExplorerEnabled && (
+              <TabsContent value="api" className="space-y-4">
+                <ApiExplorer />
+              </TabsContent>
+            )}
           </Tabs>
 
           {/* Config Dialog */}

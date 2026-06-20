@@ -22,6 +22,7 @@ import { RestartCallout } from '@/components/organisms/ConfigDialog/RestartCallo
 import { useRestartSentence } from '@/hooks/useRestartSentence';
 import { usePlatform } from '@/components/providers/PlatformProvider';
 import { classifyAddress, type AddressScope } from '@/lib/address-scope';
+import { publicAddressLink } from '@/lib/public-address';
 import { GetStartedChecklist } from './GetStartedChecklist';
 import { PkarrRecordViewer } from './PkarrRecordViewer';
 import type { DashboardOverviewProps, PkarrHealthResponse, PkarrVerdict } from './DashboardOverview.types';
@@ -660,10 +661,23 @@ export function DashboardOverview({
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {probeHostname && info.pkarr_icann_domain && (
                     <>
-                      <code className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all">
-                        {info.pkarr_icann_domain}
-                      </code>
-                      <CopyValueButton value={info.pkarr_icann_domain} label="Copy public address" />
+                      {/* The homeserver reports the domain with its publish port
+                          (e.g. host:443); render an openable link (drop :443,
+                          infer https) and copy that working URL, so a pasted
+                          address actually opens instead of failing on host:443. */}
+                      <a
+                        href={publicAddressLink(info.pkarr_icann_domain).href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 rounded bg-muted px-2 py-1 font-mono text-xs break-all text-foreground underline-offset-2 hover:underline"
+                        data-testid="public-address-link"
+                      >
+                        {publicAddressLink(info.pkarr_icann_domain).label}
+                      </a>
+                      <CopyValueButton
+                        value={publicAddressLink(info.pkarr_icann_domain).href}
+                        label="Copy public address"
+                      />
                       {isPreviewAddress && (
                         <PreviewModeBadge onSetUpCloudflare={platform === 'umbrel' ? onFixCloudflare : undefined} />
                       )}
