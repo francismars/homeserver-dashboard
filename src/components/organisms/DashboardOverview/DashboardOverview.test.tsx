@@ -286,8 +286,18 @@ describe('DashboardOverview server identity', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.public_key));
     fireEvent.click(screen.getByLabelText('Copy address'));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_pubky_address));
+    // The public address copies an openable URL (drop :443, infer https), not
+    // the bare host:443 that fails when pasted into a browser.
     fireEvent.click(screen.getByLabelText('Copy public address'));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(baseInfo.pkarr_icann_domain));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://pubky.example.com'));
+  });
+
+  it('the public address renders as an https link with the default port dropped', async () => {
+    mockBackend();
+    render(<DashboardOverview info={baseInfo} isLoading={false} error={null} />);
+    const link = await screen.findByTestId('public-address-link');
+    expect(link.getAttribute('href')).toBe('https://pubky.example.com');
+    expect(link.textContent).toBe('pubky.example.com');
   });
 });
 

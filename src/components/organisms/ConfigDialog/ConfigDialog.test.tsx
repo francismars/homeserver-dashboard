@@ -138,9 +138,9 @@ describe('ConfigDialog Cloudflare status surface', () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('cf-mode-badge')).toBeTruthy());
     expect(screen.getByTestId('cf-mode-badge').textContent).toBe('Preview');
-    await waitFor(() =>
-      expect(screen.getByTestId('cf-status-address').textContent).toBe('https://random.trycloudflare.com'),
-    );
+    // Rendered as a clickable link: clean host label, full https href.
+    await waitFor(() => expect(screen.getByTestId('cf-status-address').textContent).toBe('random.trycloudflare.com'));
+    expect(screen.getByTestId('cf-status-address').getAttribute('href')).toBe('https://random.trycloudflare.com');
     expect(screen.getByTestId('cf-disconnect')).toBeTruthy();
   });
 

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.26]
+
+### Fixed
+
+- The published "Public address" is now a working clickable link, and copying it gives a URL that opens. The homeserver reports its address with the publish port (e.g. `sub.trycloudflare.com:443`); pasting that bare `host:443` into a browser failed (the browser tried it over http on 443). The dashboard now drops the default port, infers `https`, and links/copies accordingly (Overview "Public address" and the Settings status address).
+
+### Changed
+
+- The **API** explorer tab is now hidden by default. It's a developer tool, so it only appears when the dashboard is built with `NEXT_PUBLIC_API_EXPLORER=true`; production users no longer see it (or its "Temporary" label).
+
 ## [0.1.25]
 
 ### Fixed

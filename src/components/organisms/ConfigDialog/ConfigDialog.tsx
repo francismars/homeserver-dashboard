@@ -17,6 +17,7 @@ import { CloudflarePreview } from './CloudflarePreview';
 import { RestartCallout } from './RestartCallout';
 import { useRestartSentence } from '@/hooks/useRestartSentence';
 import { usePlatform } from '@/components/providers/PlatformProvider';
+import { publicAddressLink } from '@/lib/public-address';
 
 type Tab = 'config' | 'cloudflare';
 type CloudflareMode = 'connect' | 'token' | 'preview' | 'off';
@@ -838,12 +839,33 @@ export function ConfigDialog({ open, onOpenChange, writable = false, focusCloudf
                       {cfMode !== 'off' && (
                         <div className="space-y-1">
                           <div className="flex items-center justify-between gap-3">
-                            <code
-                              className="truncate font-mono text-xs text-muted-foreground"
-                              data-testid="cf-status-address"
-                            >
-                              {cfMode === 'preview' ? (previewUrl ?? 'temporary address pending…') : cfConfig?.domain}
-                            </code>
+                            {(() => {
+                              const addr = cfMode === 'preview' ? previewUrl : cfConfig?.domain;
+                              if (!addr) {
+                                return (
+                                  <code
+                                    className="truncate font-mono text-xs text-muted-foreground"
+                                    data-testid="cf-status-address"
+                                  >
+                                    {cfMode === 'preview' ? 'temporary address pending…' : ''}
+                                  </code>
+                                );
+                              }
+                              // Drop :443 and infer https so the address opens
+                              // when clicked instead of failing on host:443.
+                              const link = publicAddressLink(addr);
+                              return (
+                                <a
+                                  href={link.href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="min-w-0 truncate font-mono text-xs text-brand underline-offset-2 hover:underline"
+                                  data-testid="cf-status-address"
+                                >
+                                  {link.label}
+                                </a>
+                              );
+                            })()}
                             <div className="flex shrink-0 items-center gap-2">
                               {(cfMode === 'connect' || cfMode === 'token') && cfConfig?.domain && (
                                 <>
