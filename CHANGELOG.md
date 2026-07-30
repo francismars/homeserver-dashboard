@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.27]
 
+### Added
+
+- An open invite QR now watches for its own redemption. While the QR is on screen the signup-code stats are re-read every few seconds, and when the unused count drops the invite switches to an "Invite used" confirmation and the counters update on their own. Redemption is detected from the admin stats rather than from the signup flow itself, so it also covers someone who joins by typing the homeserver and code into Pubky Ring by hand.
+
 ### Fixed
 
 - The invite QR code and link now carry the `pubkyauth://direct_signup` intent. `pubkyauth://signup` is the relayed cookie flow and expects `caps`, `relay` and `secret`, which an invite has none of: Pubky Ring created the account from the scan and then errored trying to deliver the authorization to a relay that was never in the link. `direct_signup` registers the account on the target homeserver with the invite token and stops there. Needs a Pubky Ring build that understands the intent.

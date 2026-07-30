@@ -7,9 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Copy, Check, QrCode, X, Gift, Plus } from 'lucide-react';
+import { Info, Copy, Check, QrCode, X, Gift, Plus, CircleCheckBig, RefreshCw } from 'lucide-react';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
+import { usePolling } from '@/hooks/usePolling';
 import { QRCodeSVG } from 'qrcode.react';
+
+/** How often the signup-code stats are re-read while a QR is on screen. */
+const WATCH_POLL_MS = 3000;
 
 export interface InviteManagementProps {
   invites: string[];
@@ -21,6 +25,8 @@ export interface InviteManagementProps {
   signupCodesUnused?: number;
   isStatsLoading?: boolean;
   homeserverPubkey?: string;
+  /** Background re-read of the signup-code stats, polled while a QR is open. */
+  onRefreshStats?: () => void | Promise<void>;
 }
 
 /** "Get Pubky Ring" assist, shown wherever the app is a prerequisite. */
@@ -50,9 +56,11 @@ export function InviteManagement({
   signupCodesUnused,
   isStatsLoading,
   homeserverPubkey,
+  onRefreshStats,
 }: InviteManagementProps) {
   const { copiedKey, copy } = useCopyFeedback();
   const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
+  const [redeemedInvites, setRedeemedInvites] = useState<Set<string>>(() => new Set());
 
   // Auto-expand the QR for a freshly-created invite, but not for invites
   // already present on first mount. useAdminActions prepends new tokens at
@@ -64,6 +72,22 @@ export function InviteManagement({
       justCreatedRef.current = false;
     }
   }, [invites.length]);
+
+  const watchedInvite = expandedInviteIndex === null ? null : (invites[expandedInviteIndex] ?? null);
+  const isWatching = watchedInvite !== null && !redeemedInvites.has(watchedInvite);
+
+  usePolling(() => onRefreshStats?.(), WATCH_POLL_MS, { enabled: isWatching && Boolean(onRefreshStats) });
+
+  // Redemption is only visible as a drop in the unused count: the admin API has
+  // no per-code status. One QR is open at a time, so the drop belongs to it.
+  const previousUnusedRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const previousUnused = previousUnusedRef.current;
+    previousUnusedRef.current = signupCodesUnused;
+    if (previousUnused === undefined || signupCodesUnused === undefined) return;
+    if (signupCodesUnused >= previousUnused || !watchedInvite) return;
+    setRedeemedInvites((current) => new Set(current).add(watchedInvite));
+  }, [signupCodesUnused, watchedInvite]);
 
   const hasStats = typeof signupCodesTotal === 'number' && typeof signupCodesUnused === 'number';
   const totalGenerated = hasStats ? signupCodesTotal : undefined;
@@ -199,6 +223,7 @@ export function InviteManagement({
               {invites.map((invite, index) => {
                 const signupUrl = generateSignupUrl(invite);
                 const isExpanded = expandedInviteIndex === index;
+                const isRedeemed = redeemedInvites.has(invite);
                 return (
                   <div key={index} className="rounded-lg border bg-muted/40 p-3 sm:p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -209,6 +234,11 @@ export function InviteManagement({
                           </span>
                         )}
                         <code className="font-mono text-xs break-all sm:text-sm sm:break-normal">{invite}</code>
+                        {isRedeemed && (
+                          <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
+                            Used
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex shrink-0 gap-2">
                         <Button
@@ -238,8 +268,26 @@ export function InviteManagement({
                       </div>
                     </div>
 
+                    {isExpanded && signupUrl && isRedeemed && (
+                      <div
+                        data-testid={`invite-redeemed-${index}`}
+                        className="mt-4 animate-in rounded-lg border border-brand bg-brand/16 p-4 fade-in"
+                      >
+                        <div className="flex items-start gap-2">
+                          <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">Invite used</p>
+                            <p className="text-xs text-muted-foreground">
+                              An account was just created on this homeserver with this code. The code is spent, so share
+                              a new one for the next person.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Expanded QR Code / Signup URL Section */}
-                    {isExpanded && signupUrl && (
+                    {isExpanded && signupUrl && !isRedeemed && (
                       <div className="mt-4 rounded-lg border bg-muted/30 p-4">
                         <p className="mb-3 text-xs font-medium text-muted-foreground">
                           Share invite - scan with Pubky Ring or copy the link
@@ -279,6 +327,11 @@ export function InviteManagement({
                             <div className="mt-1">
                               <PubkyRingAssist />
                             </div>
+                            {onRefreshStats && (
+                              <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <RefreshCw className="h-3 w-3 animate-spin" /> Waiting for the signup to complete…
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

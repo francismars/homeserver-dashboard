@@ -67,6 +67,65 @@ describe('InviteManagement QR panel', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(EXPECTED_URL));
   });
 
+  it('polls the stats only while a QR is open, and stops once the code is redeemed', async () => {
+    vi.useFakeTimers();
+    try {
+      const onRefreshStats = vi.fn();
+      const view = render(
+        <InviteManagement
+          invites={[INVITE]}
+          onGenerate={noop}
+          homeserverPubkey={HOMESERVER}
+          signupCodesTotal={1}
+          signupCodesUnused={1}
+          onRefreshStats={onRefreshStats}
+        />,
+      );
+
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(onRefreshStats).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByLabelText('Show invite QR code'));
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(onRefreshStats).toHaveBeenCalled();
+
+      // The unused count dropping while this QR is on screen is the redemption.
+      const callsBeforeRedemption = onRefreshStats.mock.calls.length;
+      view.rerender(
+        <InviteManagement
+          invites={[INVITE]}
+          onGenerate={noop}
+          homeserverPubkey={HOMESERVER}
+          signupCodesTotal={1}
+          signupCodesUnused={0}
+          onRefreshStats={onRefreshStats}
+        />,
+      );
+
+      expect(screen.getByTestId('invite-redeemed-0')).toBeTruthy();
+      expect(screen.getByText('Invite used')).toBeTruthy();
+      expect(screen.queryByText(EXPECTED_URL)).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(onRefreshStats.mock.calls.length).toBe(callsBeforeRedemption);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a count drop while no QR is open', () => {
+    const props = {
+      invites: [INVITE],
+      onGenerate: noop,
+      homeserverPubkey: HOMESERVER,
+      signupCodesTotal: 1,
+      onRefreshStats: vi.fn(),
+    };
+    const view = render(<InviteManagement {...props} signupCodesUnused={1} />);
+    view.rerender(<InviteManagement {...props} signupCodesUnused={0} />);
+    expect(screen.queryByText('Invite used')).toBeNull();
+  });
+
   it('explains the pubkyauth link needs Pubky Ring and links to pubkyring.app', () => {
     render(<InviteManagement invites={[INVITE]} onGenerate={noop} homeserverPubkey={HOMESERVER} />);
     fireEvent.click(screen.getByLabelText('Show invite QR code'));

@@ -50,6 +50,9 @@ export function useAdminInfo() {
 
   const refetch = useCallback(() => fetchInfo(false), [fetchInfo]);
 
+  /** Background refresh for callers that watch a value change (no skeletons). */
+  const refresh = useCallback(() => fetchInfo(true), [fetchInfo]);
+
   useEffect(() => {
     isMountedRef.current = true;
     void refetch();
@@ -71,5 +74,5 @@ export function useAdminInfo() {
     { enabled: !data || !!error },
   );
 
-  return { data, isLoading, error, refetch };
+  return { data, isLoading, error, refetch, refresh };
 }
