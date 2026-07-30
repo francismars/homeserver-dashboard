@@ -15,6 +15,9 @@ import { QRCodeSVG } from 'qrcode.react';
 /** How often the signup-code stats are re-read while a QR is on screen. */
 const WATCH_POLL_MS = 3000;
 
+/** How long an open QR keeps polling before it stops on its own. */
+const WATCH_TIMEOUT_MS = 5 * 60 * 1000;
+
 export interface InviteManagementProps {
   invites: string[];
   onGenerate: () => Promise<void>;
@@ -60,7 +63,8 @@ export function InviteManagement({
 }: InviteManagementProps) {
   const { copiedKey, copy } = useCopyFeedback();
   const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
-  const [redeemedInvites, setRedeemedInvites] = useState<Set<string>>(() => new Set());
+  const [signupSeenWhileOpen, setSignupSeenWhileOpen] = useState<Set<string>>(() => new Set());
+  const [watchExpired, setWatchExpired] = useState(false);
 
   // Auto-expand the QR for a freshly-created invite, but not for invites
   // already present on first mount. useAdminActions prepends new tokens at
@@ -73,26 +77,36 @@ export function InviteManagement({
     }
   }, [invites.length]);
 
-  const watchedInvite = expandedInviteIndex === null ? null : (invites[expandedInviteIndex] ?? null);
-  const isWatching = watchedInvite !== null && !redeemedInvites.has(watchedInvite);
-
-  usePolling(() => onRefreshStats?.(), WATCH_POLL_MS, { enabled: isWatching && Boolean(onRefreshStats) });
-
-  // Redemption is only visible as a drop in the unused count: the admin API has
-  // no per-code status. One QR is open at a time, so the drop belongs to it.
-  const previousUnusedRef = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    const previousUnused = previousUnusedRef.current;
-    previousUnusedRef.current = signupCodesUnused;
-    if (previousUnused === undefined || signupCodesUnused === undefined) return;
-    if (signupCodesUnused >= previousUnused || !watchedInvite) return;
-    setRedeemedInvites((current) => new Set(current).add(watchedInvite));
-  }, [signupCodesUnused, watchedInvite]);
-
   const hasStats = typeof signupCodesTotal === 'number' && typeof signupCodesUnused === 'number';
   const totalGenerated = hasStats ? signupCodesTotal : undefined;
   const totalUnused = hasStats ? signupCodesUnused : undefined;
   const totalUsed = hasStats ? Math.max(0, signupCodesTotal - signupCodesUnused) : undefined;
+
+  const watchedInvite = expandedInviteIndex === null ? null : (invites[expandedInviteIndex] ?? null);
+  const isWatching = watchedInvite !== null && !watchExpired && !signupSeenWhileOpen.has(watchedInvite);
+
+  usePolling(() => onRefreshStats?.(), WATCH_POLL_MS, { enabled: isWatching && Boolean(onRefreshStats) });
+
+  // Give up on an unattended panel rather than polling the homeserver forever.
+  useEffect(() => {
+    setWatchExpired(false);
+    if (!watchedInvite) return;
+    const timer = setTimeout(() => setWatchExpired(true), WATCH_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [watchedInvite]);
+
+  // A signup shows up as the used count going up. Watching "used" rather than
+  // "unused" survives an invite being created in the same interval, which moves
+  // both other counters. Which code was spent is not knowable here: the admin
+  // API reports totals only, so the panel reports the signup, not the code.
+  const previousUsedRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const previousUsed = previousUsedRef.current;
+    previousUsedRef.current = totalUsed;
+    if (previousUsed === undefined || totalUsed === undefined) return;
+    if (totalUsed <= previousUsed || !watchedInvite) return;
+    setSignupSeenWhileOpen((current) => new Set(current).add(watchedInvite));
+  }, [totalUsed, watchedInvite]);
 
   const handleCopy = async (invite: string, index: number) => {
     // Copy failures (clipboard unavailable) are silent.
@@ -223,7 +237,7 @@ export function InviteManagement({
               {invites.map((invite, index) => {
                 const signupUrl = generateSignupUrl(invite);
                 const isExpanded = expandedInviteIndex === index;
-                const isRedeemed = redeemedInvites.has(invite);
+                const sawSignup = signupSeenWhileOpen.has(invite);
                 return (
                   <div key={index} className="rounded-lg border bg-muted/40 p-3 sm:p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -234,11 +248,6 @@ export function InviteManagement({
                           </span>
                         )}
                         <code className="font-mono text-xs break-all sm:text-sm sm:break-normal">{invite}</code>
-                        {isRedeemed && (
-                          <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
-                            Used
-                          </Badge>
-                        )}
                       </div>
                       <div className="flex shrink-0 gap-2">
                         <Button
@@ -268,18 +277,18 @@ export function InviteManagement({
                       </div>
                     </div>
 
-                    {isExpanded && signupUrl && isRedeemed && (
+                    {isExpanded && signupUrl && sawSignup && (
                       <div
-                        data-testid={`invite-redeemed-${index}`}
+                        data-testid={`invite-signup-seen-${index}`}
                         className="mt-4 animate-in rounded-lg border border-brand bg-brand/16 p-4 fade-in"
                       >
                         <div className="flex items-start gap-2">
                           <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground">Invite used</p>
+                            <p className="text-sm font-medium text-foreground">Someone just joined</p>
                             <p className="text-xs text-muted-foreground">
-                              An account was just created on this homeserver with this code. The code is spent, so share
-                              a new one for the next person.
+                              An invite code was used while this QR was open. The homeserver only reports totals, so if
+                              it was this code, it will not work a second time.
                             </p>
                           </div>
                         </div>
@@ -287,7 +296,7 @@ export function InviteManagement({
                     )}
 
                     {/* Expanded QR Code / Signup URL Section */}
-                    {isExpanded && signupUrl && !isRedeemed && (
+                    {isExpanded && signupUrl && (
                       <div className="mt-4 rounded-lg border bg-muted/30 p-4">
                         <p className="mb-3 text-xs font-medium text-muted-foreground">
                           Share invite - scan with Pubky Ring or copy the link
@@ -327,9 +336,9 @@ export function InviteManagement({
                             <div className="mt-1">
                               <PubkyRingAssist />
                             </div>
-                            {onRefreshStats && (
+                            {isWatching && onRefreshStats && (
                               <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <RefreshCw className="h-3 w-3 animate-spin" /> Waiting for the signup to complete…
+                                <RefreshCw className="h-3 w-3 animate-spin" /> Waiting for a signup…
                               </p>
                             )}
                           </div>

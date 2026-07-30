@@ -67,20 +67,20 @@ describe('InviteManagement QR panel', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(EXPECTED_URL));
   });
 
-  it('polls the stats only while a QR is open, and stops once the code is redeemed', async () => {
+  const watchProps = (total: number, unused: number, onRefreshStats: () => void) => ({
+    invites: [INVITE],
+    onGenerate: noop,
+    homeserverPubkey: HOMESERVER,
+    signupCodesTotal: total,
+    signupCodesUnused: unused,
+    onRefreshStats,
+  });
+
+  it('polls the stats only while a QR is open, and stops once a signup lands', async () => {
     vi.useFakeTimers();
     try {
       const onRefreshStats = vi.fn();
-      const view = render(
-        <InviteManagement
-          invites={[INVITE]}
-          onGenerate={noop}
-          homeserverPubkey={HOMESERVER}
-          signupCodesTotal={1}
-          signupCodesUnused={1}
-          onRefreshStats={onRefreshStats}
-        />,
-      );
+      const view = render(<InviteManagement {...watchProps(1, 1, onRefreshStats)} />);
 
       await vi.advanceTimersByTimeAsync(7000);
       expect(onRefreshStats).not.toHaveBeenCalled();
@@ -89,41 +89,64 @@ describe('InviteManagement QR panel', () => {
       await vi.advanceTimersByTimeAsync(7000);
       expect(onRefreshStats).toHaveBeenCalled();
 
-      // The unused count dropping while this QR is on screen is the redemption.
-      const callsBeforeRedemption = onRefreshStats.mock.calls.length;
-      view.rerender(
-        <InviteManagement
-          invites={[INVITE]}
-          onGenerate={noop}
-          homeserverPubkey={HOMESERVER}
-          signupCodesTotal={1}
-          signupCodesUnused={0}
-          onRefreshStats={onRefreshStats}
-        />,
-      );
+      // A signup is the used count going up (total 1 - unused 0).
+      const callsBeforeSignup = onRefreshStats.mock.calls.length;
+      view.rerender(<InviteManagement {...watchProps(1, 0, onRefreshStats)} />);
 
-      expect(screen.getByTestId('invite-redeemed-0')).toBeTruthy();
-      expect(screen.getByText('Invite used')).toBeTruthy();
-      expect(screen.queryByText(EXPECTED_URL)).toBeNull();
+      expect(screen.getByTestId('invite-signup-seen-0')).toBeTruthy();
+      expect(screen.getByText('Someone just joined')).toBeTruthy();
+      // The code cannot be attributed, so its QR and link stay usable.
+      expect(screen.getByText(EXPECTED_URL)).toBeTruthy();
 
       await vi.advanceTimersByTimeAsync(7000);
-      expect(onRefreshStats.mock.calls.length).toBe(callsBeforeRedemption);
+      expect(onRefreshStats.mock.calls.length).toBe(callsBeforeSignup);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('ignores a count drop while no QR is open', () => {
-    const props = {
-      invites: [INVITE],
-      onGenerate: noop,
-      homeserverPubkey: HOMESERVER,
-      signupCodesTotal: 1,
-      onRefreshStats: vi.fn(),
-    };
-    const view = render(<InviteManagement {...props} signupCodesUnused={1} />);
-    view.rerender(<InviteManagement {...props} signupCodesUnused={0} />);
-    expect(screen.queryByText('Invite used')).toBeNull();
+  it('detects a signup even when an invite is created in the same interval', () => {
+    const onRefreshStats = vi.fn();
+    const view = render(<InviteManagement {...watchProps(1, 1, onRefreshStats)} />);
+    fireEvent.click(screen.getByLabelText('Show invite QR code'));
+
+    // One code redeemed and one created between polls: unused is unchanged, so
+    // only the used count reveals the signup.
+    view.rerender(<InviteManagement {...watchProps(2, 1, onRefreshStats)} />);
+    expect(screen.getByTestId('invite-signup-seen-0')).toBeTruthy();
+  });
+
+  it('ignores a signup while no QR is open, and opening one afterwards shows no banner', () => {
+    const onRefreshStats = vi.fn();
+    const view = render(<InviteManagement {...watchProps(1, 1, onRefreshStats)} />);
+    view.rerender(<InviteManagement {...watchProps(1, 0, onRefreshStats)} />);
+
+    fireEvent.click(screen.getByLabelText('Show invite QR code'));
+    expect(screen.queryByTestId('invite-signup-seen-0')).toBeNull();
+    expect(screen.getByText(EXPECTED_URL)).toBeTruthy();
+  });
+
+  it('stops polling an unattended QR after the watch window', async () => {
+    vi.useFakeTimers();
+    try {
+      const onRefreshStats = vi.fn();
+      render(<InviteManagement {...watchProps(1, 1, onRefreshStats)} />);
+      fireEvent.click(screen.getByLabelText('Show invite QR code'));
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      const callsInFirstMinute = onRefreshStats.mock.calls.length;
+      expect(callsInFirstMinute).toBeGreaterThan(10);
+
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      const callsAfterWindow = onRefreshStats.mock.calls.length;
+      expect(callsAfterWindow).toBeLessThan(callsInFirstMinute * 6);
+
+      const settled = onRefreshStats.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(onRefreshStats.mock.calls.length).toBe(settled);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('explains the pubkyauth link needs Pubky Ring and links to pubkyring.app', () => {

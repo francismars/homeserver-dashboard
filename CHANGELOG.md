@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- An open invite QR now watches for its own redemption. While the QR is on screen the signup-code stats are re-read every few seconds, and when the unused count drops the invite switches to an "Invite used" confirmation and the counters update on their own. Redemption is detected from the admin stats rather than from the signup flow itself, so it also covers someone who joins by typing the homeserver and code into Pubky Ring by hand.
+- An open invite QR now reports signups as they happen. While the QR is on screen the signup-code stats are re-read every few seconds, and a rise in the used count shows a "Someone just joined" confirmation with the counters updated. The homeserver reports totals only, with no per-code status, so the panel says a code was used without claiming it was this one, and the QR stays on screen and usable. Watching comes from the admin stats rather than the signup flow, so it also covers someone who joins by typing the homeserver and code into Pubky Ring by hand. An unattended panel stops polling after five minutes.
 
 ### Fixed
 
