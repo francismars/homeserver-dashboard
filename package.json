@@ -1,6 +1,6 @@
 {
   "name": "homeserver-dashboard",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "private": true,
   "engines": {
     "node": ">=24"

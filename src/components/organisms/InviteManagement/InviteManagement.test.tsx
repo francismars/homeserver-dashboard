@@ -1,8 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InviteManagement } from './InviteManagement';
 
 const noop = vi.fn().mockResolvedValue(undefined);
+
+const HOMESERVER = 'x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o';
+const INVITE = 'AAAA-BBBB';
+const EXPECTED_URL = `pubkyauth://direct_signup?hs=${HOMESERVER}&st=${INVITE}`;
 
 describe('InviteManagement generation failure', () => {
   it('renders an inline destructive alert with the error and a retry hint', () => {
@@ -44,14 +48,27 @@ describe('InviteManagement session-only list', () => {
 });
 
 describe('InviteManagement QR panel', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  // Pubky Ring reads the intent, not just the params: `signup` is the relayed
+  // cookie flow, so an invite must go out as `direct_signup`.
+  it('encodes the invite as a direct_signup deeplink, shown and copied verbatim', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    render(<InviteManagement invites={[INVITE]} onGenerate={noop} homeserverPubkey={HOMESERVER} />);
+    fireEvent.click(screen.getByLabelText('Show invite QR code'));
+
+    expect(screen.getByText(EXPECTED_URL)).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText('Copy invite URL 1'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(EXPECTED_URL));
+  });
+
   it('explains the pubkyauth link needs Pubky Ring and links to pubkyring.app', () => {
-    render(
-      <InviteManagement
-        invites={['AAAA-BBBB']}
-        onGenerate={noop}
-        homeserverPubkey="x8mmbr5hgsitzp7cigkfewmpqx8j5c9ot4kxe1sfniaeqgys9q6o"
-      />,
-    );
+    render(<InviteManagement invites={[INVITE]} onGenerate={noop} homeserverPubkey={HOMESERVER} />);
     fireEvent.click(screen.getByLabelText('Show invite QR code'));
     expect(screen.getByText(/only opens on a device with Pubky Ring installed/)).toBeTruthy();
     expect(screen.getByText(/Don't have Pubky Ring yet\?/)).toBeTruthy();

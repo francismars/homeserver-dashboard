@@ -75,9 +75,12 @@ export function InviteManagement({
     await copy(invite, `code-${index}`);
   };
 
+  // `direct_signup` registers the account on this homeserver straight away. The
+  // plain `signup` intent is the relayed cookie flow and needs caps/relay/secret,
+  // which an invite has none of.
   const generateSignupUrl = (inviteCode: string): string | null => {
     if (!homeserverPubkey) return null;
-    return `pubkyauth://signup?hs=${encodeURIComponent(homeserverPubkey)}&st=${encodeURIComponent(inviteCode)}`;
+    return `pubkyauth://direct_signup?hs=${encodeURIComponent(homeserverPubkey)}&st=${encodeURIComponent(inviteCode)}`;
   };
 
   const handleCopyUrl = async (inviteCode: string, index: number) => {
