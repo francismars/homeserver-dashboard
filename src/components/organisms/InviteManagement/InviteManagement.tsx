@@ -97,8 +97,11 @@ export function InviteManagement({
 
   // A signup shows up as the used count going up. Watching "used" rather than
   // "unused" survives an invite being created in the same interval, which moves
-  // both other counters. Which code was spent is not knowable here: the admin
-  // API reports totals only, so the panel reports the signup, not the code.
+  // both other counters. Which code was spent is not knowable on the homeserver
+  // this app ships: its admin API reports totals only, so the panel reports the
+  // signup and never names the code. Newer homeservers expose per-code usage
+  // (`used_at`/`used_by`) on the signup_tokens admin endpoint; move this watch
+  // over to that, and drop the counting, once the app runs one.
   const previousUsedRef = useRef<number | undefined>(undefined);
   useEffect(() => {
     const previousUsed = previousUsedRef.current;
