@@ -53,7 +53,13 @@ function TabUnavailableNotice() {
 
 export default function DashboardPage() {
   const platform = usePlatform();
-  const { data: info, isLoading: infoLoading, error: infoError, refetch: refetchInfo } = useAdminInfo();
+  const {
+    data: info,
+    isLoading: infoLoading,
+    error: infoError,
+    refetch: refetchInfo,
+    refresh: refreshInfo,
+  } = useAdminInfo();
   const {
     disableUser,
     enableUser,
@@ -341,6 +347,7 @@ export default function DashboardPage() {
                 signupCodesUnused={info?.num_unused_signup_codes}
                 isStatsLoading={infoLoading}
                 homeserverPubkey={info?.public_key ?? info?.pubkey}
+                onRefreshStats={refreshInfo}
               />
             </TabsContent>
 

@@ -16,16 +16,21 @@ export function useAdminInfo() {
 
   const isMountedRef = useRef(true);
   const fetchIdRef = useRef(0);
+  const loadingFetchIdRef = useRef(0);
   const inFlightRef = useRef(false);
 
-  // `silent` fetches (the background retries) never touch isLoading, so the
-  // page keeps showing the error explanation instead of flashing skeletons.
+  // `silent` fetches (background retries and watch polls) never touch isLoading
+  // or raise an error, so the page keeps showing whatever it already shows
+  // instead of flashing skeletons or a connection error over good data. Their
+  // spinner bookkeeping is tracked separately: a silent fetch overtaking a
+  // manual one must not leave the manual one's skeletons up for good.
   const fetchInfo = useCallback(async (silent: boolean) => {
     const service = getService();
     const fetchId = ++fetchIdRef.current;
     inFlightRef.current = true;
 
     if (!silent) {
+      loadingFetchIdRef.current = fetchId;
       setIsLoading(true);
       setError(null);
     }
@@ -38,17 +43,23 @@ export function useAdminInfo() {
       setError(null);
     } catch (err) {
       if (!isMountedRef.current) return;
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current || silent) return;
       setError(err instanceof Error ? err : new Error('Failed to load server info'));
     } finally {
       if (fetchId === fetchIdRef.current) inFlightRef.current = false;
-      if (isMountedRef.current && fetchId === fetchIdRef.current && !silent) {
+      if (isMountedRef.current && !silent && fetchId === loadingFetchIdRef.current) {
         setIsLoading(false);
       }
     }
   }, []);
 
   const refetch = useCallback(() => fetchInfo(false), [fetchInfo]);
+
+  /** Background refresh for callers that watch a value change (no skeletons). */
+  const refresh = useCallback(async () => {
+    if (inFlightRef.current) return;
+    await fetchInfo(true);
+  }, [fetchInfo]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -71,5 +82,5 @@ export function useAdminInfo() {
     { enabled: !data || !!error },
   );
 
-  return { data, isLoading, error, refetch };
+  return { data, isLoading, error, refetch, refresh };
 }

@@ -7,9 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Copy, Check, QrCode, X, Gift, Plus } from 'lucide-react';
+import { Info, Copy, Check, QrCode, X, Gift, Plus, CircleCheckBig, RefreshCw } from 'lucide-react';
 import { useCopyFeedback } from '@/hooks/useCopyFeedback';
+import { usePolling } from '@/hooks/usePolling';
 import { QRCodeSVG } from 'qrcode.react';
+
+/** How often the signup-code stats are re-read while a QR is on screen. */
+const WATCH_POLL_MS = 3000;
+
+/** How long an open QR keeps polling before it stops on its own. */
+const WATCH_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface InviteManagementProps {
   invites: string[];
@@ -21,6 +28,8 @@ export interface InviteManagementProps {
   signupCodesUnused?: number;
   isStatsLoading?: boolean;
   homeserverPubkey?: string;
+  /** Background re-read of the signup-code stats, polled while a QR is open. */
+  onRefreshStats?: () => void | Promise<void>;
 }
 
 /** "Get Pubky Ring" assist, shown wherever the app is a prerequisite. */
@@ -50,9 +59,12 @@ export function InviteManagement({
   signupCodesUnused,
   isStatsLoading,
   homeserverPubkey,
+  onRefreshStats,
 }: InviteManagementProps) {
   const { copiedKey, copy } = useCopyFeedback();
   const [expandedInviteIndex, setExpandedInviteIndex] = useState<number | null>(null);
+  const [signupSeenWhileOpen, setSignupSeenWhileOpen] = useState<Set<string>>(() => new Set());
+  const [watchExpired, setWatchExpired] = useState(false);
 
   // Auto-expand the QR for a freshly-created invite, but not for invites
   // already present on first mount. useAdminActions prepends new tokens at
@@ -70,14 +82,46 @@ export function InviteManagement({
   const totalUnused = hasStats ? signupCodesUnused : undefined;
   const totalUsed = hasStats ? Math.max(0, signupCodesTotal - signupCodesUnused) : undefined;
 
+  const watchedInvite = expandedInviteIndex === null ? null : (invites[expandedInviteIndex] ?? null);
+  const isWatching = watchedInvite !== null && !watchExpired && !signupSeenWhileOpen.has(watchedInvite);
+
+  usePolling(() => onRefreshStats?.(), WATCH_POLL_MS, { enabled: isWatching && Boolean(onRefreshStats) });
+
+  // Give up on an unattended panel rather than polling the homeserver forever.
+  useEffect(() => {
+    setWatchExpired(false);
+    if (!watchedInvite) return;
+    const timer = setTimeout(() => setWatchExpired(true), WATCH_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [watchedInvite]);
+
+  // A signup shows up as the used count going up. Watching "used" rather than
+  // "unused" survives an invite being created in the same interval, which moves
+  // both other counters. Which code was spent is not knowable on the homeserver
+  // this app ships: its admin API reports totals only, so the panel reports the
+  // signup and never names the code. Newer homeservers expose per-code usage
+  // (`used_at`/`used_by`) on the signup_tokens admin endpoint; move this watch
+  // over to that, and drop the counting, once the app runs one.
+  const previousUsedRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const previousUsed = previousUsedRef.current;
+    previousUsedRef.current = totalUsed;
+    if (previousUsed === undefined || totalUsed === undefined) return;
+    if (totalUsed <= previousUsed || !watchedInvite) return;
+    setSignupSeenWhileOpen((current) => new Set(current).add(watchedInvite));
+  }, [totalUsed, watchedInvite]);
+
   const handleCopy = async (invite: string, index: number) => {
     // Copy failures (clipboard unavailable) are silent.
     await copy(invite, `code-${index}`);
   };
 
+  // `direct_signup` registers the account on this homeserver straight away. The
+  // plain `signup` intent is the relayed cookie flow and needs caps/relay/secret,
+  // which an invite has none of.
   const generateSignupUrl = (inviteCode: string): string | null => {
     if (!homeserverPubkey) return null;
-    return `pubkyauth://signup?hs=${encodeURIComponent(homeserverPubkey)}&st=${encodeURIComponent(inviteCode)}`;
+    return `pubkyauth://direct_signup?hs=${encodeURIComponent(homeserverPubkey)}&st=${encodeURIComponent(inviteCode)}`;
   };
 
   const handleCopyUrl = async (inviteCode: string, index: number) => {
@@ -196,6 +240,7 @@ export function InviteManagement({
               {invites.map((invite, index) => {
                 const signupUrl = generateSignupUrl(invite);
                 const isExpanded = expandedInviteIndex === index;
+                const sawSignup = signupSeenWhileOpen.has(invite);
                 return (
                   <div key={index} className="rounded-lg border bg-muted/40 p-3 sm:p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -234,6 +279,24 @@ export function InviteManagement({
                         )}
                       </div>
                     </div>
+
+                    {isExpanded && signupUrl && sawSignup && (
+                      <div
+                        data-testid={`invite-signup-seen-${index}`}
+                        className="mt-4 animate-in rounded-lg border border-brand bg-brand/16 p-4 fade-in"
+                      >
+                        <div className="flex items-start gap-2">
+                          <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">Someone just joined</p>
+                            <p className="text-xs text-muted-foreground">
+                              An invite code was used while this QR was open. The homeserver only reports totals, so if
+                              it was this code, it will not work a second time.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Expanded QR Code / Signup URL Section */}
                     {isExpanded && signupUrl && (
@@ -276,6 +339,11 @@ export function InviteManagement({
                             <div className="mt-1">
                               <PubkyRingAssist />
                             </div>
+                            {isWatching && onRefreshStats && (
+                              <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <RefreshCw className="h-3 w-3 animate-spin" /> Waiting for a signup…
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

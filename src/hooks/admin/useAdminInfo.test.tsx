@@ -121,6 +121,82 @@ describe('useAdminInfo', () => {
     }
   });
 
+  it('refresh updates data without flipping isLoading', async () => {
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(okBody, { status: 200, headers: jsonHeaders }));
+
+    const { result } = renderHook(() => useAdminInfo());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ...JSON.parse(okBody), num_unused_signup_codes: 0 }), {
+        status: 200,
+        headers: jsonHeaders,
+      }),
+    );
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current.data?.num_unused_signup_codes).toBe(0);
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it('a failing refresh leaves the good data and does not raise a connection error', async () => {
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(okBody, { status: 200, headers: jsonHeaders }));
+
+    const { result } = renderHook(() => useAdminInfo());
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'blip' }), { status: 502, headers: jsonHeaders }));
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.data?.version).toBe('1.0.0');
+  });
+
+  // A watch poll landing on top of a manual refetch used to strand isLoading at
+  // true, leaving skeletons over the whole page until the next manual fetch.
+  it('a refresh during an in-flight refetch is skipped, and isLoading still clears', async () => {
+    let releaseSlowFetch: (() => void) | undefined;
+    const slowResponse = new Promise<Response>((resolve) => {
+      releaseSlowFetch = () => resolve(new Response(okBody, { status: 200, headers: jsonHeaders }));
+    });
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(okBody, { status: 200, headers: jsonHeaders }));
+
+    const { result } = renderHook(() => useAdminInfo());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    fetchMock.mockReturnValueOnce(slowResponse);
+    const callsBefore = fetchMock.mock.calls.length;
+    let refetchDone: Promise<void> | undefined;
+    act(() => {
+      refetchDone = result.current.refetch();
+    });
+    expect(result.current.isLoading).toBe(true);
+
+    // The 3s watch poll lands while the manual refetch is still in the air.
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
+
+    await act(async () => {
+      releaseSlowFetch?.();
+      await refetchDone;
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
   it('never stacks requests: a hanging fetch suppresses further retries', async () => {
     vi.useFakeTimers();
     try {
